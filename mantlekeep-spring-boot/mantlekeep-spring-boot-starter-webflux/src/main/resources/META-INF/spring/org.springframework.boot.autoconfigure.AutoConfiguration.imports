@@ -1,0 +1,2 @@
+dev.mantlekeep.springboot.webflux.config.MantlekeepAutoConfiguration
+dev.mantlekeep.springboot.webflux.identity.MantlekeepIdentityAutoConfiguration

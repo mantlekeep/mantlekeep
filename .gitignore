@@ -1,0 +1,22 @@
+# Build outputs
+build/
+.gradle/
+bin/
+out/
+
+# Go
+*.test
+*.out
+
+# Runtime data (audit chain, event/store databases)
+*.db
+*.db-*
+mantlekeep-data/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log

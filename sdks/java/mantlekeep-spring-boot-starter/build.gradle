@@ -1,0 +1,29 @@
+// mantlekeep-spring-boot-starter — the ergonomics: a product adds THIS dependency plus a
+// few mantlekeep.door.* properties and gets governance with ZERO wiring code. Rides
+// Spring's DI and AOP (never hand-rolled reflection): auto-configuration builds the
+// DoorClient bean from properties; @MantlekeepIntent + an aspect governs BEFORE execution.
+plugins { id 'java-library' }
+
+compileJava.options.release = 17
+compileTestJava.options.release = 17
+// The aspect binds its annotation parameter by NAME (@Around("@annotation(governedIntent)")).
+compileJava.options.compilerArgs << '-parameters'
+
+dependencies {
+    api project(':mantlekeep-door-client')
+
+    implementation 'org.springframework.boot:spring-boot:4.1.0'
+    implementation 'org.springframework.boot:spring-boot-autoconfigure:4.1.0'
+    implementation 'org.springframework:spring-context:7.0.8'
+    implementation 'org.springframework:spring-aop:7.0.8'
+    implementation 'org.aspectj:aspectjweaver:1.9.25.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+    testImplementation 'org.springframework.boot:spring-boot-test:4.1.0'
+    testImplementation 'org.springframework:spring-test:7.0.8'
+    // ApplicationContextRunner's context type implements AssertJ's AssertProvider.
+    testImplementation 'org.assertj:assertj-core:3.27.7'
+}
+
+tasks.named('test') { useJUnitPlatform() }

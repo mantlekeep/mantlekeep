@@ -1,0 +1,19 @@
+// mantlekeep-door-client — the door abstraction, FRAMEWORK-AGNOSTIC: no Spring, no JSON
+// library, pure JDK (java.net.http + the same regex-JSON discipline as the flat client).
+// Two DoorClient implementations, one interface, mode chosen by config:
+//   service  → HTTP to the remote door (prod — scalable, shared chain)
+//   embedded → the in-process native core behind the NativeCore port (tests/dev/air-gap)
+// SACRED library module: additive only, semver, ABI-minded.
+plugins { id 'java-library' }
+
+compileJava.options.release = 17
+compileTestJava.options.release = 17
+
+dependencies {
+    api project(':mantlekeep-adapter-spi')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+}
+
+tasks.named('test') { useJUnitPlatform() }

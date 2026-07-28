@@ -1,0 +1,5 @@
+
+${mantlekeep.brand.mark:🔱}  ${mantlekeep.brand.name:MantleKeep}
+   ${mantlekeep.brand.tagline:the one door — human + AI, every action governed}
+   :: sovereign spine :: Spring Boot ${spring-boot.version}
+
