@@ -4,11 +4,26 @@ The Java SDK is the **socket** products plug into: a config-driven door client, 
 adapter SPI, example adapters, and Spring Boot starters. Dependency direction is
 one-way and strict: `product → starter → door-client → adapter-spi`.
 
-Requires a JDK 25 toolchain.
+Requires a JDK 25 toolchain. Gradle and Maven are both first-class — same modules, same
+tests, same `dev.mantlekeep:*` coordinates. Use whichever your shop standardises on.
 
 ```bash
 cd sdks/java
-./gradlew build
+./gradlew build          # Gradle
+mvn install              # Maven
+```
+
+Add the starter and you have governance with no wiring code:
+
+```gradle
+implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0"
+```
+```xml
+<dependency>
+  <groupId>dev.mantlekeep</groupId>
+  <artifactId>mantlekeep-spring-boot-starter</artifactId>
+  <version>0.1.0</version>
+</dependency>
 ```
 
 ## The door client, plain Java

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- mantlekeep-adapter-store-inmemory — a worked StorePort adapter. Copy this shape to
+     build your own against a real backend; it teaches the pattern without touching the
+     sealed core. Registers an AdapterProvider in META-INF/services. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.mantlekeep</groupId>
+    <artifactId>mantlekeep-java-parent</artifactId>
+    <version>0.1.0</version>
+  </parent>
+
+  <artifactId>mantlekeep-adapter-store-inmemory</artifactId>
+  <name>MantleKeep in-memory store adapter</name>
+  <description>Example StorePort adapter — the extension pattern, discovered via ServiceLoader.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-adapter-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-door-client</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
