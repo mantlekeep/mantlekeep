@@ -15,3 +15,39 @@ tasks.register('run', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'dev.mantlekeep.Example'
 }
+
+// ── Publishing (Maven) ───────────────────────────────────────────────────────
+// Coordinates: dev.mantlekeep:<module>:<version> (artifactId = module name). The brand
+// group is kept even on GitHub Packages — which verifies no namespace — so the SAME GAV
+// upgrades to Maven Central later, once mantlekeep.dev is owned + DNS-verified. The bank's
+// Nexus proxies GitHub Packages exactly as it would Central. Consume with:
+//   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0"
+allprojects {
+    group = 'dev.mantlekeep'
+    version = '0.1.0'
+
+    // Every java-library module (root flat client + the SDK subprojects) becomes publishable.
+    // Sources jar included (cheap + useful); javadoc jar is deferred to the Maven Central step
+    // (Central requires it, GitHub Packages does not — keeps this build robust for now).
+    plugins.withId('java-library') {
+        apply plugin: 'maven-publish'
+        java { withSourcesJar() }
+        publishing {
+            publications {
+                maven(MavenPublication) { from components.java }
+            }
+            repositories {
+                maven {
+                    name = 'GitHubPackages'
+                    url = uri('https://maven.pkg.github.com/potkei/mantlekeep')
+                    credentials {
+                        // set at publish time via env (GITHUB_ACTOR/GITHUB_TOKEN) or
+                        // gradle.properties (gpr.user/gpr.key); lazy — local publish needs neither.
+                        username = System.getenv('GITHUB_ACTOR') ?: findProperty('gpr.user')
+                        password = System.getenv('GITHUB_TOKEN') ?: findProperty('gpr.key')
+                    }
+                }
+            }
+        }
+    }
+}
