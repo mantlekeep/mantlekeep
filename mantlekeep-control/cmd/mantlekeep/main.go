@@ -35,7 +35,10 @@ func main() {
 		case "agent":
 			fmt.Println("the \"agent\" role is a PRODUCT — run it from the mantlekeep-agent binary: `mantlekeep-agent` (composes the core through its public door seam)")
 			os.Exit(2)
-		case "serve", "run", "products", "publish", "install":
+		case "serve":
+			runServe()
+			return
+		case "run", "products", "publish", "install":
 			fmt.Printf("the %q role is a PRODUCT command — run it from the MantleKeep binary (mantlekeep.dev/portal)\n", os.Args[1])
 			os.Exit(2)
 		case "server", "worker":

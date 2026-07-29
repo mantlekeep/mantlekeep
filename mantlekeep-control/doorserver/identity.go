@@ -1,0 +1,121 @@
+package doorserver
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"sync"
+	"time"
+
+	mantlekeep "mantlekeep.dev/control"
+)
+
+var (
+	errMissingDoor      = errors.New("doorserver: Options.Door is required")
+	errNoIdentitySource = errors.New(
+		"doorserver: no way to identify callers — set TrustedUserHeader (production) or DevLogin (dev only)")
+)
+
+const sessionCookieName = "mantlekeep_session"
+
+// resolveCaller determines WHO is acting, in trust order: a header asserted by
+// something that already authenticated, then a dev session cookie. It returns false
+// when neither yields a subject the identity resolver recognises — the door is never
+// asked to judge an anonymous request.
+func (s *Server) resolveCaller(request *http.Request) (mantlekeep.Subject, bool) {
+	if header := s.options.TrustedUserHeader; header != "" {
+		if userID := request.Header.Get(header); userID != "" {
+			return s.resolveUser(request, userID)
+		}
+	}
+	if s.options.DevLogin {
+		if cookie, err := request.Cookie(sessionCookieName); err == nil {
+			if userID, found := s.sessions.lookup(cookie.Value); found {
+				return s.resolveUser(request, userID)
+			}
+		}
+	}
+	return mantlekeep.Subject{}, false
+}
+
+// resolveUser turns an asserted user id into a Subject with effective roles. The
+// resolver is the authority on roles — a caller never asserts its own.
+func (s *Server) resolveUser(request *http.Request, userID string) (mantlekeep.Subject, bool) {
+	subject, err := s.door.Identity.Resolve(
+		request.Context(), mantlekeep.ExternalIdentity{ID: userID})
+	if err != nil {
+		return mantlekeep.Subject{}, false
+	}
+	return subject, true
+}
+
+// handleDevLogin mints a session for a named user WITHOUT any credential check. It is
+// registered only when Options.DevLogin is set, so this cannot be reached in a
+// deployment that did not deliberately ask for it.
+func (s *Server) handleDevLogin(writer http.ResponseWriter, request *http.Request) {
+	var body struct {
+		User string `json:"user"`
+	}
+	if err := json.NewDecoder(request.Body).Decode(&body); err != nil || body.User == "" {
+		writeJSON(writer, http.StatusBadRequest, map[string]any{"error": "expected {\"user\":\"…\"}"})
+		return
+	}
+	// Reject an unknown user here rather than at the first govern call, so a typo fails
+	// where it was made.
+	if _, ok := s.resolveUser(request, body.User); !ok {
+		writeJSON(writer, http.StatusUnauthorized, map[string]any{"error": "unknown subject " + body.User})
+		return
+	}
+
+	token := s.sessions.create(body.User)
+	http.SetCookie(writer, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	writeJSON(writer, http.StatusOK, map[string]any{"user": body.User})
+}
+
+// sessionStore holds dev sessions in memory. Deliberately not durable: sessions from a
+// credential-free login must not survive a restart.
+type sessionStore struct {
+	mutex    sync.RWMutex
+	byToken  map[string]string
+}
+
+func newSessionStore() *sessionStore {
+	return &sessionStore{byToken: map[string]string{}}
+}
+
+func (store *sessionStore) create(userID string) string {
+	token := randomHex(16)
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	store.byToken[token] = userID
+	return token
+}
+
+func (store *sessionStore) lookup(token string) (string, bool) {
+	store.mutex.RLock()
+	defer store.mutex.RUnlock()
+	userID, found := store.byToken[token]
+	return userID, found
+}
+
+// newIntentID gives each governed request a unique, sortable id for the audit record.
+func newIntentID() string {
+	return "INT-" + time.Now().UTC().Format("20060102-150405") + "-" + randomHex(4)
+}
+
+func randomHex(byteCount int) string {
+	buffer := make([]byte, byteCount)
+	if _, err := rand.Read(buffer); err != nil {
+		// crypto/rand failing is not a recoverable application condition.
+		panic("doorserver: cannot read random bytes: " + err.Error())
+	}
+	return hex.EncodeToString(buffer)
+}

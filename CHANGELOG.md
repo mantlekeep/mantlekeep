@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-29
+
+### Added
+- **`mantlekeep serve` — the framework now runs the door it documents.** The SDKs shipped a client for
+  the `POST /api/govern` wire contract and nothing published implemented the other half: you could call
+  a door, but not run one, so `mode: service` had nothing to point at. The new `doorserver` package
+  serves the frozen contract (`/api/govern`, `/api/audit`, and an opt-in dev `/api/login`) over the same
+  `Submitter` the embedded path uses — HTTP is a transport, never a second set of rules. Mount it as an
+  `http.Handler` inside a product, or run `mantlekeep serve`.
+  **Fails closed:** it refuses to start unless a caller can be identified (`MANTLEKEEP_USER_HEADER` for
+  a gateway-authenticated deployment, or an explicit dev login), and refuses any request without a
+  resolvable identity before the door is asked.
+  **Verified end to end against the real Java SDK client**, not just against my reading of the contract:
+  allow returns a token, a policy deny returns its reason, and both land on one hash-chained ledger that
+  verifies (`intact: true`). A *validation* rejection is correctly not chained; a *policy* deny is.
+- **`BrandPrefix` (Java) — configuration files can speak the product's name, not the framework's.**
+  The core could hide `MANTLEKEEP_` from operators, but every `application.yml` still had to say
+  `mantlekeep:` — the one file a reviewer opens first. `BrandPrefix.use("acme")` (or
+  `MANTLEKEEP_BRAND_PREFIX`) makes `acme.door.url` bind, via an `EnvironmentPostProcessor` that adds
+  aliases at the **lowest** precedence — so an explicit `mantlekeep.*` value always wins and adopting a
+  prefix can never silently change existing configuration. Four tests, each watched failing first.
+
 ## [0.1.6] — 2026-07-29
 
 ### Added
@@ -105,7 +127,8 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 _On release, move this block out of PENDING and date it (see RELEASE.md)._
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/potkei/mantlekeep/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/potkei/mantlekeep/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/potkei/mantlekeep/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/potkei/mantlekeep/compare/v0.1.3...v0.1.4

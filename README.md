@@ -124,6 +124,30 @@ Everything is config-driven. The conventions:
 - Identity headers at a service boundary: `X-Mantlekeep-User`, `X-Mantlekeep-Roles`.
 - Go module path: `mantlekeep.dev/control`. Java packages: `dev.mantlekeep.*`.
 
+## Run the door as a service
+
+Several services, one door, one chain — the shape a multi-service deployment needs, and
+what every SDK client in `service` mode talks to:
+
+```bash
+MANTLEKEEP_DEV_LOGIN=true mantlekeep serve      # dev: :8080, cookie login
+MANTLEKEEP_USER_HEADER=X-Auth-User mantlekeep serve   # production: trust a gateway's header
+```
+
+| Route | |
+|---|---|
+| `POST /api/govern` | `{action, resource, goal, env, params}` → `{"decision":"allow","token":…}` or `{"decision":"deny","reason":…}` |
+| `GET /api/audit` | `{"intact":bool,"count":n,"records":[…]}` — re-walks the hash chain on every call |
+| `POST /api/login` | dev identity only; enabled explicitly, never on by default |
+
+It **fails closed**: with no way to identify callers it refuses to start, and a request
+with no resolvable identity is refused before the door is asked. The server adds no
+governance of its own — it hands every request to the same door the embedded path uses.
+
+*Embedded or service?* `embedded` gives each process its own local door and chain — right
+for a single sovereign zone with no infrastructure. `service` gives many services **one
+shared chain**, which is what an auditor needs to see one trail across them.
+
 ## White-labelling — ship it under your own name, without forking
 
 Your organisation can ship a branded binary whose operators never type `MANTLEKEEP_`.
@@ -156,6 +180,23 @@ value an operator sets (`ACME_BRAND_NAME=…`) wins over your default.
 
 To make it yours: copy `cmd/acme-govern/`, change the prefix and the display values.
 That is the whole procedure.
+
+**Java products get the same seam for configuration.** Declare the prefix in your
+launcher and your configuration files stop naming the framework:
+
+```java
+BrandPrefix.use("acme");                 // or MANTLEKEEP_BRAND_PREFIX=acme
+SpringApplication.run(Application.class, args);
+```
+```yaml
+acme:
+  door:
+    mode: service
+    url: https://door.internal
+```
+
+Aliases are added at the lowest precedence, so an explicit `mantlekeep.*` value always
+wins — adopting a prefix can never silently change configuration you already had.
 
 **Do not fork the framework to rebrand it.** Renaming its packages or copying its
 source takes you off the upgrade path — a security fix then has to be re-applied by
