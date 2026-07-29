@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-07-29
+
+### Added
+- **A worked white-label example — `cmd/acme-govern`.** The white-label seam
+  (`app.RemapEnvPrefix`) already existed, but nothing showed how to use it, so "brand it without
+  forking" was a claim with no code behind it. This is a second branded binary built from the
+  unmodified core: it remaps `ACME_* → MANTLEKEEP_*`, sets its own brand defaults, and assembles the
+  SAME door / policy floor / hash-chained audit through the public `doorkit` seam. Copy the directory,
+  change one constant and four defaults, and the binary is yours. Verified by running it: allow + deny
+  both governed, audit chain intact, and an operator setting only `ACME_BRAND_*` reaches the engine.
+  Documented in the README, including why forking to rebrand is the one thing not to do (it leaves the
+  upgrade path, so security fixes stop flowing in).
+
 ## [0.1.4] — 2026-07-29
 
 ### Fixed
@@ -80,7 +93,8 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 _On release, move this block out of PENDING and date it (see RELEASE.md)._
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/potkei/mantlekeep/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/potkei/mantlekeep/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/potkei/mantlekeep/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/potkei/mantlekeep/compare/v0.1.1...v0.1.2

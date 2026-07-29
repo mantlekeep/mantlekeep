@@ -124,6 +124,34 @@ Everything is config-driven. The conventions:
 - Identity headers at a service boundary: `X-Mantlekeep-User`, `X-Mantlekeep-Roles`.
 - Go module path: `mantlekeep.dev/control`. Java packages: `dev.mantlekeep.*`.
 
+## White-labelling — ship it under your own name, without forking
+
+Your organisation can ship a branded binary whose operators never type `MANTLEKEEP_`.
+A worked example is in the repo — build it and run it:
+
+```bash
+cd mantlekeep-control
+go build -o acme-govern ./cmd/acme-govern
+ACME_BRAND_NAME="Northwind Governance" ./acme-govern
+```
+
+It links **no extra engine code**: the same door, the same policy floor, the same
+hash-chained audit as the stock `mantlekeep` binary. Only two things differ, both
+configuration:
+
+- `app.RemapEnvPrefix("ACME", "MANTLEKEEP")` copies every `ACME_*` variable onto the
+  name the engine reads — one call covers present and future variables, because it
+  works by prefix, not an enumerated list.
+- Four brand defaults, each still overridable from the environment.
+
+To make it yours: copy `cmd/acme-govern/`, change the `brandPrefix` constant and the
+four defaults. That is the whole procedure.
+
+**Do not fork the framework to rebrand it.** Renaming its packages or copying its
+source takes you off the upgrade path — a security fix then has to be re-applied by
+hand, forever. The seam exists so the engine can stay an unmodified dependency: your
+name on the outside, one shared engine underneath.
+
 ## License
 
 Apache-2.0. Copyright 2026 Kelvin Chan and the MantleKeep co-owners. See `LICENSE`
