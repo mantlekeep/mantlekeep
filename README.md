@@ -136,16 +136,26 @@ ACME_BRAND_NAME="Northwind Governance" ./acme-govern
 ```
 
 It links **no extra engine code**: the same door, the same policy floor, the same
-hash-chained audit as the stock `mantlekeep` binary. Only two things differ, both
-configuration:
+hash-chained audit as the stock `mantlekeep` binary. The entire brand is one call:
 
-- `app.RemapEnvPrefix("ACME", "MANTLEKEEP")` copies every `ACME_*` variable onto the
-  name the engine reads — one call covers present and future variables, because it
-  works by prefix, not an enumerated list.
-- Four brand defaults, each still overridable from the environment.
+```go
+app.Brand(app.BrandOptions{
+    Prefix:  "ACME",              // operators set ACME_* and never see MANTLEKEEP_
+    Name:    "Acme Control",
+    Mark:    "◆",
+    Tagline: "every action through one door",
+})
 
-To make it yours: copy `cmd/acme-govern/`, change the `brandPrefix` constant and the
-four defaults. That is the whole procedure.
+brand := app.CurrentBrand()       // read it back without naming engine variables
+```
+
+Note what is absent: **no `MANTLEKEEP_` variable appears in your code.** The framework
+owns its own namespace, so a brand never has to learn it. `Prefix` covers present *and
+future* variables because it maps by prefix rather than an enumerated list, and any
+value an operator sets (`ACME_BRAND_NAME=…`) wins over your default.
+
+To make it yours: copy `cmd/acme-govern/`, change the prefix and the display values.
+That is the whole procedure.
 
 **Do not fork the framework to rebrand it.** Renaming its packages or copying its
 source takes you off the upgrade path — a security fix then has to be re-applied by

@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-07-29
+
+### Added
+- **`app.Brand` / `app.CurrentBrand` — a brand states its identity without naming engine variables.**
+  The env-prefix remap hid `MANTLEKEEP_` from *operators*, but a white-label author still had to write
+  `os.Setenv("MANTLEKEEP_BRAND_NAME", …)` — the framework's namespace leaked into every product that
+  branded itself, and each new engine variable would have leaked again. `Brand` takes the brand's own
+  prefix and display values and does both halves of the translation; `CurrentBrand` reads the result
+  back. **No `MANTLEKEEP_` string now appears in branded product code.** Operator-set values still win
+  over brand defaults, and empty fields are left untouched. `RemapEnvPrefix` remains public and
+  unchanged (additive, no break). Four tests, each watched failing before being trusted.
+
 ## [0.1.5] — 2026-07-29
 
 ### Added
@@ -93,7 +105,8 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 _On release, move this block out of PENDING and date it (see RELEASE.md)._
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/potkei/mantlekeep/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/potkei/mantlekeep/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/potkei/mantlekeep/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/potkei/mantlekeep/compare/v0.1.2...v0.1.3

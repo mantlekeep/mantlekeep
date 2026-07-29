@@ -40,21 +40,20 @@ import (
 const brandPrefix = "ACME"
 
 func main() {
-	// 1. Operators speak ACME_*; the engine still reads MANTLEKEEP_* underneath.
-	//    Set before anything reads configuration.
-	app.RemapEnvPrefix(brandPrefix, "MANTLEKEEP")
+	// ONE call makes this binary itself. Note what is NOT here: no MANTLEKEEP_
+	// variable names. The framework owns its own namespace, so a brand never has to
+	// know it — operators speak ACME_*, and any ACME_BRAND_* they set wins over these
+	// defaults. Change these five lines and the binary is yours.
+	app.Brand(app.BrandOptions{
+		Prefix:  brandPrefix,
+		Name:    "Acme Control",
+		Mark:    "◆",
+		Kicker:  "governed delivery",
+		Tagline: "every action through one door",
+	})
 
-	// 2. The brand face. Each is overridable by the operator as ACME_BRAND_*,
-	//    because the remap above already copied those in.
-	setDefault("MANTLEKEEP_BRAND_NAME", "Acme Control")
-	setDefault("MANTLEKEEP_BRAND_MARK", "◆")
-	setDefault("MANTLEKEEP_BRAND_KICKER", "governed delivery")
-	setDefault("MANTLEKEEP_BRAND_TAGLINE", "every action through one door")
-
-	fmt.Printf("%s %s — %s\n",
-		os.Getenv("MANTLEKEEP_BRAND_MARK"),
-		os.Getenv("MANTLEKEEP_BRAND_NAME"),
-		os.Getenv("MANTLEKEEP_BRAND_TAGLINE"))
+	brand := app.CurrentBrand()
+	fmt.Printf("%s %s — %s\n", brand.Mark, brand.Name, brand.Tagline)
 	fmt.Println("────────────────────────────────────────────────────────")
 	fmt.Printf("(engine: unmodified MantleKeep core; brand prefix %s_*)\n\n", brandPrefix)
 
@@ -94,14 +93,6 @@ func main() {
 	must(err)
 	fmt.Printf("\n  audit chain intact: %v\n", ok)
 	fmt.Println("\nSame engine, different face. Nothing was forked to get here.")
-}
-
-// setDefault sets an environment variable only when it is unset, so the binary is
-// branded out of the box yet still fully overridable by the operator.
-func setDefault(key, value string) {
-	if os.Getenv(key) == "" {
-		_ = os.Setenv(key, value)
-	}
 }
 
 func must(err error) {
