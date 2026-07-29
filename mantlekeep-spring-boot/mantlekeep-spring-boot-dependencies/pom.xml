@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The BOM ("-dependencies"): pins versions for every module and imports the Spring Boot
+     platform, so modules declare dependencies without versions. The Maven equivalent of
+     the Gradle `java-platform`. Deliberately has NO parent — a BOM must stay standalone
+     so consumers can import it without inheriting our build config. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>dev.mantlekeep</groupId>
+  <artifactId>mantlekeep-spring-boot-dependencies</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>MantleKeep Spring Boot (BOM)</name>
+  <description>Version constraints for the MantleKeep Spring Boot family; imports the Spring Boot BOM.</description>
+
+  <properties>
+    <spring.boot.version>4.1.0</spring.boot.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring Boot's own platform supplies Reactor, Jackson, AspectJ, JUnit versions. -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring.boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- MantleKeep module versions are pinned here as the family grows. -->
+      <dependency>
+        <groupId>dev.mantlekeep</groupId>
+        <artifactId>mantlekeep-spring-boot-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>

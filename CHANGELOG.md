@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-29
+
+### Fixed
+- **Fresh clones could not build the Go core.** Dropping the root `go.work`/`go.work.sum` in v0.1.1 also
+  dropped the `/go.mod` hash lines those files carried for two indirect deps, so `go build ./cmd/mantlekeep`
+  on a machine with a cold module cache failed with `missing go.sum entry for go.mod file`. `go.sum` is
+  restored (and `cucumber/godog`, a phantom require imported by no package here, is gone). Verified with an
+  isolated module cache: build clean, `go test ./...` 42 passed in 18 packages, `go vet` clean.
+
+### Added
+- **Maven build for the Spring Boot starter family too** (`mantlekeep-spring-boot/`) — v0.1.2 covered only
+  `sdks/java`, leaving half the Java surface Gradle-only. Adds a parent POM + a real Maven **BOM**
+  (`-dependencies`, importing the Spring Boot platform) + module POMs for `-core`, `-starter-webflux`,
+  `-starter-ai`. The Gradle idioms map onto their Maven equivalents rather than being reinvented: convention
+  plugins → parent POM, `java-platform` → BOM, `annotationProcessor` → `optional` dependency.
+  Verified: `mvn install` green, **51 tests** pass; `./gradlew build` still green.
+  (`mantlekeep-spring-boot-parent/` stays Gradle-only by design — in Maven a parent POM *is* that mechanism.)
+
 ## [0.1.2] — 2026-07-29
 
 ### Added
@@ -49,7 +67,8 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 _On release, move this block out of PENDING and date it (see RELEASE.md)._
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/potkei/mantlekeep/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/potkei/mantlekeep/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0

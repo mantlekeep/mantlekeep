@@ -94,9 +94,12 @@ implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0"
 
 ### Spring Boot starters
 
+The starter family (`-core`, `-starter-webflux`, `-starter-ai`) also builds with either tool:
+
 ```bash
 cd mantlekeep-spring-boot
-./gradlew build          # builds the starter family
+./gradlew build          # Gradle
+mvn install              # Maven
 ```
 
 ## Configuration namespace
