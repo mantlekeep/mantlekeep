@@ -5,7 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
-## [0.1.1] — Unreleased
+## [0.1.2] — 2026-07-29
+
+### Added
+- **Maven build alongside Gradle — both first-class.** The Java SDK now ships `pom.xml` files (a parent
+  aggregator + one per module), so a Maven shop can build the framework **from source** — the case that
+  matters for air-gapped rebuilds, CVE patching on vendored source, and internal audit. Verified: `mvn install`
+  green, 32 tests pass, identical `dev.mantlekeep:*:0.1.0` coordinates to the Gradle build, which stays green.
+  (Maven *consumers* were never blocked — published artifacts were always ordinary POMs; this adds *building*.)
+  Known limit: the legacy flat sidecar client (`sdks/java/src`) stays Gradle-only — a Maven parent cannot
+  carry its own sources; the full `starter → door-client → adapter-spi` chain is Maven-buildable.
+
+## [0.1.1] — 2026-07-28
 
 ### Changed
 - **Go: `mantlekeep-control` is now a standalone module.** Removed the redundant single-module
@@ -14,11 +25,6 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
   green standalone (`GOWORK=off`).
 
 ### Added
-- **Maven build alongside Gradle — both first-class.** The Java SDK now ships `pom.xml` files (a parent
-  aggregator + one per module), so a Maven shop can build the framework **from source** — the case that
-  matters for air-gapped rebuilds, CVE patching on vendored source, and internal audit. Verified: `mvn install`
-  green, 32 tests pass, identical `dev.mantlekeep:*:0.1.0` coordinates to the Gradle build, which stays green.
-  (Maven *consumers* were never blocked — published artifacts were always ordinary POMs; this adds *building*.)
 - **Java SDK is now publishable to Maven** as `dev.mantlekeep:<module>:0.1.0` (jar + sources + POM,
   transitive `dev.mantlekeep` chain). Published to GitHub Packages first (no domain needed), upgradeable
   to Maven Central under the same coordinates once `mantlekeep.dev` is DNS-verified. Consume the whole
@@ -43,6 +49,7 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 _On release, move this block out of PENDING and date it (see RELEASE.md)._
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0...HEAD
-[0.1.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/potkei/mantlekeep/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0
