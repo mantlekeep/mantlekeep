@@ -20,3 +20,7 @@ mantlekeep-data/
 
 # Logs
 *.log
+
+# Go workspace is local-dev only — control is a standalone module
+go.work
+go.work.sum

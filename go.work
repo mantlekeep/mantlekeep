@@ -1,4 +1,0 @@
-// MantleKeep workspace — the generic governance core.
-go 1.26.4
-
-use ./mantlekeep-control
