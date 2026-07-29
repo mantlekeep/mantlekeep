@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-07-29
+
+### Fixed
+- **The repo builds from its root again.** v0.1.1 removed the root `go.work` as "a pointless single-module
+  workspace" — but that workspace was what let `go build` / `go test` / `go vet` run from the repo root.
+  Without it the root gave `cannot find main module, but found .git/config`. `go.work` is restored (its
+  generated `go.work.sum` stays gitignored, and no longer reappears now that `go.sum` is complete), so both
+  work: from the root `go build -o mantlekeep ./mantlekeep-control/cmd/mantlekeep`, or from inside the
+  module `go build -o mantlekeep ./cmd/mantlekeep`. Verified from a fresh clone with a cold module cache.
+- **README build instructions are now the commands that actually work** — root and in-module forms, the
+  Windows `.\`/`.exe` variant, and the two rules that bite: pass the package path, and from the root use
+  `./mantlekeep-control/...` (a bare `./...` matches no module).
+
 ## [0.1.3] — 2026-07-29
 
 ### Fixed
@@ -67,7 +80,8 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 _On release, move this block out of PENDING and date it (see RELEASE.md)._
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/potkei/mantlekeep/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/potkei/mantlekeep/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/potkei/mantlekeep/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0...v0.1.1

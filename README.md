@@ -56,13 +56,26 @@ Requires Go 1.26+.
 
 ```bash
 git clone https://github.com/potkei/mantlekeep.git
-cd mantlekeep/mantlekeep-control
-go build ./...
+cd mantlekeep
+
+# From the repo root (a go.work covers the module):
+go build -o mantlekeep ./mantlekeep-control/cmd/mantlekeep
+go test ./mantlekeep-control/...
+
+# Or from inside the module — it is a standalone Go module too:
+cd mantlekeep-control
+go build -o mantlekeep ./cmd/mantlekeep
 go test ./...
 
 # Run the door + spine smoke demo (embedded, no external services):
 go run ./cmd/mantlekeep
 ```
+
+On Windows use `.\` and an `.exe` name — `go build -o mantlekeep.exe .\cmd\mantlekeep`.
+
+Two rules worth knowing: pass the **package path** (`./cmd/mantlekeep`), not just `-o`; and
+from the repo root, patterns must name the module (`./mantlekeep-control/...`) — a bare
+`./...` at the root matches no module and fails.
 
 The smoke demo submits a batch of intents to the door, prints each verdict, and
 verifies the audit hash-chain is intact — then runs the orchestrator spine, including

@@ -21,8 +21,8 @@ mantlekeep-data/
 # Logs
 *.log
 
-# Go workspace is local-dev only — control is a standalone module
-go.work
+# go.work IS committed (it makes the repo buildable from the root).
+# Only the generated workspace checksum file stays out of git.
 go.work.sum
 
 # Maven build output
