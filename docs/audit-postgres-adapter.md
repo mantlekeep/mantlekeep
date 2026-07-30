@@ -120,6 +120,9 @@ it governs and records with no reachback.
 Sharding by load, by contrast, splits one governance domain across chains for a reason that means nothing
 to an auditor, and leaves you reconciling trails that should never have been separated.
 
+> **Across zones, see `multi-zone.md`.** Data residency makes a per-zone chain and store mandatory rather
+> than optional, and turns the hash-compatibility requirement in §5 into a cross-jurisdiction contract.
+
 ## 7. Verify
 
 Walk a chain in `seq` order for a `chain_id`, recompute each record's hash from its content plus the
