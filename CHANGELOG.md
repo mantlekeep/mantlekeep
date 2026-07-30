@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [0.2.0] — 2026-07-29
 
+### Changed
+- **The Java artifacts are versioned 0.2.0, matching the tag.** They still declared `0.1.0` while this
+  tag shipped `BrandPrefix` — so following the docs got you either an artifact without the feature
+  (`0.1.0`) or one that did not resolve (`0.2.0`). Both build systems, both module families, and every
+  quoted coordinate now agree. Verified: Maven and Gradle green on `sdks/java` and the starter family.
+
 ### Added
 - **`mantlekeep serve` — the framework now runs the door it documents.** The SDKs shipped a client for
   the `POST /api/govern` wire contract and nothing published implemented the other half: you could call
@@ -89,7 +95,7 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 - **Maven build alongside Gradle — both first-class.** The Java SDK now ships `pom.xml` files (a parent
   aggregator + one per module), so a Maven shop can build the framework **from source** — the case that
   matters for air-gapped rebuilds, CVE patching on vendored source, and internal audit. Verified: `mvn install`
-  green, 32 tests pass, identical `dev.mantlekeep:*:0.1.0` coordinates to the Gradle build, which stays green.
+  green, 32 tests pass, identical `dev.mantlekeep:*:0.2.0` coordinates to the Gradle build, which stays green.
   (Maven *consumers* were never blocked — published artifacts were always ordinary POMs; this adds *building*.)
   Known limit: the legacy flat sidecar client (`sdks/java/src`) stays Gradle-only — a Maven parent cannot
   carry its own sources; the full `starter → door-client → adapter-spi` chain is Maven-buildable.
@@ -106,7 +112,7 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 - **Java SDK is now publishable to Maven** as `dev.mantlekeep:<module>:0.1.0` (jar + sources + POM,
   transitive `dev.mantlekeep` chain). Published to GitHub Packages first (no domain needed), upgradeable
   to Maven Central under the same coordinates once `mantlekeep.dev` is DNS-verified. Consume the whole
-  governance stack with one line: `implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0"`.
+  governance stack with one line: `implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.2.0"`.
 
 ## [0.1.0] — 2026-07-28
 
