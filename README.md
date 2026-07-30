@@ -45,6 +45,8 @@ Start here to adopt and build on MantleKeep:
 | [Why govern human + AI actions](docs/why-govern-ai.md) | The case for adopting: the problem, MantleKeep's answer, who it's for. |
 | [Architecture](docs/architecture.md) | One page: the decide-vs-execute rule, the core, the ports/adapters, the dependency direction — with a diagram and a full text description. |
 | [Build your first governed product](docs/build-your-first-product.md) | A runnable ~5-minute tutorial: write a `WorkerPort` adapter, wire the door, submit intents, and see govern-before-execute + the hash-chain. |
+| [Layering a product](docs/layering.md) | How one product is specialised twice — generic → domain → team — by composition rather than copying: the four seams, and the tests that prove it is layering and not forks. |
+| [Templates, behaviours and workers](docs/behaviours.md) | The composition model: a pipeline is a template instantiated with a behaviour whose phases workers execute. Sealed `run()`, behaviour selection by repository style, chains as a DAG, platform vs content. |
 | [Extending MantleKeep](docs/extending.md) | The adapter guide: the ports, the SPI + `ServiceLoader` discovery, adding an adapter, and how config selects it. |
 | [The door — library + wire contract](docs/door.md) · [Java SDK quick-start](docs/sdk-quickstart.md) | Reference notes on the core and the SDK. |
 
