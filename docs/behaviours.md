@@ -126,6 +126,74 @@ For the linked style the manifest declares chains and dependencies
 step runs. A pipeline that silently drops a subproject is worse than one that refuses to start, because
 nobody notices the thing that stopped being built.
 
+## 6b. The execution unit — govern per phase, execute per GROUP
+
+**The mistake this section exists to prevent:** assuming that because every phase is governed separately,
+every phase must *run* separately. That produces one pod per phase, and a pipeline that spends most of its
+life waiting for schedulers and image pulls. A conventional CI agent runs a whole pipeline in one place and
+feels fast for exactly this reason.
+
+**Two boundaries, and they are orthogonal:**
+
+| | Granularity | Cost |
+|---|---|---|
+| **Governance boundary** — what needs a decision | **per phase**, always | one call to the door: milliseconds |
+| **Execution boundary** — what shares a process, filesystem, workspace | **per group**, configurable | a new unit: scheduling + image pull + start, often tens of seconds |
+
+Governing finely is cheap. Executing finely is expensive. Coupling them makes governance look costly when
+it is not, and invites someone to "fix performance" by governing less — the worst possible trade.
+
+### Three modes; the middle one is the default
+
+```
+unit = run          one execution unit for the whole run; phases share a workspace.
+                    Fastest. The conventional-agent model. Weakest isolation.
+
+unit = branch       one unit per INDEPENDENT branch of the DAG.        ← default
+                    Independent branches run in parallel; phases within
+                    a branch run sequentially and share a workspace.
+
+unit = phase        one unit per phase. Strongest isolation, slowest;
+                    nothing is shared, so every phase re-fetches its inputs.
+```
+
+`branch` is the default because it matches what a DAG already tells you: **branches that declare no
+dependency on each other have no reason to share a workspace, and every reason to run at the same time.**
+Phases that *do* depend on each other pass work through the filesystem, so putting them in one unit is both
+faster and simpler than staging artefacts between pods.
+
+This is a well-trodden conclusion, not a novel one: mature Kubernetes-native CI systems group a task's
+steps into a single pod as sequential containers over a shared workspace, and use separate pods for
+independent tasks.
+
+### The mode never changes whether something is governed
+
+**Every phase submits to the door in every mode.** The mode decides *where* work runs, never *whether* it
+was decided. A change that reduces the number of execution units must not reduce the number of decisions on
+the chain — and if a chain shows fewer records after a performance change, that is a bug, not a
+optimisation. Make it an assertion in the test suite.
+
+### Isolation is a security decision, not only a performance one
+
+Phases sharing a unit share a filesystem. That is fine for phases that trust each other — a build feeding a
+verify. It is **not** fine for a phase that executes untrusted code, which must either get its own unit or
+run inside the sandbox.
+
+That is precisely what the sandbox is for (§8): a tool from a registry is untrusted regardless of the pod
+it sits in, so sandboxing lets untrusted work stay in a shared, fast unit instead of paying pod isolation
+for every step. **Sandbox the untrusted thing; do not isolate the whole pipeline to contain it.**
+
+### If a unit is still slow to start
+
+Fix the start-up cost rather than the granularity — but only after the granularity is right:
+
+- keep a **warm pool** of pre-scheduled idle units, so a run claims one instead of waiting for a scheduler;
+- keep unit images **small and pre-pulled** on the nodes that will run them;
+- leave **scheduling headroom** so a unit is not waiting on a node that is itself being provisioned.
+
+None of these help if the pipeline is still spawning a unit per phase — that is the ordering: granularity
+first, warm start second.
+
 ## 7. Platform versus content — why this avoids a change request per change
 
 The split that makes the model viable operationally:
