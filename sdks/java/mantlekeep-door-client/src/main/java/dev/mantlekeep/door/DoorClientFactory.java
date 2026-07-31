@@ -42,7 +42,12 @@ public final class DoorClientFactory {
             throw new IllegalArgumentException(
                     "mantlekeep.door.mode=service requires mantlekeep.door.url (the remote door's base URL)");
         }
-        return new ServiceDoorClient(config.doorUrl(), config.devLoginUser());
+        // Pass the CONFIGURED header names through. Dropping them here would silently
+        // fall back to the framework's own names, so a white-labelled deployment would
+        // send X-Mantlekeep-User to a door reading X-Acme-User — a 401 that looks like a
+        // broken service rather than a setting that never arrived.
+        return new ServiceDoorClient(config.doorUrl(), config.devLoginUser(),
+                config.serviceUser(), config.callerHeader(), config.onBehalfOfHeader());
     }
 
     private static DoorClient createEmbeddedClient(DoorConfig config) {

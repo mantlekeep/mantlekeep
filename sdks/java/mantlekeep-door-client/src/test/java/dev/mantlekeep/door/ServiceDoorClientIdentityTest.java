@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.mantlekeep.door.model.DoorConfig;
+import dev.mantlekeep.door.model.DoorMode;
 import dev.mantlekeep.door.model.Intent;
 import dev.mantlekeep.door.model.Subject;
 import java.io.IOException;
@@ -103,6 +105,28 @@ class ServiceDoorClientIdentityTest {
         assertEquals("session-service", lastHeaders.get("X-acme-user"));
         assertEquals("lead-bob", lastHeaders.get("X-acme-on-behalf-of"));
         assertNull(lastHeaders.get("X-mantlekeep-user"), "the framework's name must not leak through");
+    }
+
+    @Test
+    void configuredHeaderNamesSurviveTheFACTORY_notJustTheConstructor() {
+        // The gap this covers: the client honoured header names passed to its constructor,
+        // and DoorConfig carried them, but DoorClientFactory dropped them in between — so
+        // a configured deployment silently sent the framework's default names. Constructing
+        // the client directly could never reveal that; only building it the way a product
+        // does, from configuration, can.
+        DoorConfig config = new DoorConfig(DoorMode.SERVICE, null, doorUrl(), null, null, null, null,
+                "session-service", "X-Acme-User", "X-Acme-On-Behalf-Of");
+
+        try (DoorClient door = DoorClientFactory.create(config)) {
+            door.decide(intentBy("lead-bob"));
+        }
+
+        assertEquals("session-service", lastHeaders.get("X-acme-user"),
+                "the CONFIGURED caller header must reach the wire, not the framework default");
+        assertEquals("lead-bob", lastHeaders.get("X-acme-on-behalf-of"));
+        assertNull(lastHeaders.get("X-mantlekeep-user"),
+                "falling back to the default name is the bug: the door reads X-Acme-User "
+                        + "and would refuse this with an unexplained 401");
     }
 
     @Test
