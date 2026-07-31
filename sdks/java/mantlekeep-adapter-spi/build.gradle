@@ -1,0 +1,8 @@
+// mantlekeep-adapter-spi — the SPI every adapter implements: the ports as interfaces plus
+// the ServiceLoader AdapterProvider contract. ZERO dependencies (pure JDK) — this is
+// the module every adapter jar compiles against, so it must drag nothing with it.
+// SACRED library module: additive only, semver, ABI-minded.
+plugins { id 'java-library' }
+
+compileJava.options.release = 17
+compileTestJava.options.release = 17

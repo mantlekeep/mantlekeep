@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- mantlekeep-spring-boot-starter — the ergonomics: add THIS plus a few mantlekeep.door.*
+     properties and get governance with ZERO wiring code. Rides Spring's DI and AOP
+     (never hand-rolled reflection). This is the ONE artifact a product depends on. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.mantlekeep</groupId>
+    <artifactId>mantlekeep-java-parent</artifactId>
+    <version>0.1.0-rc.1</version>
+  </parent>
+
+  <artifactId>mantlekeep-spring-boot-starter</artifactId>
+  <name>MantleKeep Spring Boot starter</name>
+  <description>Auto-configured DoorClient bean + the @MantlekeepIntent govern-before-execute aspect.</description>
+
+  <dependencies>
+    <!-- Exposed to consumers (Gradle `api`) — a product uses DoorClient/Intent directly. -->
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-door-client</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-aop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.aspectj</groupId>
+      <artifactId>aspectjweaver</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- The auto-configuration test drives Spring's ApplicationContextRunner. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

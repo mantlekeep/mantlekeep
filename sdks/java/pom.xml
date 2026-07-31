@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MantleKeep Java SDK — Maven build (the alternative to the Gradle build alongside it).
+
+  WHY BOTH: consumers were never blocked (the published artifacts are ordinary Maven
+  POMs, so any Maven product can depend on them). What this adds is BUILDING the SDK
+  with Maven — which matters for a Maven-shop host that must build the framework FROM
+  SOURCE: air-gapped rebuilds, CVE patching on vendored source, or an internal audit of
+  what it runs. Gradle stays the reference build; this is the equivalent, not a fork.
+
+  Dependency direction (one-way, SACRED): product → starter → door-client → adapter-spi.
+
+  Build:      mvn -f sdks/java/pom.xml install
+  Publish:    mvn -f sdks/java/pom.xml deploy      (GitHub Packages; see distributionManagement)
+
+  NOTE ON SCOPES: Gradle's `implementation` (compile classpath, not exposed to consumers)
+  has no exact Maven equivalent — Maven's `compile` is transitive. Modules below use
+  `compile` where the code needs it and `provided`/`test` where isolation is expressible.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>dev.mantlekeep</groupId>
+  <artifactId>mantlekeep-java-parent</artifactId>
+  <version>0.1.0-rc.1</version>
+  <packaging>pom</packaging>
+
+  <name>MantleKeep Java SDK (parent)</name>
+  <description>Governance SDK for MantleKeep — the door client, adapter SPI, and Spring Boot starter.</description>
+  <url>https://github.com/potkei/mantlekeep</url>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+
+  <scm>
+    <url>https://github.com/potkei/mantlekeep</url>
+    <connection>scm:git:https://github.com/potkei/mantlekeep.git</connection>
+  </scm>
+
+  <!--
+    The multi-module SDK. The root flat sidecar client (dev.mantlekeep.MantlekeepClient,
+    sources at sdks/java/src) is the ORIGINAL demo-path client and remains Gradle-only —
+    a Maven parent cannot carry its own sources. Everything the blueprint depends on
+    (starter → door-client → adapter-spi) is here.
+  -->
+  <modules>
+    <module>mantlekeep-adapter-spi</module>
+    <module>mantlekeep-door-client</module>
+    <module>mantlekeep-spring-boot-starter</module>
+    <module>mantlekeep-java-core</module>
+    <module>mantlekeep-adapter-store-inmemory</module>
+    <module>mantlekeep-adapter-policy-allowlist</module>
+  </modules>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- JDK 17 bytecode by default (mirrors the Gradle `options.release = 17`);
+         mantlekeep-java-core overrides to 22 for the Panama/FFM binding. -->
+    <maven.compiler.release>17</maven.compiler.release>
+    <junit.version>6.0.3</junit.version>
+    <spring.boot.version>4.1.0</spring.boot.version>
+    <spring.version>7.0.8</spring.version>
+    <aspectj.version>1.9.25.1</aspectj.version>
+    <assertj.version>3.27.7</assertj.version>
+  </properties>
+
+  <!-- Versions pinned ONCE here; modules declare deps without a version. -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>dev.mantlekeep</groupId>
+        <artifactId>mantlekeep-adapter-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>dev.mantlekeep</groupId>
+        <artifactId>mantlekeep-door-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-launcher</artifactId>
+        <version>${junit.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-test</artifactId>
+        <version>${spring.boot.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-test</artifactId>
+        <version>${spring.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <!-- ApplicationContextRunner's context type implements AssertJ's AssertProvider. -->
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot</artifactId>
+        <version>${spring.boot.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-autoconfigure</artifactId>
+        <version>${spring.boot.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-context</artifactId>
+        <version>${spring.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-aop</artifactId>
+        <version>${spring.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.aspectj</groupId>
+        <artifactId>aspectjweaver</artifactId>
+        <version>${aspectj.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.13.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.2.5</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.3.1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <!-- Sources jar on every module — matches the Gradle build's withSourcesJar(). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals><goal>jar-no-fork</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Same host + coordinates as the Gradle publish, so either build produces the
+       identical GAV. Credentials come from ~/.m2/settings.xml (server id below). -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/potkei/mantlekeep</url>
+    </repository>
+  </distributionManagement>
+</project>

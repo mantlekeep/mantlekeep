@@ -1,0 +1,6 @@
+# Gradle build output (do NOT commit; the wrapper jar IS committed so builds are reproducible)
+build/
+*/build/
+.gradle/
+*/.gradle/
+!gradle/wrapper/gradle-wrapper.jar

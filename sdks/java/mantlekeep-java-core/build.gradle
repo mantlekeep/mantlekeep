@@ -1,0 +1,20 @@
+// mantlekeep-java-core — the thin Panama (FFM) binding over the Rust core's C ABI: the
+// SACRED FFI surface (submit/audit/verify/free — keep it ruthlessly small + stable).
+// OPTIONAL runtime drop-in: door-client never depends on this module; this module
+// implements door-client's NativeCore port and registers via ServiceLoader.
+// Needs Java 22+ (java.lang.foreign is final since 22); the rest of the SDK stays 17.
+// The native library itself (libmantlekeep_core.dylib) is built from spike/rust-core and
+// located at RUNTIME via mantlekeep.door.core-path — never compiled into this jar.
+plugins { id 'java-library' }
+
+compileJava.options.release = 22
+compileTestJava.options.release = 22
+
+dependencies {
+    implementation project(':mantlekeep-door-client')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+}
+
+tasks.named('test') { useJUnitPlatform() }

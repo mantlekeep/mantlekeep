@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- mantlekeep-java-core — the OPTIONAL native (Panama/FFM) binding: a runtime drop-in
+     that swaps the embedded door for the in-process native core. Needs JDK 22 bytecode
+     for the FFM API, so it overrides the parent's release=17. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.mantlekeep</groupId>
+    <artifactId>mantlekeep-java-parent</artifactId>
+    <version>0.1.0-rc.1</version>
+  </parent>
+
+  <artifactId>mantlekeep-java-core</artifactId>
+  <name>MantleKeep native core binding</name>
+  <description>Optional Panama/FFM NativeCore binding — registered via ServiceLoader, selected by config.</description>
+
+  <properties>
+    <!-- Panama/FFM is a JDK 22 API (mirrors the Gradle `options.release = 22`). -->
+    <maven.compiler.release>22</maven.compiler.release>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-door-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -1,0 +1,20 @@
+// The MantleKeep Java SDK — a multi-module, config-driven governance client.
+// Dependency direction (one-way, SACRED): product → starter → door-client → adapter-spi.
+// mantlekeep-java-core is the OPTIONAL native (Panama/FFM) binding — a runtime drop-in.
+rootProject.name = 'mantlekeep-java'
+
+// One repository declaration for every module (the root flat client needs none —
+// it is dependency-free; the subprojects fetch Spring/JUnit from Maven Central).
+dependencyResolutionManagement {
+    repositories { mavenCentral() }
+}
+
+include 'mantlekeep-adapter-spi'
+include 'mantlekeep-door-client'
+include 'mantlekeep-spring-boot-starter'
+include 'mantlekeep-java-core'
+
+// Example adapter SDKs — independent jars that EXTEND the SPI (never the core):
+// each registers an AdapterProvider in META-INF/services; config selects it by name.
+include 'mantlekeep-adapter-store-inmemory'
+include 'mantlekeep-adapter-policy-allowlist'

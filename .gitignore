@@ -1,0 +1,29 @@
+# Build outputs
+build/
+.gradle/
+bin/
+out/
+
+# Go
+*.test
+*.out
+
+# Runtime data (audit chain, event/store databases)
+*.db
+*.db-*
+mantlekeep-data/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+
+# go.work IS committed (it makes the repo buildable from the root).
+# Only the generated workspace checksum file stays out of git.
+go.work.sum
+
+# Maven build output
+target/

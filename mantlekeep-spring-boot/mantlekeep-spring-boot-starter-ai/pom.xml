@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The AI starter: an AgentPort backed by a local agent CLI, so a governed loop can
+     draft roles through the developer's own headless harness. The BYOK seam stays
+     pluggable — this is ONE adapter, never a hard dependency on a vendor. Depends on -core. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.mantlekeep</groupId>
+    <artifactId>mantlekeep-spring-boot</artifactId>
+    <version>0.1.0-rc.1</version>
+  </parent>
+
+  <artifactId>mantlekeep-spring-boot-starter-ai</artifactId>
+  <name>MantleKeep Spring Boot starter (AI)</name>
+  <description>AgentPort adapter over a local agent CLI — the BYOK seam, governed through the door.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-spring-boot-core</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Mono/Flux on the AgentPort adapter surface -->
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <!-- parse the CLI's stream-json deltas -->
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <!-- @ConfigurationProperties binding -->
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

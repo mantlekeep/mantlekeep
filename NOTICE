@@ -1,0 +1,13 @@
+MantleKeep
+Copyright 2026 Kelvin Chan and the MantleKeep co-owners.
+
+This product was designed and authored by Kelvin Chan (architect and lead) together
+with the MantleKeep co-owners. Copyright is retained by the authors.
+
+This distribution is the SURFACE of the framework — the generic governance engine,
+the SDK/port contracts, example adapters, and two example governed-worker services.
+It is licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+"MantleKeep" and its marks identify this project and its origin. The trademark grant
+in Section 6 of the Apache License does not extend to the project name or marks
+beyond reasonable and customary descriptive use.

@@ -1,0 +1,53 @@
+// Root module — the ORIGINAL flat sidecar client (dev.mantlekeep.MantlekeepClient), kept
+// compiling untouched while the multi-module SDK grows in the subprojects below.
+// New work goes in mantlekeep-adapter-spi / mantlekeep-door-client / mantlekeep-spring-boot-starter /
+// mantlekeep-java-core; this flat client remains for the sidecar demo path.
+plugins { id 'java-library' }
+
+// MantleKeep's Java SDK uses ONLY the JDK (java.net.http) — no external dependencies,
+// so it drags nothing into a host's app. Compiled for JDK 17+ bytecode with whatever
+// newer JDK runs the build (release, not toolchain — no JDK auto-download needed).
+compileJava.options.release = 17
+
+// Run the example against a live core:  ./gradlew run   (needs `mantlekeep serve` on :8080)
+tasks.register('run', JavaExec) {
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.mantlekeep.Example'
+}
+
+// ── Publishing (Maven) ───────────────────────────────────────────────────────
+// Coordinates: dev.mantlekeep:<module>:<version> (artifactId = module name). The brand
+// group is kept even on GitHub Packages — which verifies no namespace — so the SAME GAV
+// upgrades to Maven Central later, once mantlekeep.dev is owned + DNS-verified. An internal
+// artifact proxy mirrors GitHub Packages exactly as it would Central. Consume with:
+//   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0-rc.1"
+allprojects {
+    group = 'dev.mantlekeep'
+    version = '0.1.0-rc.1'
+
+    // Every java-library module (root flat client + the SDK subprojects) becomes publishable.
+    // Sources jar included (cheap + useful); javadoc jar is deferred to the Maven Central step
+    // (Central requires it, GitHub Packages does not — keeps this build robust for now).
+    plugins.withId('java-library') {
+        apply plugin: 'maven-publish'
+        java { withSourcesJar() }
+        publishing {
+            publications {
+                maven(MavenPublication) { from components.java }
+            }
+            repositories {
+                maven {
+                    name = 'GitHubPackages'
+                    url = uri('https://maven.pkg.github.com/potkei/mantlekeep')
+                    credentials {
+                        // set at publish time via env (GITHUB_ACTOR/GITHUB_TOKEN) or
+                        // gradle.properties (gpr.user/gpr.key); lazy — local publish needs neither.
+                        username = System.getenv('GITHUB_ACTOR') ?: findProperty('gpr.user')
+                        password = System.getenv('GITHUB_TOKEN') ?: findProperty('gpr.key')
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,20 @@
+// mantlekeep-adapter-policy-allowlist — a SECOND, independent example adapter SDK, for a
+// DIFFERENT kind (policy-evaluator): proof that unrelated adapter jars extend the one
+// AdapterProvider SPI side by side, each selected by config name.
+// Compile-time dependency is the SPI ONLY (one-way: adapter → spi, never the core).
+// The door-client appears in TEST scope only — the tests drive the real AdapterCatalog
+// selection path; nothing of it leaks into this adapter's published ABI.
+plugins { id 'java-library' }
+
+compileJava.options.release = 17
+compileTestJava.options.release = 17
+
+dependencies {
+    implementation project(':mantlekeep-adapter-spi')
+
+    testImplementation project(':mantlekeep-door-client')
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+}
+
+tasks.named('test') { useJUnitPlatform() }

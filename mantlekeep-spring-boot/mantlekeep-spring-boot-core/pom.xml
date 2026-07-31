@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shared, transport-agnostic contracts: DoorClient (interface), Intent/Decision,
+     @MantlekeepIntent, AgentPort. Kept minimal — only Reactor for the Mono/Flux in
+     signatures. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.mantlekeep</groupId>
+    <artifactId>mantlekeep-spring-boot</artifactId>
+    <version>0.1.0-rc.1</version>
+  </parent>
+
+  <artifactId>mantlekeep-spring-boot-core</artifactId>
+  <name>MantleKeep Spring Boot core</name>
+  <description>Transport-agnostic governance contracts shared by every MantleKeep starter.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

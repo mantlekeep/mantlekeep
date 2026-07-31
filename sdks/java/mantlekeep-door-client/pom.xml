@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- mantlekeep-door-client — the door abstraction, FRAMEWORK-AGNOSTIC: no Spring, no
+     JSON library, pure JDK (java.net.http). SACRED library module: additive only,
+     semver, ABI-minded. Exposes the SPI to consumers (Gradle `api`) → compile scope. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.mantlekeep</groupId>
+    <artifactId>mantlekeep-java-parent</artifactId>
+    <version>0.1.0-rc.1</version>
+  </parent>
+
+  <artifactId>mantlekeep-door-client</artifactId>
+  <name>MantleKeep door client</name>
+  <description>Config-driven DoorClient (service | embedded) — govern-before-execute, pure JDK.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-adapter-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
