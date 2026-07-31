@@ -1,6 +1,15 @@
 // Package sdk implements the one door — mantlekeep.Submitter. Humans and AI both
-// call Submit. It validates the intent, evaluates policy, records the decision
-// in the audit trail, and issues a scoped ExecutionToken on allow. No bypass.
+// call Submit. It validates the intent, evaluates policy, records the decision in
+// the audit trail, and issues a scoped ExecutionToken on allow.
+//
+// WHAT THIS GUARANTEES, precisely: every intent submitted here is decided and
+// recorded before a token exists. It does NOT prevent a caller from performing the
+// effect without asking — code that never calls Submit is not seen by the door, and
+// no in-process check can change that, because whoever can add such code can also
+// remove the check. Preventing execution requires withholding the CAPABILITY to
+// execute (short-lived credentials released only on allow); see
+// docs/credential-brokering.md. Until then the honest claim is a tamper-evident
+// record of everything that was asked, not proof that nothing else happened.
 package sdk
 
 import (

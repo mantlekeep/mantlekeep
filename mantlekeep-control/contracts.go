@@ -176,13 +176,22 @@ type PolicyEvaluator interface {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Execution — the TOKEN. A valid intent yields a scoped, expiring token that
-// the orchestrator requires to run anything. No token → nothing executes.
+// Execution — the TOKEN. A valid intent yields a scoped, expiring token naming what
+// was approved and until when. The orchestrator carries it, and a caller that holds
+// a token can show WHICH decision authorised the work.
+//
+// It is not, today, a capability that gates execution: it is an opaque random value,
+// unsigned and unverified, so a component that chooses not to check it is unaffected
+// by it. Making a token gate execution requires signing it at the door and verifying
+// it where the effect happens — and even that binds only components that verify.
+// See docs/credential-brokering.md for the structural control.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ExecutionToken is a cryptographic capability scoped to one approved intent.
+// ExecutionToken records which approved intent authorises a piece of work, and for
+// how long. Treat it as EVIDENCE of a decision rather than as a key: it is currently
+// unsigned, so it proves nothing to a party that did not issue it.
 type ExecutionToken struct {
-	Value     string // opaque token (signed/hashed)
+	Value     string // opaque random value; NOT signed — see the note above
 	IntentID  string // the intent it authorises
 	Scope     string // resource scope it is valid for
 	IssuedAt  time.Time
