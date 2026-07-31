@@ -214,9 +214,27 @@ edited in place. A team upgrades by moving to a new version, and the move itself
 
 Two things this model adds over a conventional CI system, and the only two:
 
-1. **Every phase is submitted to the door before it executes.** Not the run — *each phase*. A deny stops
-   that phase before its effect, and both the allow and the deny are on one chain. One trail per system,
-   not one log per pipeline.
+1. **Governance granularity — decide this deliberately, because both answers are defensible.**
+
+   | | What reaches the chain | Suits |
+   |---|---|---|
+   | **Transition-level** *(the usual first slice)* | propose · approve · reject — two or three records per run | one approval authorises the whole run; no floor needs step-specific data |
+   | **Phase-level** *(the fuller form)* | every phase, each with its own parameters | a floor must gate one phase differently from another — "deploy to prod" separately from "build" |
+
+   **Start at transition level.** It is simpler, it is honest, and it is enough when the approval genuinely
+   covers the run. Move to phase level when a floor needs to inspect a *particular* phase's parameters —
+   that requirement is what tells you, rather than a preference for more records.
+
+   The trade is real in both directions: transition-level means an approved run executes its phases
+   unchecked, so the approval must be worth that. Phase-level means more records, and records nobody reads
+   dilute the ones that matter.
+
+   **What does not change with granularity:** whatever IS submitted is decided before its effect, and both
+   allow and deny reach one chain. One trail per system, not one log per pipeline.
+
+   **Steps are not the same thing as chain records.** A step's status and its real output belong on the RUN
+   record, which is where someone looks to see what a run did. The chain answers a different question — was
+   anything altered — so it carries decisions, not progress.
 2. **Untrusted step logic runs in a sandbox** (memory-limited, execution-limited, no network) rather than
    trusted on a build agent. A tool from a registry is not automatically trusted just because it was
    approved once.
