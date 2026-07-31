@@ -183,6 +183,37 @@ implementation from config. Same security rule: the binding is selected from the
 
 ---
 
+## Executing through the door — use `GovernedWorker`, not the raw port
+
+`WorkerPort` is the adapter's side of the contract: it performs an effect and asks nothing. What puts the
+door in front of it is **`GovernedWorker`**, whose decide-then-dispatch sequence is `final`:
+
+```java
+governedWorker.run(intent, workRequestJson);   // decides; dispatches ONLY on allow
+```
+
+**The Spring starter publishes `GovernedWorker` and deliberately does not publish `WorkerPort`.** The
+adapter is resolved from the registered SPI set, so it never enters the application context — meaning
+`@Autowired WorkerPort` does not resolve. You cannot casually inject the unwrapped executor, because that
+bean does not exist.
+
+```yaml
+mantlekeep:
+  adapters:
+    worker: my-worker        # the registered adapter name; enables the GovernedWorker bean
+```
+
+**Why this is the framework's job rather than yours:** a product holding both a door client and a worker
+has to *remember* to govern. It usually does — until a new endpoint takes a shortcut and review does not
+catch it. Moving the sequence into the layer you do not write turns "remembered" into "structural for this
+path".
+
+**Be clear about the limit, because overclaiming here is worse than the gap.** Both still live in one
+process, so code that deliberately constructs the raw adapter can still bypass this. What changes is the
+*kind* of failure: an omission that leaves no trace becomes a decision that leaves a diff a reviewer can
+see. For a control that removes the capability rather than raising its cost, see
+`credential-brokering.md` — the executor holds no credentials until the door releases them.
+
 ## The rules that don't bend
 
 - **Extend, don't edit.** Add adapters; never modify the core to make room for a

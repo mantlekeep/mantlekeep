@@ -1,8 +1,12 @@
 package dev.mantlekeep.spring;
 
+import dev.mantlekeep.door.AdapterCatalog;
 import dev.mantlekeep.door.DoorClient;
+import dev.mantlekeep.door.GovernedWorker;
 import dev.mantlekeep.door.DoorClientFactory;
 import dev.mantlekeep.door.model.Subject;
+import dev.mantlekeep.spi.AdapterKind;
+import dev.mantlekeep.spi.WorkerPort;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -46,5 +50,27 @@ public class MantlekeepAutoConfiguration {
     public MantlekeepIntentAspect mantleIntentAspect(
             DoorClient doorClient, SubjectResolver subjectResolver) {
         return new MantlekeepIntentAspect(doorClient, subjectResolver);
+    }
+
+    /**
+     * The governed execution path — the only worker a product is given.
+     *
+     * <p>Note what is NOT published here: the raw {@link dev.mantlekeep.spi.WorkerPort}.
+     * The adapter is resolved from the registered SPI set, so it never enters the
+     * application context and {@code @Autowired WorkerPort} does not resolve. A product
+     * therefore cannot casually inject the unwrapped executor — not because it was asked
+     * not to, but because that bean does not exist.
+     *
+     * <p>Registered only when {@code mantlekeep.adapters.worker} names a worker, since a
+     * product that dispatches nothing needs no executor.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "mantlekeep.adapters", name = "worker")
+    public GovernedWorker governedWorker(DoorClient doorClient, MantlekeepProperties properties) {
+        String workerName = properties.adapters().get("worker");
+        Object adapter = AdapterCatalog.discover()
+                .select(AdapterKind.WORKER, workerName, properties.adapters());
+        return new GovernedWorker(doorClient, (WorkerPort) adapter);
     }
 }
