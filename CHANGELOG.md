@@ -22,6 +22,10 @@ claims.
   through `doorkit` with no native library, and that path works today.
 - The `ExecutionToken` is an opaque random value: it records which decision authorised a piece of work,
   and is neither signed nor verified. It is evidence, not a key.
+- **The Java surface is duplicated across two module trees** — `DoorClient`, `Intent` and door config are
+  each declared twice (and `Intent` three times, with two of them disagreeing about their fields). A fix
+  must therefore be applied to both, and each tree's tests pass while the copies diverge. See
+  `docs/java-consolidation.md` for the target shape and migration order.
 - Governance inside an executing process is enforced by the framework owning the dispatch path, not by
   removing the ability to bypass it. See `docs/credential-brokering.md` for the structural control.
 
