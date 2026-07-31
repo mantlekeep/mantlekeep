@@ -23,7 +23,7 @@ import reactor.test.StepVerifier;
 class WebClientDoorClientTest {
 
     private static final DoorProperties PROPS =
-            new DoorProperties("http://door.local", "/api/govern", "", "session-service", null, null, null);
+            new DoorProperties("http://door.local", "/api/govern", "", "session-service", null, null, null, null);
 
     private WebClientDoorClient clientReturning(ExchangeFunction exchange) {
         WebClient webClient = WebClient.builder().baseUrl(PROPS.baseUrl()).exchangeFunction(exchange).build();

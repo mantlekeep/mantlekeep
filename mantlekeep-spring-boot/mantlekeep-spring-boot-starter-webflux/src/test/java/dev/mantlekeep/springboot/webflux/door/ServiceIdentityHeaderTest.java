@@ -20,8 +20,13 @@ import org.junit.jupiter.api.Test;
 class ServiceIdentityHeaderTest {
 
     private static DoorProperties properties(String serviceUser, String serviceUserHeader) {
+        return properties(serviceUser, serviceUserHeader, null);
+    }
+
+    private static DoorProperties properties(
+            String serviceUser, String serviceUserHeader, String onBehalfOfHeader) {
         return new DoorProperties("http://door.local", "/api/govern", "",
-                serviceUser, serviceUserHeader, null, null);
+                serviceUser, serviceUserHeader, onBehalfOfHeader, null, null);
     }
 
     @Test
@@ -49,8 +54,24 @@ class ServiceIdentityHeaderTest {
     }
 
     @Test
+    void theOnBehalfOfHeaderIsRenAMEABLE_andTravelsWithItsPair() {
+        // Renaming only one of the pair is worse than renaming neither: the door
+        // recognises the caller, does not recognise the delegation, and records the
+        // action against the SERVICE rather than the person — silently.
+        DoorProperties branded = properties("svc", "X-Acme-User", "X-Acme-On-Behalf-Of");
+
+        assertEquals("X-Acme-User", branded.serviceUserHeader());
+        assertEquals("X-Acme-On-Behalf-Of", branded.onBehalfOfHeader());
+    }
+
+    @Test
+    void theOnBehalfOfHeaderDefaultsAlongsideTheCallerHeader() {
+        assertEquals("X-Mantlekeep-On-Behalf-Of", properties("svc", null).onBehalfOfHeader());
+    }
+
+    @Test
     void theOnBehalfOfHeaderIsTheDocumentedName() {
         // The other half of the pair — pinned for the same reason the caller header is.
-        assertEquals("X-Mantlekeep-On-Behalf-Of", WebClientDoorClient.ON_BEHALF_OF);
+        assertEquals("X-Mantlekeep-On-Behalf-Of", WebClientDoorClient.DEFAULT_ON_BEHALF_OF);
     }
 }

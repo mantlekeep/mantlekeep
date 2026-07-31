@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     bearer-token: ${MANTLEKEEP_DOOR_TOKEN:}
  *     service-user: session-service      # who THIS service is to the door
  *     service-user-header: X-Mantlekeep-User
+ *     on-behalf-of-header: X-Mantlekeep-On-Behalf-Of   # rename WITH the caller header
  *     connect-timeout: 3s
  *     response-timeout: 10s
  * </pre>
@@ -31,6 +32,7 @@ public record MantlekeepDoorProperties(
         String bearerToken,
         String serviceUser,
         String serviceUserHeader,
+        String onBehalfOfHeader,
         Duration connectTimeout,
         Duration responseTimeout) {
 }

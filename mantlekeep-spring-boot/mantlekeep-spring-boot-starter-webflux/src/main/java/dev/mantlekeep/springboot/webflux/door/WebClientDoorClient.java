@@ -34,8 +34,14 @@ public class WebClientDoorClient implements DoorClient {
         this.properties = properties;
     }
 
-    /** Header naming the subject this application acts for; the door decides if it may. */
-    static final String ON_BEHALF_OF = "X-Mantlekeep-On-Behalf-Of";
+    /**
+     * The DEFAULT header naming the subject this application acts for. It is a default,
+     * not a constant: a branded deployment renames it together with the caller header,
+     * and renaming only one is worse than renaming neither — the door recognises the
+     * caller, does not recognise the delegation, and records the action against the
+     * SERVICE instead of the person, with nothing reporting that it happened.
+     */
+    static final String DEFAULT_ON_BEHALF_OF = "X-Mantlekeep-On-Behalf-Of";
 
     @Override
     public Mono<Decision> submit(Intent intent) {
@@ -55,7 +61,7 @@ public class WebClientDoorClient implements DoorClient {
                     // WHO THE SERVICE ACTS FOR. Recorded as the subject, with the service
                     // as `via` — the door decides whether this service may make the claim.
                     if (!onBehalfOf.isBlank()) {
-                        headers.set(ON_BEHALF_OF, onBehalfOf);
+                        headers.set(properties.onBehalfOfHeader(), onBehalfOf);
                     }
                 })
                 .bodyValue(intent)

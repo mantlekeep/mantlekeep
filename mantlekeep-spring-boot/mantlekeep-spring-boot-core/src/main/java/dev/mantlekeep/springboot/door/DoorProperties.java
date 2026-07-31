@@ -17,6 +17,13 @@ import java.time.Duration;
  * @param serviceUserHeader the header carrying {@code serviceUser} (default
  *                        {@code X-Mantlekeep-User} — the same header the door reads as the
  *                        authenticated caller)
+ * @param onBehalfOfHeader the header naming the person this service acts for (default
+ *                        {@code X-Mantlekeep-On-Behalf-Of}). It travels WITH
+ *                        {@code serviceUserHeader} and must be renamed with it: a door
+ *                        reading a branded pair will see one header it recognises and one
+ *                        it does not, so the caller authenticates and the delegation is
+ *                        silently dropped — the action is then recorded against the
+ *                        SERVICE rather than the person.
  * @param connectTimeout  connection timeout (default 3s)
  * @param responseTimeout response timeout (default 10s)
  */
@@ -26,6 +33,7 @@ public record DoorProperties(
         String bearerToken,
         String serviceUser,
         String serviceUserHeader,
+        String onBehalfOfHeader,
         Duration connectTimeout,
         Duration responseTimeout) {
 
@@ -36,6 +44,8 @@ public record DoorProperties(
         serviceUser = serviceUser == null ? "" : serviceUser.trim();
         serviceUserHeader = (serviceUserHeader == null || serviceUserHeader.isBlank())
                 ? "X-Mantlekeep-User" : serviceUserHeader;
+        onBehalfOfHeader = (onBehalfOfHeader == null || onBehalfOfHeader.isBlank())
+                ? "X-Mantlekeep-On-Behalf-Of" : onBehalfOfHeader;
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(3) : connectTimeout;
         responseTimeout = responseTimeout == null ? Duration.ofSeconds(10) : responseTimeout;
     }
