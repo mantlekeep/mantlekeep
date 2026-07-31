@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.mantlekeep.door.model.AuditRecord;
 import dev.mantlekeep.door.model.Decision;
+import dev.mantlekeep.door.model.ExecutionToken;
 import dev.mantlekeep.door.model.Intent;
 import dev.mantlekeep.door.model.Subject;
 import dev.mantlekeep.spi.WorkerPort;
@@ -80,6 +81,29 @@ class GovernedWorkerTest {
         assertTrue(!worker.dispatched,
                 "THE guarantee: a denied intent must produce NO side effect. If the adapter "
                         + "ran, governance is advice rather than control.");
+    }
+
+    @Test
+    void workUnderAnExistingApprovalDoesNotAskTheDoorAgain() {
+        RecordingWorker worker = new RecordingWorker();
+        // A door that would DENY — proving runUnder does not consult it. A saga approved
+        // as a unit must not re-ask per step, or transition-level governance silently
+        // becomes phase-level and the chain fills with decisions nobody made.
+        GovernedWorker governed = new GovernedWorker(doorThat(false, "would deny"), worker);
+
+        governed.runUnder(new ExecutionToken("token-from-the-approval"), "{}");
+
+        assertTrue(worker.dispatched, "an already-approved run must be able to execute its steps");
+    }
+
+    @Test
+    void dispatchingWithoutAnApprovalTokenIsRefused() {
+        GovernedWorker governed = new GovernedWorker(doorThat(true, ""), new RecordingWorker());
+
+        // Not a security control — it is traceability. Work that names no decision cannot
+        // be tied back to an approval, which is the point of carrying the token at all.
+        assertThrows(IllegalArgumentException.class,
+                () -> governed.runUnder(new ExecutionToken(""), "{}"));
     }
 
     @Test

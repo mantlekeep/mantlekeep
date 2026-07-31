@@ -189,8 +189,15 @@ implementation from config. Same security rule: the binding is selected from the
 door in front of it is **`GovernedWorker`**, whose decide-then-dispatch sequence is `final`:
 
 ```java
-governedWorker.run(intent, workRequestJson);   // decides; dispatches ONLY on allow
+governedWorker.run(intent, workRequestJson);            // decides, then dispatches ONLY on allow
+governedWorker.runUnder(approvalToken, workRequestJson); // dispatch beneath an approval already granted
 ```
+
+**Which one depends on where you govern.** `run` asks the door for THIS dispatch — use it when a step needs
+its own decision, because a floor must inspect that step's parameters. `runUnder` executes beneath a
+decision already made, which is right when one approval covers a whole run: asking again per step would
+fill the chain with decisions nobody made and turn transition-level governance into phase-level by
+accident. The token names which approval the work belongs to, so the dispatch remains traceable either way.
 
 **The Spring starter publishes `GovernedWorker` and deliberately does not publish `WorkerPort`.** The
 adapter is resolved from the registered SPI set, so it never enters the application context — meaning

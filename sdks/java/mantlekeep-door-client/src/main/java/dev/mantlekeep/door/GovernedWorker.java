@@ -1,6 +1,7 @@
 package dev.mantlekeep.door;
 
 import dev.mantlekeep.door.model.Decision;
+import dev.mantlekeep.door.model.ExecutionToken;
 import dev.mantlekeep.door.model.Intent;
 import dev.mantlekeep.spi.WorkerPort;
 import java.util.Objects;
@@ -69,6 +70,41 @@ public final class GovernedWorker {
             // value would proceed as though nothing had happened, and a refusal that can
             // be ignored is not a refusal.
             throw new DoorDeniedException(intent, decision);
+        }
+        return delegate.dispatch(workRequestJson);
+    }
+
+    /**
+     * Dispatches under an approval already granted — for a flow governed at the
+     * TRANSITION level, where one decision authorises a whole run and its steps then
+     * execute beneath it.
+     *
+     * <p>Use this when the approval genuinely covers the work: a saga that was approved as
+     * a unit should not ask again for each of its steps, or the chain fills with decisions
+     * nobody made and transition-level governance quietly becomes phase-level.
+     *
+     * <p>Use {@link #run} instead when a step needs its OWN decision — when a floor must
+     * inspect that step's parameters, or refuse one phase while allowing another. The
+     * requirement decides which, not a preference for more records.
+     *
+     * <p><b>What the token does here:</b> it names which decision this dispatch belongs to,
+     * so the work can be traced back to its approval. It is not verified — an expired or
+     * fabricated token is not rejected — so this method trusts its caller by design. That
+     * trust is bounded by the caller already being inside an approved run; it is not a
+     * second authorisation.
+     *
+     * @param approval the token issued when the run was approved
+     * @param workRequestJson the work for the adapter
+     * @return the adapter's receipt
+     * @throws IllegalArgumentException if the approval has expired — a stale approval is a
+     *         caller bug worth surfacing loudly rather than a decision to re-take
+     */
+    public String runUnder(ExecutionToken approval, String workRequestJson) {
+        Objects.requireNonNull(approval, "approval");
+        if (approval.value() == null || approval.value().isBlank()) {
+            throw new IllegalArgumentException(
+                    "dispatch under an approval requires the token the door issued; "
+                            + "an empty token means the work is not traceable to any decision");
         }
         return delegate.dispatch(workRequestJson);
     }
