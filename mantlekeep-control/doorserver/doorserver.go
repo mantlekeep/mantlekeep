@@ -19,6 +19,7 @@ package doorserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	mantlekeep "mantlekeep.dev/control"
@@ -37,6 +38,26 @@ type Options struct {
 	// SECURITY: only set this when something in front of the door actually strips and
 	// re-sets the header. Trusting a client-settable header is impersonation.
 	TrustedUserHeader string
+
+	// DelegatedSubjectHeader names the header by which an authenticated SERVICE says
+	// which person it is acting for — the business-to-business case, where a service
+	// account authenticates but a human is the one whose action this really is.
+	//
+	// Both identities are recorded: the person as the SUBJECT (who acted) and the
+	// service as VIA (which application carried the claim). An audit that keeps only
+	// one of them cannot answer the question it exists to answer.
+	//
+	// Empty disables delegation entirely.
+	DelegatedSubjectHeader string
+
+	// Delegators lists the authenticated callers permitted to act for someone else.
+	//
+	// SECURITY — this list is the whole control. Without it, any caller could name any
+	// subject and the door would believe it, which is impersonation with an audit trail
+	// that lies. A caller NOT on this list attempting delegation is REFUSED; it is never
+	// silently downgraded to acting as itself, because that would turn a privilege
+	// violation into a successful request.
+	Delegators []string
 
 	// DevLogin enables POST /api/login, which mints a cookie session for a named user
 	// with NO credential check. Development and tests only — never enable it where a
@@ -86,12 +107,15 @@ type governRequest struct {
 }
 
 func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request) {
-	subject, ok := s.resolveCaller(request)
-	if !ok {
-		// No identity means no accountable actor, so there is nothing to record and
-		// nothing to authorise. Refuse before the door is troubled.
-		writeJSON(writer, http.StatusUnauthorized,
-			map[string]any{"decision": "deny", "reason": "unauthenticated: no caller identity"})
+	actor, err := s.resolveCaller(request)
+	if err != nil {
+		// No accountable actor means nothing to record and nothing to authorise; an
+		// overreaching delegator is refused outright rather than downgraded.
+		status, reason := http.StatusUnauthorized, err.Error()
+		if errors.Is(err, errDelegationRefused) {
+			status = http.StatusForbidden
+		}
+		writeJSON(writer, status, map[string]any{"decision": "deny", "reason": reason})
 		return
 	}
 
@@ -112,19 +136,21 @@ func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request)
 		params["env"] = body.Env
 	}
 
-	token, err := s.door.Submitter.Submit(request.Context(), mantlekeep.Intent{
-		ID:       newIntentID(),
-		Subject:  subject,
+	token, submitErr := s.door.Submitter.Submit(request.Context(), mantlekeep.Intent{
+		ID:      newIntentID(),
+		Subject: actor.subject,
+		// Which application carried the claim. Empty when the subject acted itself.
+		Via:      actor.via,
 		Action:   body.Action,
 		Resource: body.Resource,
 		Spec:     mantlekeep.IntentSpec{Goal: body.Goal},
 		Params:   params,
 	})
-	if err != nil {
+	if submitErr != nil {
 		// A deny is a normal, recorded outcome — not a server fault. 403 says the door
 		// answered and the answer was no.
 		writeJSON(writer, http.StatusForbidden,
-			map[string]any{"decision": "deny", "reason": err.Error()})
+			map[string]any{"decision": "deny", "reason": submitErr.Error()})
 		return
 	}
 

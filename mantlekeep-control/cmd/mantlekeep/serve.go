@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"mantlekeep.dev/control/app"
 	"mantlekeep.dev/control/doorkit"
@@ -27,6 +28,10 @@ func runServe() {
 	address := envOrDefault("MANTLEKEEP_ADDR", ":8080")
 	auditPath := envOrDefault("MANTLEKEEP_AUDIT_PATH", filepath.Join(app.DataDir(), "audit.db"))
 	userHeader := os.Getenv("MANTLEKEEP_USER_HEADER")
+	// Delegation: a service account authenticates as itself and names the person it acts
+	// for. Both reach the chain — the person as subject, the service as `via`.
+	delegatedHeader := os.Getenv("MANTLEKEEP_ON_BEHALF_OF_HEADER")
+	delegators := splitList(os.Getenv("MANTLEKEEP_DELEGATORS"))
 	devLogin := os.Getenv("MANTLEKEEP_DEV_LOGIN") == "true"
 
 	// Fail closed: a door with no way to identify callers would deny every request.
@@ -40,9 +45,11 @@ func runServe() {
 	must(err)
 
 	server, err := doorserver.New(doorserver.Options{
-		Door:              door,
-		TrustedUserHeader: userHeader,
-		DevLogin:          devLogin,
+		Door:                   door,
+		TrustedUserHeader:      userHeader,
+		DelegatedSubjectHeader: delegatedHeader,
+		Delegators:             delegators,
+		DevLogin:               devLogin,
 	})
 	must(err)
 
@@ -58,9 +65,24 @@ func runServe() {
 	if devLogin {
 		fmt.Println("  identity: POST /api/login enabled — DEV ONLY, no credential check")
 	}
+	if len(delegators) > 0 {
+		fmt.Printf("  delegate: %s may act for others via %s\n",
+			strings.Join(delegators, ", "), delegatedHeader)
+	}
 	fmt.Println("  routes:   POST /api/govern · GET /api/audit")
 
 	log.Fatal(http.ListenAndServe(address, server.Handler()))
+}
+
+// splitList parses a comma-separated env value, ignoring blanks and stray spaces.
+func splitList(value string) []string {
+	var items []string
+	for _, part := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
 }
 
 func envOrDefault(key, fallback string) string {

@@ -25,8 +25,8 @@ const auditRecordLimit = 500
 // the ledger has been tampered with. Clients call it to assert the guarantee, so it is
 // computed on every request rather than cached.
 func (s *Server) handleAudit(writer http.ResponseWriter, request *http.Request) {
-	if _, ok := s.resolveCaller(request); !ok {
-		writeJSON(writer, http.StatusUnauthorized, map[string]any{"error": "unauthenticated"})
+	if _, err := s.resolveCaller(request); err != nil {
+		writeJSON(writer, http.StatusUnauthorized, map[string]any{"error": err.Error()})
 		return
 	}
 
