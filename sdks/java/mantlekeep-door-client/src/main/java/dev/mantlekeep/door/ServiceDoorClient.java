@@ -62,7 +62,10 @@ public final class ServiceDoorClient implements DoorClient {
     @Override
     public Decision decide(Intent intent) {
         loginForDevelopmentIfConfigured();
-        String environment = intent.parameters().getOrDefault(ENVIRONMENT_PARAMETER, "");
+        // env is read generically off params — the engine names no environment. It is a
+        // scalar by convention, so render whatever was supplied rather than assuming.
+        Object environmentValue = intent.parameters().get(ENVIRONMENT_PARAMETER);
+        String environment = environmentValue == null ? "" : environmentValue.toString();
         String governRequestJson = "{"
                 + "\"action\":" + JsonText.quote(intent.action()) + ","
                 + "\"resource\":" + JsonText.quote(intent.resource()) + ","

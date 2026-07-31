@@ -15,7 +15,7 @@ public record Intent(
         String action,
         String resource,
         String goal,
-        Map<String, String> parameters) {
+        Map<String, Object> parameters) {
 
     public Intent {
         id = id == null ? "" : id;

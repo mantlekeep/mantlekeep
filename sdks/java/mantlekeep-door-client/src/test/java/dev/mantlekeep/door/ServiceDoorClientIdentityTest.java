@@ -3,6 +3,7 @@ package dev.mantlekeep.door;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpServer;
 import dev.mantlekeep.door.model.DoorConfig;
@@ -127,6 +128,38 @@ class ServiceDoorClientIdentityTest {
         assertNull(lastHeaders.get("X-mantlekeep-user"),
                 "falling back to the default name is the bug: the door reads X-Acme-User "
                         + "and would refuse this with an unexplained 401");
+    }
+
+    @Test
+    void nestedParametersSurviveTheWire() {
+        // A policy floor that caps a SET of resources reads a map at its parameter. While
+        // parameters were Map<String,String> this could not be expressed at all, so such a
+        // floor could never fire from Java — and it failed SILENTLY: the request was
+        // allowed because the floor found nothing to inspect.
+        try (DoorClient door = new ServiceDoorClient(doorUrl(), "", "session-service",
+                "X-Mantlekeep-User", "X-Mantlekeep-On-Behalf-Of")) {
+            door.decide(new Intent("", new Subject("lead-bob", "operator"), "session.deploy",
+                    "session-a", "deploy",
+                    Map.of("maxResources", Map.of("cpu", "16"))));
+        }
+
+        assertTrue(lastBody.contains("\"maxResources\""), "the nested key is missing: " + lastBody);
+        assertTrue(lastBody.contains("\"cpu\""),
+                "the nested map was flattened or stringified, so the floor cannot read it: " + lastBody);
+    }
+
+    @Test
+    void numbersAndBooleansKeepTheirJsonTypes() {
+        // A numeric floor comparing "8" as text is not the same comparison as 8 as a
+        // number; quoting everything would make a cap floor subtly wrong rather than broken.
+        try (DoorClient door = new ServiceDoorClient(doorUrl(), "", "session-service",
+                "X-Mantlekeep-User", "X-Mantlekeep-On-Behalf-Of")) {
+            door.decide(new Intent("", new Subject("lead-bob", "operator"), "session.kill",
+                    "session-a", "kill", Map.of("replicas", 3, "force", true)));
+        }
+
+        assertTrue(lastBody.contains("\"replicas\":3"), "a number was quoted: " + lastBody);
+        assertTrue(lastBody.contains("\"force\":true"), "a boolean was quoted: " + lastBody);
     }
 
     @Test

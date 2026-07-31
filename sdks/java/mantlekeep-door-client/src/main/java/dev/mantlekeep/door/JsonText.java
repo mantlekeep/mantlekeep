@@ -46,10 +46,49 @@ final class JsonText {
     }
 
     /** Renders a JSON object of string→string. */
-    static String object(Map<String, String> values) {
+    /**
+     * Serialises a parameter map, including NESTED structures.
+     *
+     * <p>Nesting is not a convenience: a policy floor that caps a set of resources reads a
+     * MAP at its parameter — {@code {"maxResources": {"cpu": "8"}}} — and a flat
+     * string-to-string map cannot express that. A client limited to flat values cannot
+     * trigger such a floor at all, and the failure is silent: the request is allowed
+     * because the floor found nothing to inspect.
+     */
+    static String object(Map<String, ?> values) {
         return values.entrySet().stream()
-                .map(entry -> quote(entry.getKey()) + ":" + quote(entry.getValue()))
+                .map(entry -> quote(entry.getKey()) + ":" + value(entry.getValue()))
                 .collect(Collectors.joining(",", "{", "}"));
+    }
+
+    /**
+     * Renders one value. Numbers and booleans keep their JSON types so a numeric floor
+     * compares numbers; maps and lists recurse; anything else is quoted as a string.
+     */
+    @SuppressWarnings("unchecked")
+    private static String value(Object raw) {
+        if (raw == null) {
+            return "null";
+        }
+        if (raw instanceof Map<?, ?> nested) {
+            return object((Map<String, ?>) nested);
+        }
+        if (raw instanceof Iterable<?> items) {
+            StringBuilder out = new StringBuilder("[");
+            boolean first = true;
+            for (Object item : items) {
+                if (!first) {
+                    out.append(',');
+                }
+                out.append(value(item));
+                first = false;
+            }
+            return out.append(']').toString();
+        }
+        if (raw instanceof Number || raw instanceof Boolean) {
+            return raw.toString();
+        }
+        return quote(raw.toString());
     }
 
     /** Extracts a string field's value (unescaped), or empty when absent. */
