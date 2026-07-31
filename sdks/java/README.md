@@ -22,7 +22,7 @@ product ──▶ mantlekeep-spring-boot-starter ──▶ mantlekeep-door-clien
 | `mantlekeep-java-core` | the thin Panama/FFM binding over the Rust core's C ABI (the SACRED five-symbol surface, adapted from `spike/rust-core/java-core/`) — an **optional runtime drop-in**, Java 22+ | door-client |
 | `mantlekeep-adapter-store-inmemory` | **example adapter SDK**: a `StorePort` adapter, config name `inmemory` | spi only |
 | `mantlekeep-adapter-policy-allowlist` | **example adapter SDK**: a `PolicyEvaluator` adapter, config name `allowlist` | spi only |
-| root `src/` | the original flat, dependency-free sidecar client (`dev.mantlekeep.MantleKeepClient`) — kept as-is for the sidecar demo path | none |
+| root `src/` | the original flat, dependency-free sidecar client (`dev.mantlekeep.MantlekeepClient`) — kept as-is for the sidecar demo path | none |
 
 Adding a backend never edits these modules: implement a port, register the provider,
 select it by name in config. Library modules are additive-only, semver, ABI-minded.

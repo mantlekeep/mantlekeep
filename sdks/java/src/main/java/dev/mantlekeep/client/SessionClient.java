@@ -198,13 +198,13 @@ public final class SessionClient {
     private String post(String path, String json) {
         return send(HttpRequest.newBuilder(URI.create(base + "/api/sessions" + path))
                 .header("Content-Type", "application/json")
-                .header("X-Mantlekeepkeep-User", caller)
+                .header("X-Mantlekeep-User", caller)
                 .POST(HttpRequest.BodyPublishers.ofString(json)), path);
     }
 
     private String get(String path) {
         return send(HttpRequest.newBuilder(URI.create(base + "/api/sessions" + path))
-                .header("X-Mantlekeepkeep-User", caller)
+                .header("X-Mantlekeep-User", caller)
                 .GET(), path);
     }
 

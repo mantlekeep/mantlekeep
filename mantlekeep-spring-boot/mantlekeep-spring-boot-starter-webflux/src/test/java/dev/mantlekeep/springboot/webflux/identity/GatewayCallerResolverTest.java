@@ -27,8 +27,8 @@ class GatewayCallerResolverTest {
     @Test
     void readsTheCallerAndRolesTheGatewayAsserted() {
         Caller caller = new GatewayCallerResolver(DEFAULTS)
-                .resolve(request("X-Mantlekeepkeep-User", "arch-carol",
-                        "X-Mantlekeepkeep-Roles", "architect, approver"))
+                .resolve(request("X-Mantlekeep-User", "arch-carol",
+                        "X-Mantlekeep-Roles", "architect, approver"))
                 .orElseThrow();
 
         assertEquals("arch-carol", caller.name());
@@ -39,7 +39,7 @@ class GatewayCallerResolverTest {
     @Test
     void aCallerWithoutRolesIsStillACaller() {
         Caller caller = new GatewayCallerResolver(DEFAULTS)
-                .resolve(request("X-Mantlekeepkeep-User", "larry")).orElseThrow();
+                .resolve(request("X-Mantlekeep-User", "larry")).orElseThrow();
 
         assertEquals("larry", caller.name());
         assertTrue(caller.roles().isEmpty()); // authorisation is the door's job, not the header's
@@ -49,7 +49,7 @@ class GatewayCallerResolverTest {
     void noIdentityHeaderMeansNoCaller_neverADefaultName() {
         assertTrue(new GatewayCallerResolver(DEFAULTS).resolve(request()).isEmpty());
         assertTrue(new GatewayCallerResolver(DEFAULTS)
-                .resolve(request("X-Mantlekeepkeep-User", "   ")).isEmpty()); // blank is not a name
+                .resolve(request("X-Mantlekeep-User", "   ")).isEmpty()); // blank is not a name
     }
 
     @Test
@@ -61,7 +61,7 @@ class GatewayCallerResolverTest {
 
         // and it never overrides a real asserted identity
         assertEquals("arch-carol", new GatewayCallerResolver(dev)
-                .resolve(request("X-Mantlekeepkeep-User", "arch-carol")).orElseThrow().name());
+                .resolve(request("X-Mantlekeep-User", "arch-carol")).orElseThrow().name());
     }
 
     @Test

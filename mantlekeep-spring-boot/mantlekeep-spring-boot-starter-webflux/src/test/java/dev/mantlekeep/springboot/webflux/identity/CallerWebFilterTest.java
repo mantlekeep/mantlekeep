@@ -17,7 +17,7 @@ class CallerWebFilterTest {
     private static MockServerWebExchange exchange(String path, String user) {
         MockServerHttpRequest.BaseBuilder<?> builder = MockServerHttpRequest.get(path);
         if (user != null) {
-            builder = builder.header("X-Mantlekeepkeep-User", user);
+            builder = builder.header("X-Mantlekeep-User", user);
         }
         return MockServerWebExchange.from(builder.build());
     }

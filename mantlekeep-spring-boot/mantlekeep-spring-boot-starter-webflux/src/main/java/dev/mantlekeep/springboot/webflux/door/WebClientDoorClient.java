@@ -35,7 +35,7 @@ public class WebClientDoorClient implements DoorClient {
     }
 
     /** Header naming the subject this application acts for; the door decides if it may. */
-    static final String ON_BEHALF_OF = "X-Mantlekeepkeep-On-Behalf-Of";
+    static final String ON_BEHALF_OF = "X-Mantlekeep-On-Behalf-Of";
 
     @Override
     public Mono<Decision> submit(Intent intent) {
