@@ -16,13 +16,13 @@ mvn install              # Maven
 Add the starter and you have governance with no wiring code:
 
 ```gradle
-implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.2.0"
+implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0-rc.1"
 ```
 ```xml
 <dependency>
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-spring-boot-starter</artifactId>
-  <version>0.2.0</version>
+  <version>0.1.0-rc.1</version>
 </dependency>
 ```
 

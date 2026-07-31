@@ -5,169 +5,60 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
-## [0.3.0-rc.1] — 2026-07-31
+## [0.1.0-rc.1] — 2026-07-31
 
-*A release candidate: the API in this line is not frozen. Iteration happens in the candidates, so the
-release history records deliberate releases rather than a stream of corrections. It promotes to `0.3.0`
-when the API has held for a full cycle, every documented command runs from a fresh clone, a real consumer
-has driven it end to end, and no defect is known in the surface it claims.*
+The first release candidate. **The API is not frozen** — this line exists so the shape can be exercised
+against real consumers before anything is promised. Iteration happens inside the candidates.
 
-### Note on versions
-The Java artifacts stay at **`0.2.0`** in this candidate: nothing in the Java SDK changed, so re-publishing
-an identical jar under a new number would be noise. **An artifact's version moves when its own content
-moves** — the repository tag versions the repository, not every artifact inside it. (This is the opposite
-of the v0.2.0 situation, where the tag carried a Java feature the artifacts did not: that was a real
-mismatch, because a consumer following the docs could not get what the tag claimed.)
+**It promotes to `0.1.0` when:** the API has held for a full candidate cycle · every documented command
+runs from a fresh clone · a real consumer has driven it end to end · no defect is known in the surface it
+claims.
 
-### Added
-- **A service can act for a person, and the chain records both.** The core has modelled this all along
-  (`Intent.Via` → `AuditRecord.Via`), but the HTTP door read a single header and never populated it — so
-  the business-to-business case could not be expressed, and any record it produced lost half the story.
-  `MANTLEKEEP_ON_BEHALF_OF_HEADER` names the person; the chain shows them as **subject** and the service as
-  **via**.
-  The control is the **`MANTLEKEEP_DELEGATORS` allowlist**, not the header: without it any caller could
-  name any subject, which is impersonation with an audit trail that lies. A caller not on the list is
-  **refused** (403, its own reason) and never silently downgraded to acting as itself — that downgrade
-  would turn a privilege violation into a successful request.
-- **Design notes for scale and topology** — a shared Postgres audit chain (why the chain must serialise,
-  and why the adapter lives outside the core so no driver enters it), federated doors across zones
-  (a cross-zone step is governed twice, and hashes travel rather than records), and the execution unit
-  (govern per phase, execute per group — the fix for a pod per step).
+### The governance core
 
-## [0.2.0] — 2026-07-29
+- **One door.** `submit(intent) → allow | deny`, decided against policy, recorded, and returning an
+  execution token only on allow. Govern first; execute second. A deny aborts before any side effect.
+- **A tamper-evident chain.** Every allow *and* every deny is appended to a hash-chain in which each
+  record covers the previous record's hash, so alteration is detectable by re-walking it.
+- **A generic policy floor.** The engine knows zero product, action, environment or role names; grants and
+  floors are supplied as data and unioned across layers. With no policy loaded the door denies — safe by
+  default rather than permissive by default.
+- **The sealed floor.** An AI can never approve its own work. This is not configuration.
+- **Ports and adapters.** The core knows only the port; backend knowledge lives in an adapter selected by
+  configuration and discovered through a registered set — never `Class.forName` on a config value.
+- **An orchestrator spine.** Forward run with compensate-in-reverse rollback.
 
-### Changed
-- **The Java artifacts are versioned 0.2.0, matching the tag.** They still declared `0.1.0` while this
-  tag shipped `BrandPrefix` — so following the docs got you either an artifact without the feature
-  (`0.1.0`) or one that did not resolve (`0.2.0`). Both build systems, both module families, and every
-  quoted coordinate now agree. Verified: Maven and Gradle green on `sdks/java` and the starter family.
+### Running it
 
-### Added
-- **`mantlekeep serve` — the framework now runs the door it documents.** The SDKs shipped a client for
-  the `POST /api/govern` wire contract and nothing published implemented the other half: you could call
-  a door, but not run one, so `mode: service` had nothing to point at. The new `doorserver` package
-  serves the frozen contract (`/api/govern`, `/api/audit`, and an opt-in dev `/api/login`) over the same
-  `Submitter` the embedded path uses — HTTP is a transport, never a second set of rules. Mount it as an
-  `http.Handler` inside a product, or run `mantlekeep serve`.
-  **Fails closed:** it refuses to start unless a caller can be identified (`MANTLEKEEP_USER_HEADER` for
-  a gateway-authenticated deployment, or an explicit dev login), and refuses any request without a
-  resolvable identity before the door is asked.
-  **Verified end to end against the real Java SDK client**, not just against my reading of the contract:
-  allow returns a token, a policy deny returns its reason, and both land on one hash-chained ledger that
-  verifies (`intact: true`). A *validation* rejection is correctly not chained; a *policy* deny is.
-- **`BrandPrefix` (Java) — configuration files can speak the product's name, not the framework's.**
-  The core could hide `MANTLEKEEP_` from operators, but every `application.yml` still had to say
-  `mantlekeep:` — the one file a reviewer opens first. `BrandPrefix.use("acme")` (or
-  `MANTLEKEEP_BRAND_PREFIX`) makes `acme.door.url` bind, via an `EnvironmentPostProcessor` that adds
-  aliases at the **lowest** precedence — so an explicit `mantlekeep.*` value always wins and adopting a
-  prefix can never silently change existing configuration. Four tests, each watched failing first.
+- **`mantlekeep serve`** — the door as a service: `POST /api/govern`, `GET /api/audit`, and an opt-in dev
+  login. It **fails closed twice**: it refuses to start without a way to identify callers, and refuses any
+  request whose caller cannot be resolved, before the door is asked.
+- **Delegation.** A service account can act *for* a person: the chain records the person as **subject** and
+  the service as **via**. The control is an explicit delegator allowlist — a caller not on it is refused
+  outright, never silently downgraded to acting as itself.
+- **Embedded or service.** Embedded gives a process its own local door and chain, which is right for one
+  sovereign zone; service gives many services **one shared chain**, which is what an auditor needs.
 
-## [0.1.6] — 2026-07-29
+### SDKs
 
-### Added
-- **`app.Brand` / `app.CurrentBrand` — a brand states its identity without naming engine variables.**
-  The env-prefix remap hid `MANTLEKEEP_` from *operators*, but a white-label author still had to write
-  `os.Setenv("MANTLEKEEP_BRAND_NAME", …)` — the framework's namespace leaked into every product that
-  branded itself, and each new engine variable would have leaked again. `Brand` takes the brand's own
-  prefix and display values and does both halves of the translation; `CurrentBrand` reads the result
-  back. **No `MANTLEKEEP_` string now appears in branded product code.** Operator-set values still win
-  over brand defaults, and empty fields are left untouched. `RemapEnvPrefix` remains public and
-  unchanged (additive, no break). Four tests, each watched failing before being trusted.
+- **Java** — a config-driven `DoorClient` (`service` | `embedded`), the adapter SPI, worked example
+  adapters, and a Spring Boot starter whose `@MantlekeepIntent` aspect governs a method before it runs.
+- **Build with Gradle or Maven** — both first-class, producing identical artifacts, so a host that must
+  build from source (an air-gapped rebuild, a patch on vendored source, an internal audit) can.
 
-## [0.1.5] — 2026-07-29
+### White-labelling
 
-### Added
-- **A worked white-label example — `cmd/acme-govern`.** The white-label seam
-  (`app.RemapEnvPrefix`) already existed, but nothing showed how to use it, so "brand it without
-  forking" was a claim with no code behind it. This is a second branded binary built from the
-  unmodified core: it remaps `ACME_* → MANTLEKEEP_*`, sets its own brand defaults, and assembles the
-  SAME door / policy floor / hash-chained audit through the public `doorkit` seam. Copy the directory,
-  change one constant and four defaults, and the binary is yours. Verified by running it: allow + deny
-  both governed, audit chain intact, and an operator setting only `ACME_BRAND_*` reaches the engine.
-  Documented in the README, including why forking to rebrand is the one thing not to do (it leaves the
-  upgrade path, so security fixes stop flowing in).
+- **`app.Brand`** — a product states its own name and environment prefix; **no framework variable name
+  appears in branded product code**. `BrandPrefix` does the same for Java configuration, so
+  `application.yml` speaks the product's name. Aliases apply at the lowest precedence, so adopting a prefix
+  cannot silently change existing configuration.
+- **A worked example** (`cmd/acme-govern`) builds a second branded binary from the unmodified core.
 
-## [0.1.4] — 2026-07-29
+### Documentation
 
-### Fixed
-- **The repo builds from its root again.** v0.1.1 removed the root `go.work` as "a pointless single-module
-  workspace" — but that workspace was what let `go build` / `go test` / `go vet` run from the repo root.
-  Without it the root gave `cannot find main module, but found .git/config`. `go.work` is restored (its
-  generated `go.work.sum` stays gitignored, and no longer reappears now that `go.sum` is complete), so both
-  work: from the root `go build -o mantlekeep ./mantlekeep-control/cmd/mantlekeep`, or from inside the
-  module `go build -o mantlekeep ./cmd/mantlekeep`. Verified from a fresh clone with a cold module cache.
-- **README build instructions are now the commands that actually work** — root and in-module forms, the
-  Windows `.\`/`.exe` variant, and the two rules that bite: pass the package path, and from the root use
-  `./mantlekeep-control/...` (a bare `./...` matches no module).
+Adoption guides, the door's library and wire contracts, and the design notes that explain the shape:
+layering a product across generic/domain/team, the template–behaviour–worker composition model, a shared
+audit chain for replication, federated doors across zones, and the execution unit.
 
-## [0.1.3] — 2026-07-29
-
-### Fixed
-- **Fresh clones could not build the Go core.** Dropping the root `go.work`/`go.work.sum` in v0.1.1 also
-  dropped the `/go.mod` hash lines those files carried for two indirect deps, so `go build ./cmd/mantlekeep`
-  on a machine with a cold module cache failed with `missing go.sum entry for go.mod file`. `go.sum` is
-  restored (and `cucumber/godog`, a phantom require imported by no package here, is gone). Verified with an
-  isolated module cache: build clean, `go test ./...` 42 passed in 18 packages, `go vet` clean.
-
-### Added
-- **Maven build for the Spring Boot starter family too** (`mantlekeep-spring-boot/`) — v0.1.2 covered only
-  `sdks/java`, leaving half the Java surface Gradle-only. Adds a parent POM + a real Maven **BOM**
-  (`-dependencies`, importing the Spring Boot platform) + module POMs for `-core`, `-starter-webflux`,
-  `-starter-ai`. The Gradle idioms map onto their Maven equivalents rather than being reinvented: convention
-  plugins → parent POM, `java-platform` → BOM, `annotationProcessor` → `optional` dependency.
-  Verified: `mvn install` green, **51 tests** pass; `./gradlew build` still green.
-  (`mantlekeep-spring-boot-parent/` stays Gradle-only by design — in Maven a parent POM *is* that mechanism.)
-
-## [0.1.2] — 2026-07-29
-
-### Added
-- **Maven build alongside Gradle — both first-class.** The Java SDK now ships `pom.xml` files (a parent
-  aggregator + one per module), so a Maven shop can build the framework **from source** — the case that
-  matters for air-gapped rebuilds, CVE patching on vendored source, and internal audit. Verified: `mvn install`
-  green, 32 tests pass, identical `dev.mantlekeep:*:0.2.0` coordinates to the Gradle build, which stays green.
-  (Maven *consumers* were never blocked — published artifacts were always ordinary POMs; this adds *building*.)
-  Known limit: the legacy flat sidecar client (`sdks/java/src`) stays Gradle-only — a Maven parent cannot
-  carry its own sources; the full `starter → door-client → adapter-spi` chain is Maven-buildable.
-
-## [0.1.1] — 2026-07-28
-
-### Changed
-- **Go: `mantlekeep-control` is now a standalone module.** Removed the redundant single-module
-  `go.work`/`go.work.sum` at the repo root (they only stitched the one module and left a stray root
-  checksum file); `go.mod`/`go.sum` live in the `mantlekeep-control/` subproject. Build + vet verified
-  green standalone (`GOWORK=off`).
-
-### Added
-- **Java SDK is now publishable to Maven** as `dev.mantlekeep:<module>:0.1.0` (jar + sources + POM,
-  transitive `dev.mantlekeep` chain). Published to GitHub Packages first (no domain needed), upgradeable
-  to Maven Central under the same coordinates once `mantlekeep.dev` is DNS-verified. Consume the whole
-  governance stack with one line: `implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.2.0"`.
-
-## [0.1.0] — 2026-07-28
-
-### Added
-- **The generic governance core** — the one **door** (`submit(intent) → allow/deny`), the
-  tamper-evident **hash-chain** audit, the **generic policy floor** engine (data-driven; the engine
-  knows zero product, action, environment, or role names), and the **ports/adapters** seam
-  (`WorkerPort`, `PolicyEvaluator`, `StorePort`, `AgentPort`).
-- **Govern-before-execute** + the **sealed floor** — every action decided at one door before any side
-  effect; AI can never approve its own work.
-- **The orchestrator/saga spine** — forward run + compensate-in-reverse rollback.
-- **Java SDK** — a config-driven `DoorClient` (`service` | `embedded` modes), the adapter **SPI** +
-  `ServiceLoader` discovery, example adapters (in-memory store, allow-list policy), and the **Spring
-  Boot starter** (`@MantlekeepIntent` aspect, identity resolution, a BYOK agent starter).
-- **Configurable branding** via `*_BRAND_*` env (`GET /api/brand`) — white-label with no fork.
-- **Adoption docs** — build-your-first-product tutorial, extending guide, architecture, why-govern-ai.
-- **Apache-2.0** licensed; NOTICE credits the authors.
-
-_On release, move this block out of PENDING and date it (see RELEASE.md)._
-
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/potkei/mantlekeep/compare/v0.1.6...v0.2.0
-[0.1.6]: https://github.com/potkei/mantlekeep/compare/v0.1.5...v0.1.6
-[0.1.5]: https://github.com/potkei/mantlekeep/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/potkei/mantlekeep/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/potkei/mantlekeep/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/potkei/mantlekeep/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...HEAD
+[0.1.0-rc.1]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0-rc.1

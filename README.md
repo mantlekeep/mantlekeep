@@ -88,7 +88,7 @@ a saga rollback with compensation.
 ### Java SDK
 
 Requires a JDK 25 toolchain. **Build with either Gradle or Maven** — both are first-class and
-produce the identical `dev.mantlekeep:*:0.2.0` artifacts.
+produce the identical `dev.mantlekeep:*:0.1.0-rc.1` artifacts.
 
 ```bash
 cd sdks/java
@@ -99,13 +99,13 @@ mvn install              # Maven — same coordinates, same tests
 Consume the whole governance stack with one dependency:
 
 ```gradle
-implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.2.0"
+implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0-rc.1"
 ```
 ```xml
 <dependency>
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-spring-boot-starter</artifactId>
-  <version>0.2.0</version>
+  <version>0.1.0-rc.1</version>
 </dependency>
 ```
 

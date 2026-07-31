@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.mantlekeep"
-version = "0.2.0"
+version = "0.1.0-rc.1"
 
 java {
     toolchain {

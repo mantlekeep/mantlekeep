@@ -21,10 +21,10 @@ tasks.register('run', JavaExec) {
 // group is kept even on GitHub Packages — which verifies no namespace — so the SAME GAV
 // upgrades to Maven Central later, once mantlekeep.dev is owned + DNS-verified. An internal
 // artifact proxy mirrors GitHub Packages exactly as it would Central. Consume with:
-//   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.2.0"
+//   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0-rc.1"
 allprojects {
     group = 'dev.mantlekeep'
-    version = '0.2.0'
+    version = '0.1.0-rc.1'
 
     // Every java-library module (root flat client + the SDK subprojects) becomes publishable.
     // Sources jar included (cheap + useful); javadoc jar is deferred to the Maven Central step
