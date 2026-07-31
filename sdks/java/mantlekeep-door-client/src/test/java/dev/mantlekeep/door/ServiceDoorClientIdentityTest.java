@@ -163,6 +163,25 @@ class ServiceDoorClientIdentityTest {
     }
 
     @Test
+    void aPlainStringMapStillCompilesAndIsSent() {
+        // Java generics are invariant, so widening the component to Map<String,Object>
+        // would have stopped every existing Map<String,String> caller from compiling —
+        // a break with no benefit, since these values are only read and serialised.
+        // The wildcard accepts both shapes; this test pins that it still accepts the
+        // simple one, which is what most callers write.
+        Map<String, String> flat = new java.util.HashMap<>();
+        flat.put("imageRef", "registry/app@sha256:aa");
+
+        try (DoorClient door = new ServiceDoorClient(doorUrl(), "", "session-service",
+                "X-Mantlekeep-User", "X-Mantlekeep-On-Behalf-Of")) {
+            door.decide(new Intent("", new Subject("lead-bob", "operator"), "session.deploy",
+                    "session-a", "deploy", flat));
+        }
+
+        assertTrue(lastBody.contains("imageRef"), "a plain string map must still reach the wire");
+    }
+
+    @Test
     void theSubjectNeverTravelsInTheBody() {
         try (DoorClient door = new ServiceDoorClient(doorUrl(), "", "session-service",
                 "X-Mantlekeep-User", "X-Mantlekeep-On-Behalf-Of")) {

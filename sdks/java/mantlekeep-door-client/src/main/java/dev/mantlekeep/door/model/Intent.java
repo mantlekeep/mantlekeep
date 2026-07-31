@@ -15,8 +15,13 @@ public record Intent(
         String action,
         String resource,
         String goal,
-        Map<String, Object> parameters) {
+        Map<String, ?> parameters) {
 
+    // A WILDCARD, not Map<String,Object>: Java generics are invariant, so a product that
+    // naturally declares Map<String,String> would not fit Map<String,Object> and would stop
+    // compiling. The wildcard accepts both, and a floor needing nested values can still pass
+    // Map<String,Object>. Values are only ever read and serialised, never assigned into, so
+    // the weaker type costs nothing here.
     public Intent {
         id = id == null ? "" : id;
         subject = subject == null ? Subject.anonymous() : subject;
