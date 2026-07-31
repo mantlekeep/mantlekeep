@@ -194,6 +194,48 @@ Fix the start-up cost rather than the granularity — but only after the granula
 None of these help if the pipeline is still spawning a unit per phase — that is the ordering: granularity
 first, warm start second.
 
+## 6c. Saga boundaries — a saga must not span what it cannot compensate
+
+A flow often crosses services: one saves a session, another publishes the artifact. The question is
+whether that is **one saga spanning both** or **two sagas that hand off**.
+
+**Two, and the reason is compensation.** If the first service's saga included the second's work, then on a
+later failure it would have to *undo* that work — delete from a registry it has no authority over. Making
+that possible means giving it an undo hook into the other service's domain, and it now holds authority
+nobody granted it. **When a saga boundary is wrong, the compensation requirement quietly demands a
+privilege escalation.** That is the tell.
+
+So **each service owns the saga for what it can undo**:
+
+```
+  SERVICE A                                SERVICE B
+  ── saga 1, owned here ──                 ── saga 2, owned here ──
+  DOOR: a.action  ✔                        DOOR: b.action  ✔
+    step        ↺ compensable                step        ↺ compensable
+    step        ↺ compensable                step        ↺ compensable
+    hand off ─────────────────────────▶      (begins)
+  (ends here)
+```
+
+**Two decisions, not three.** The first service's decision covers its own action *including the handoff* —
+"may this be done, and sent there". The second judges on **its own** floors and may refuse what the first
+happily requested. Crossing a boundary means more governance, not less; the same rule as a cross-zone step.
+
+**Link the halves with a self-expiring artifact, not a distributed transaction.** If the second service
+never acts, the artifact expires on its own. That is what removes the need for cross-service compensation
+entirely — the orphan cleans itself up rather than requiring a coordinator with reach into both.
+
+| What fails | What happens |
+|---|---|
+| the first decision is denied | nothing runs; one deny recorded |
+| a step in saga 1 fails | saga 1 compensates its own steps; service B never involved |
+| the second decision is denied | the artifact already exists and **expires by TTL**; both halves recorded |
+| a step in saga 2 fails | saga 2 compensates its own steps; service A unaffected |
+
+**Prefer an asynchronous handoff.** Calling the second service and awaiting its result invites the first to
+"handle" the second's failures, which is how the second saga gets absorbed into the first and the boundary
+erodes. Drop the artifact; let the other side pick it up and govern it.
+
 ## 7. Platform versus content — why this avoids a change request per change
 
 The split that makes the model viable operationally:
@@ -260,5 +302,8 @@ Two things this model adds over a conventional CI system, and the only two:
 6. **Every phase — not just the run — has a chain record**, allow or deny.
 7. **A template/behaviour/tool is referenced by version**, and upgrading is a version change plus an
    approval record.
+8. **No saga compensates another service's work.** Check the compensations: if one reaches across a
+   service boundary, the saga boundary is in the wrong place — and the privilege it needed to do so
+   was never granted to it.
 
 If (1) fails, nothing else in this document matters: an overridable skeleton means governance is optional.
