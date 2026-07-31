@@ -29,6 +29,7 @@ public class MantlekeepAutoConfiguration {
     @ConditionalOnMissingBean
     public DoorProperties mantleDoorProperties(MantlekeepDoorProperties props) {
         return new DoorProperties(props.baseUrl(), props.governPath(), props.bearerToken(),
+                props.serviceUser(), props.serviceUserHeader(),
                 props.connectTimeout(), props.responseTimeout());
     }
 

@@ -46,6 +46,14 @@ public class WebClientDoorClient implements DoorClient {
         return webClient.post()
                 .uri(properties.governPath())
                 .headers(headers -> {
+                    // WHO THIS SERVICE IS. The door authenticates the application first;
+                    // only then will it accept the application's claim about a person.
+                    // Without this the door sees an unidentified caller and refuses.
+                    if (!properties.serviceUser().isBlank()) {
+                        headers.set(properties.serviceUserHeader(), properties.serviceUser());
+                    }
+                    // WHO THE SERVICE ACTS FOR. Recorded as the subject, with the service
+                    // as `via` — the door decides whether this service may make the claim.
                     if (!onBehalfOf.isBlank()) {
                         headers.set(ON_BEHALF_OF, onBehalfOf);
                     }
