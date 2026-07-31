@@ -215,7 +215,7 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	if denied, reason := admitFloor(action, input.Intent.Params, input.Subject.Roles); denied {
 		return deny(reason), nil
 	}
-	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: "mantlekeep.rbac"}, nil
+	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: policyID("rbac")}, nil
 }
 
 // StepAuth is the per-step authorization request: WHO is triggering WHICH step of a
@@ -251,7 +251,7 @@ func (r *RBAC) EvaluateStep(in StepAuth) mantlekeep.Decision {
 			return deny("separation of duties: the author of step " + in.Step + " cannot trigger it")
 		}
 	}
-	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: "mantlekeep.rbac"}
+	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: policyID("rbac")}
 }
 
 // authorizerFor picks the effective action-authorizer for THIS request. When a ScopeResolver is
@@ -303,7 +303,7 @@ func holdsAtLeast(roles []string, need mantlekeep.Role) bool {
 }
 
 func deny(reason string) mantlekeep.Decision {
-	return mantlekeep.Decision{Action: mantlekeep.ActionDeny, Reason: reason, PolicyID: "mantlekeep.rbac", Warnings: []string{reason}}
+	return mantlekeep.Decision{Action: mantlekeep.ActionDeny, Reason: reason, PolicyID: policyID("rbac"), Warnings: []string{reason}}
 }
 
 func rolesToStrings(rs []mantlekeep.Role) []string {

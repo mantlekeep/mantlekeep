@@ -125,6 +125,9 @@ mvn install              # Maven
 Everything is config-driven. The conventions:
 
 - Environment variables: `MANTLEKEEP_*` (e.g. `MANTLEKEEP_DOOR_URL`, `MANTLEKEEP_BIND_STORE_AUDIT`).
+- Policy namespace: `MANTLEKEEP_POLICY_NAMESPACE` — prefixes the `PolicyID` on every audit record
+  (`acme.rbac`, `acme.failsafe`). Defaults to the brand name, then to `mantlekeep`. Set it before a
+  deployment starts recording: a decision already on the chain cannot be relabelled.
 - Spring properties: `mantlekeep.*` (e.g. `mantlekeep.door.url`, `mantlekeep.brand`).
 - Identity headers at a service boundary: `X-Mantlekeep-User`, `X-Mantlekeep-Roles`.
 - Go module path: `mantlekeep.dev/control`. Java packages: `dev.mantlekeep.*`.
