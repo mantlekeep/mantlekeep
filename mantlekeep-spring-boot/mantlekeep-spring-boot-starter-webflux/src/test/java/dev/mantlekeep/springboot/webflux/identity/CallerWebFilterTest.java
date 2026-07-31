@@ -23,8 +23,8 @@ class CallerWebFilterTest {
     }
 
     private static CallerWebFilter filter(String devUser) {
-        return new CallerWebFilter(
-                new GatewayCallerResolver(new IdentityProperties(null, null, devUser)));
+        IdentityProperties properties = new IdentityProperties(null, null, devUser);
+        return new CallerWebFilter(new GatewayCallerResolver(properties), properties);
     }
 
     @Test

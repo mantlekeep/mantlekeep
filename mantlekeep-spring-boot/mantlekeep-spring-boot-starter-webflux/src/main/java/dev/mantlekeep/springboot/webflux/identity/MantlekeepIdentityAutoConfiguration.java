@@ -45,7 +45,7 @@ public class MantlekeepIdentityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public CallerWebFilter callerWebFilter(CallerResolver resolver) {
-        return new CallerWebFilter(resolver);
+    public CallerWebFilter callerWebFilter(CallerResolver resolver, IdentityProperties properties) {
+        return new CallerWebFilter(resolver, properties);
     }
 }
