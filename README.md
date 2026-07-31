@@ -152,9 +152,15 @@ It **fails closed**: with no way to identify callers it refuses to start, and a 
 with no resolvable identity is refused before the door is asked. The server adds no
 governance of its own — it hands every request to the same door the embedded path uses.
 
-*Embedded or service?* `embedded` gives each process its own local door and chain — right
-for a single sovereign zone with no infrastructure. `service` gives many services **one
-shared chain**, which is what an auditor needs to see one trail across them.
+*Embedded or service?* The distinction is where the chain lives: `embedded` gives a process
+its own local door and chain — right for a single isolated zone with no infrastructure —
+while `service` gives many services **one shared chain**, which is what an auditor needs to
+read one trail across them.
+
+> **Java products: use `service`.** Embedded mode from Java goes through a native binding,
+> and **this build ships no native library** — there is no `c-shared` target that produces
+> one, so `mantlekeep.door.mode=embedded` cannot start. A **Go** product embeds the core
+> directly through the `doorkit` package, which needs no native library and works today.
 
 ## White-labelling — ship it under your own name, without forking
 

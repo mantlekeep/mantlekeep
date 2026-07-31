@@ -14,6 +14,17 @@ against real consumers before anything is promised. Iteration happens inside the
 runs from a fresh clone · a real consumer has driven it end to end · no defect is known in the surface it
 claims.
 
+### Known limitations
+
+- **Embedded mode is not usable from Java.** `mantlekeep.door.mode=embedded` resolves a native binding,
+  and this build ships no native library — no `c-shared` target produces one. Java products should use
+  `mode: service` against a door run with `mantlekeep serve`. A **Go** product embeds the core directly
+  through `doorkit` with no native library, and that path works today.
+- The `ExecutionToken` is an opaque random value: it records which decision authorised a piece of work,
+  and is neither signed nor verified. It is evidence, not a key.
+- Governance inside an executing process is enforced by the framework owning the dispatch path, not by
+  removing the ability to bypass it. See `docs/credential-brokering.md` for the structural control.
+
 ### The governance core
 
 - **One door.** `submit(intent) → allow | deny`, decided against policy, recorded, and returning an

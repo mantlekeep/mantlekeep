@@ -20,8 +20,10 @@ public final class PanamaMantlekeepCoreProvider implements NativeCoreProvider {
     public NativeCore create(DoorConfig config) {
         if (config.corePath() == null) {
             throw new IllegalArgumentException(
-                    "the panama binding needs mantlekeep.door.core-path "
-                            + "(the native core library, e.g. libmantlekeep_core.dylib)");
+                    "embedded mode needs a native core library at mantlekeep.door.core-path. "
+                            + "This build does not ship one — no c-shared target produces it yet — "
+                            + "so embedded mode is not usable from Java. Use mantlekeep.door.mode=service "
+                            + "against a door run with `mantlekeep serve`.");
         }
         return new PanamaMantlekeepCore(config.corePath(), config.policyPaths());
     }
