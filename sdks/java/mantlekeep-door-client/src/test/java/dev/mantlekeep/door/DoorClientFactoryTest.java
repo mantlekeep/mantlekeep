@@ -29,7 +29,7 @@ class DoorClientFactoryTest {
 
     @Test
     void serviceModeWithoutUrlFailsFast() {
-        DoorConfig config = new DoorConfig(DoorMode.SERVICE, null, null, null, null, null, null);
+        DoorConfig config = new DoorConfig(DoorMode.SERVICE, null, null, null, null, null, null, null, null, null);
         IllegalArgumentException failure =
                 assertThrows(IllegalArgumentException.class, () -> DoorClientFactory.create(config));
         assertTrue(failure.getMessage().contains("mantlekeep.door.url"));
@@ -38,7 +38,7 @@ class DoorClientFactoryTest {
     @Test
     void embeddedModeSelectsTheRegisteredBindingByName() {
         DoorConfig config = new DoorConfig(DoorMode.EMBEDDED, null, null, null, null,
-                Map.of(DoorConfig.NATIVE_CORE_ADAPTER_KEY, "in-memory"), null);
+                Map.of(DoorConfig.NATIVE_CORE_ADAPTER_KEY, "in-memory"), null, null, null, null);
         try (DoorClient doorClient = DoorClientFactory.create(config)) {
             assertInstanceOf(EmbeddedDoorClient.class, doorClient);
             assertTrue(doorClient.decide(Intent.of("job.build", "prove wiring")).allowed());
@@ -57,7 +57,7 @@ class DoorClientFactoryTest {
     @Test
     void unknownBindingNameFailsFastListingTheRegisteredSet() {
         DoorConfig config = new DoorConfig(DoorMode.EMBEDDED, null, null, null, null,
-                Map.of(DoorConfig.NATIVE_CORE_ADAPTER_KEY, "com.evil.Backdoor"), null);
+                Map.of(DoorConfig.NATIVE_CORE_ADAPTER_KEY, "com.evil.Backdoor"), null, null, null, null);
         IllegalArgumentException failure =
                 assertThrows(IllegalArgumentException.class, () -> DoorClientFactory.create(config));
         assertTrue(failure.getMessage().contains("in-memory"),
@@ -68,7 +68,7 @@ class DoorClientFactoryTest {
     void unknownAdapterSelectionFailsFastAtStartup() {
         DoorConfig config = new DoorConfig(DoorMode.SERVICE, null,
                 URI.create("http://localhost:8080"), null, null,
-                Map.of("store", "not-registered"), null);
+                Map.of("store", "not-registered"), null, null, null, null);
         IllegalArgumentException failure =
                 assertThrows(IllegalArgumentException.class, () -> DoorClientFactory.create(config));
         assertTrue(failure.getMessage().contains("store"));

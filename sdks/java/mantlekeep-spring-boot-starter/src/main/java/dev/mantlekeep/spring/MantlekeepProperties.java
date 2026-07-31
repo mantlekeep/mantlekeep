@@ -41,19 +41,34 @@ public record MantlekeepProperties(
         List<String> policyPaths,
         Map<String, String> adapters,
         String subject,
-        String devLoginUser) {
+        String devLoginUser,
+        String serviceUser,
+        String callerHeader,
+        String onBehalfOfHeader) {
 
     public MantlekeepProperties {
         mode = mode == null ? DoorMode.SERVICE : mode;
         brand = brand == null || brand.isBlank() ? "mantlekeep" : brand;
         policyPaths = policyPaths == null ? List.of() : List.copyOf(policyPaths);
         adapters = adapters == null ? Map.of() : Map.copyOf(adapters);
+        // WHO THIS APPLICATION IS to the door. Required whenever it acts for a person:
+        // the door authenticates the application before accepting that claim, and the
+        // name must be on its delegator allowlist. Blank means it acts only as itself.
+        serviceUser = serviceUser == null ? "" : serviceUser.trim();
+        // Header NAMES, because a white-labelled product renames them. A door reading
+        // X-Acme-User will not see X-Mantlekeep-User, and the mismatch surfaces as a 401
+        // that looks like a broken service rather than a setting.
+        callerHeader = (callerHeader == null || callerHeader.isBlank())
+                ? "X-Mantlekeep-User" : callerHeader;
+        onBehalfOfHeader = (onBehalfOfHeader == null || onBehalfOfHeader.isBlank())
+                ? "X-Mantlekeep-On-Behalf-Of" : onBehalfOfHeader;
         subject = subject == null ? "" : subject;
         devLoginUser = devLoginUser == null ? "" : devLoginUser;
     }
 
     /** The framework-agnostic config the factory consumes. */
     public DoorConfig toDoorConfig() {
-        return new DoorConfig(mode, brand, url, corePath, policyPaths, adapters, devLoginUser);
+        return new DoorConfig(mode, brand, url, corePath, policyPaths, adapters, devLoginUser,
+                serviceUser, callerHeader, onBehalfOfHeader);
     }
 }

@@ -37,8 +37,20 @@ public final class ServiceDoorClient implements DoorClient {
     private final String devLoginUser;
     private final HttpClient httpClient;
     private final AtomicBoolean devLoginDone = new AtomicBoolean();
+    private final String serviceUser;
+    private final String callerHeader;
+    private final String onBehalfOfHeader;
 
+    /** Development convenience: no service identity, cookie login only. */
     public ServiceDoorClient(URI doorUrl, String devLoginUser) {
+        this(doorUrl, devLoginUser, "", "X-Mantlekeep-User", "X-Mantlekeep-On-Behalf-Of");
+    }
+
+    public ServiceDoorClient(URI doorUrl, String devLoginUser, String serviceUser,
+            String callerHeader, String onBehalfOfHeader) {
+        this.serviceUser = serviceUser == null ? "" : serviceUser.trim();
+        this.callerHeader = callerHeader;
+        this.onBehalfOfHeader = onBehalfOfHeader;
         this.doorUrl = stripTrailingSlash(doorUrl);
         this.devLoginUser = devLoginUser == null ? "" : devLoginUser;
         this.httpClient = HttpClient.newBuilder()
@@ -58,7 +70,7 @@ public final class ServiceDoorClient implements DoorClient {
                 + "\"env\":" + JsonText.quote(environment) + ","
                 + "\"params\":" + JsonText.object(intent.parameters())
                 + "}";
-        String responseJson = post("/api/govern", governRequestJson);
+        String responseJson = post("/api/govern", governRequestJson, intent.subject().id());
         boolean allowed = "allow".equals(JsonText.stringField(responseJson, "decision"));
         return allowed
                 ? Decision.allow(JsonText.stringField(responseJson, "token"))
@@ -95,14 +107,41 @@ public final class ServiceDoorClient implements DoorClient {
     }
 
     private String post(String path, String requestJson) {
-        return send(HttpRequest.newBuilder(URI.create(doorUrl + path))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestJson))
-                .build());
+        return post(path, requestJson, "");
+    }
+
+    /**
+     * Sends the request with the caller carried in HEADERS, never in the body.
+     *
+     * <p>The subject travels as a header because a body-supplied caller is forgeable: the
+     * door resolves roles server-side from an identity something in front of it
+     * authenticated, and a request that could name its own subject would make that
+     * pointless.
+     *
+     * <p>When this application has its own identity, it authenticates as itself and names
+     * the person separately — recorded as the subject, with the service as {@code via}.
+     * Without one, the subject is the caller.
+     */
+    private String post(String path, String requestJson, String subjectId) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(doorUrl + path))
+                .header("Content-Type", "application/json");
+        if (!serviceUser.isBlank()) {
+            request.header(callerHeader, serviceUser);
+            if (!subjectId.isBlank() && !subjectId.equals(serviceUser)) {
+                request.header(onBehalfOfHeader, subjectId);
+            }
+        } else if (!subjectId.isBlank()) {
+            request.header(callerHeader, subjectId);
+        }
+        return send(request.POST(HttpRequest.BodyPublishers.ofString(requestJson)).build());
     }
 
     private String get(String path) {
-        return send(HttpRequest.newBuilder(URI.create(doorUrl + path)).GET().build());
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(doorUrl + path));
+        if (!serviceUser.isBlank()) {
+            request.header(callerHeader, serviceUser);
+        }
+        return send(request.GET().build());
     }
 
     private String send(HttpRequest request) {

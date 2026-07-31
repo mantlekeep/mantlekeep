@@ -28,7 +28,7 @@ class PanamaMantlekeepCoreProviderTest {
     @Test
     void aMissingCorePathFailsFastNamingTheProperty() {
         DoorConfig configWithoutCorePath =
-                new DoorConfig(DoorMode.EMBEDDED, null, null, null, null, null, null);
+                new DoorConfig(DoorMode.EMBEDDED, null, null, null, null, null, null, null, null, null);
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                 () -> new PanamaMantlekeepCoreProvider().create(configWithoutCorePath));
         assertTrue(failure.getMessage().contains("core-path"));
