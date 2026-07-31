@@ -5,6 +5,35 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.3.0-rc.1] — 2026-07-31
+
+*A release candidate: the API in this line is not frozen. Iteration happens in the candidates, so the
+release history records deliberate releases rather than a stream of corrections. It promotes to `0.3.0`
+when the API has held for a full cycle, every documented command runs from a fresh clone, a real consumer
+has driven it end to end, and no defect is known in the surface it claims.*
+
+### Note on versions
+The Java artifacts stay at **`0.2.0`** in this candidate: nothing in the Java SDK changed, so re-publishing
+an identical jar under a new number would be noise. **An artifact's version moves when its own content
+moves** — the repository tag versions the repository, not every artifact inside it. (This is the opposite
+of the v0.2.0 situation, where the tag carried a Java feature the artifacts did not: that was a real
+mismatch, because a consumer following the docs could not get what the tag claimed.)
+
+### Added
+- **A service can act for a person, and the chain records both.** The core has modelled this all along
+  (`Intent.Via` → `AuditRecord.Via`), but the HTTP door read a single header and never populated it — so
+  the business-to-business case could not be expressed, and any record it produced lost half the story.
+  `MANTLEKEEP_ON_BEHALF_OF_HEADER` names the person; the chain shows them as **subject** and the service as
+  **via**.
+  The control is the **`MANTLEKEEP_DELEGATORS` allowlist**, not the header: without it any caller could
+  name any subject, which is impersonation with an audit trail that lies. A caller not on the list is
+  **refused** (403, its own reason) and never silently downgraded to acting as itself — that downgrade
+  would turn a privilege violation into a successful request.
+- **Design notes for scale and topology** — a shared Postgres audit chain (why the chain must serialise,
+  and why the adapter lives outside the core so no driver enters it), federated doors across zones
+  (a cross-zone step is governed twice, and hashes travel rather than records), and the execution unit
+  (govern per phase, execute per group — the fix for a pod per step).
+
 ## [0.2.0] — 2026-07-29
 
 ### Changed
