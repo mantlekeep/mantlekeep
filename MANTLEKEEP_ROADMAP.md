@@ -17,7 +17,17 @@ Everything below is the path to that gate, ordered so each step unblocks the nex
 surfaced (identity reaching the door, nested floor parameters, brandable policy namespace and headers,
 `GovernedWorker`). See `CHANGELOG.md`.
 
-**2. Consolidate the two Java module trees.** *This is the multiplier.* `DoorClient`, `Intent`, and door
+**2. Unify the `Decision` up, and consolidate onto it.** *These turned out to be one job.* The two Java
+trees do not merely duplicate the door types — they encode two different contracts: a minimal 2-state
+`Decision` (allow/deny) in the SDK, and a rich 3-state one (`ALLOW | DENY | REQUIRE_APPROVAL`, with
+`policyId`, `reasons[]`, `requiredApprovers`, `expiresAt`) in the starter core — which matches what the Go
+engine already decides but never sends. Consolidating *down* to the minimal shape would delete the
+approval structure a governed propose→approve flow needs. So: enrich the wire and the SDK `Decision` to the
+rich 3-state shape (the engine already models it), fold in the typed denial taxonomy (item 5) as the
+`outcome` + coded `reasons`, then unify both clients on the one type. Delivers consolidation, typed denials,
+and the reactive `runUnder` path in a single move. Original consolidation note: `docs/java-consolidation.md`.
+
+**2b. (folded into 2)** The old "consolidate the two trees" — *This is the multiplier.* `DoorClient`, `Intent`, and door
 config are declared twice, so every door-contract change must be made twice and one copy drifts — the cause
 of a run of defects. Target: the pure-JDK `door-client` is the one spine; each web framework is a thin
 optional adapter (`docs/java-consolidation.md`). Doing this first means every step below lands **once**, and
@@ -45,7 +55,7 @@ chain and the saga timeline can use different backends by config), correlated to
 tamper-evident without being on the chain. Recording verbosity (`none | decisions | steps | full`) is
 env-scaled policy; govern-before-execute stays sealed at every level.
 
-**6. A typed denial taxonomy.** Stable denial codes (`DENY_FLOOR`, `DENY_SEPARATION_OF_DUTIES`,
+**6. Typed denial taxonomy — FOLDED INTO ITEM 2.** (Unifying the `Decision` up carries the typed `outcome` + coded reasons; kept here for the record.) Stable denial codes (`DENY_FLOOR`, `DENY_SEPARATION_OF_DUTIES`,
 `DENY_IDENTITY`, …) so a product maps refusals to `400/401/403/409` deterministically and never surfaces a
 `500`. Small, and it removes product-specific string parsing of deny reasons.
 
