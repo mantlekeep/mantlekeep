@@ -46,16 +46,44 @@ That is a reasonable local decision that becomes a structural problem: the frame
 thing `layering.md` warns products against. **A reactive door client is an ADAPTER over the door client,
 not a second door client.** The distinction is invisible on the day and expensive a month later.
 
-## 4. The target shape
+## 4. The target shape — a pure-JDK spine, every framework a thin adapter
+
+**This was the design all along.** `mantlekeep-door-client` is already pure JDK — `java.net.http`, no
+Spring, no Reactor (verified: it imports nothing outside `java.*`). That is the generic spine. What went
+wrong is not the design; it is that the WebFlux tree **drifted from it** — reimplementing `DoorClient`,
+`Intent` and config with Reactor types instead of adapting the spine. Consolidation restores the intent,
+it does not introduce a new one.
+
+The rule that makes the framework serve any consumer: **no web-framework type in the core. Reactive,
+servlet, native — all stay at the edge, in optional adapters. The door-client never learns which framework
+is calling it.** This is the port-and-adapter discipline applied to the *consumer's* framework, the same
+way `WorkerPort` applies it to the backend.
 
 ```
 mantlekeep-adapter-spi        ports only, zero dependencies
         ↑
 mantlekeep-door-client        DoorClient · Intent · Decision · DoorConfig   ← the ONE definition
-        ↑                     framework-agnostic, pure JDK
-        ├── mantlekeep-spring-boot-starter          blocking Spring ergonomics
-        └── mantlekeep-spring-boot-starter-webflux  a REACTIVE ADAPTER over the same types
+        ↑                     PURE JDK (java.net.http) — assumes no framework
+        ├── spring-boot-starter          blocking (Spring MVC) — thin bean wiring
+        ├── spring-boot-starter-webflux  reactive — a thin Mono ADAPTER over the spine
+        └── (no adapter needed)          Quarkus · Micronaut · plain Java · GraalVM native · Android
+                                         depend on the door-client DIRECTLY
 ```
+
+**Who depends on what:**
+
+| Consumer | Depends on |
+|---|---|
+| Spring MVC (blocking) | door-client + a thin MVC starter (bean wiring only) |
+| Spring WebFlux (reactive) | door-client + the webflux adapter (wraps calls in `Mono`) |
+| Quarkus / Micronaut / plain Java / Android | **door-client alone** |
+| GraalVM native image | **door-client alone** — `java.net.http` is reflection-free and AOT-friendly; Spring/Reactor are not |
+
+**Why WebFlux must not be the base:** `Mono` is one framework's vocabulary. Making it the base forces every
+consumer — MVC, Quarkus, native — to depend on Reactor for nothing. WebFlux is the *only* flavour that even
+needs an adapter, because it needs the `Mono` wrapper; MVC uses the spine's blocking `decide()`/`submit()`
+as-is, and everything else uses the spine directly. Treating the reactive path as the base was exactly
+backwards.
 
 Concretely:
 
