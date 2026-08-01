@@ -1,9 +1,11 @@
 package dev.mantlekeep.springboot.webflux.intent;
 
-import dev.mantlekeep.springboot.door.Decision;
+import dev.mantlekeep.door.model.Decision;
+import dev.mantlekeep.door.model.Intent;
+import dev.mantlekeep.door.model.Subject;
 import dev.mantlekeep.springboot.door.DoorClient;
-import dev.mantlekeep.springboot.door.Intent;
 import dev.mantlekeep.springboot.intent.MantlekeepIntent;
+import java.util.Map;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -46,7 +48,10 @@ public class MantlekeepIntentAspect {
     private static Intent toIntent(MantlekeepIntent annotation) {
         String action = annotation.value();
         String goal = annotation.goal().isBlank() ? "invoke " + action : annotation.goal();
-        return Intent.of(action).resource(annotation.resource()).goal(goal).build();
+        // The spine's canonical constructor: identity is resolved at the door from the
+        // authenticated caller (carried as a header), so the intent leaves the subject
+        // anonymous here — it is never asserted from application code.
+        return new Intent("", Subject.anonymous(), action, annotation.resource(), goal, Map.of());
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,7 @@
 package dev.mantlekeep.springboot.door;
 
+import dev.mantlekeep.door.model.Decision;
+
 /**
  * Signals that the door denied an intent, or that the call to the door failed.
  *

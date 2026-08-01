@@ -6,6 +6,10 @@ plugins {
 
 dependencies {
     api(platform(project(":mantlekeep-spring-boot-dependencies")))
+    // The pure-JDK door spine — the ONE definition of Intent · Decision · DoorClient ·
+    // DoorConfig. Composed in from sdks/java (see settings.gradle.kts includeBuild), so the
+    // starter family adapts the spine rather than re-declaring it.
+    api("dev.mantlekeep:mantlekeep-door-client:0.1.0-rc.2")
     api("io.projectreactor:reactor-core")
 
     testImplementation("org.junit.jupiter:junit-jupiter")

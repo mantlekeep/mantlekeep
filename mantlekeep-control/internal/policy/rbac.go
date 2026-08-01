@@ -179,10 +179,12 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	requester := input.Intent.Requester
 
 	if goal == "" {
-		return deny("intent_spec.goal is required"), nil
+		return deny(mantlekeep.DenialValidation, "intent_spec.goal is required"), nil
 	}
 	if isAI && approvalActions()[action] {
-		return deny("AI agents cannot approve: " + action), nil
+		// The sealed floor: an AI may never be the approver. This is a separation-of-duties
+		// denial, not a generic policy error — classify it so it can never be mistaken for one.
+		return deny(mantlekeep.DenialSeparationOfDuties, "AI agents cannot approve: "+action), nil
 	}
 	// Pick the effective authorizer for THIS request — per-scope when a ScopeResolver is wired
 	// and the intent names a known scope, else the global resolution.
@@ -191,12 +193,12 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	// action (a product's "promote") is a grant PLUS a generic required_role_when floor RULE in the
 	// product's floor DATA (applied below), so the engine names no product verb and no environment.
 	if !r.actionAllowed(roles, action, dyn) {
-		return deny("no role permits action " + action), nil
+		return deny(mantlekeep.DenialActionNotAllowed, "no role permits action "+action), nil
 	}
 	// Separation of duties: when a requester is supplied (a run approval), the
 	// acting subject must not be that same person — no one approves their own request.
 	if requester != "" && requester == subjectID {
-		return deny("separation of duties: the approver cannot be the requester"), nil
+		return deny(mantlekeep.DenialSeparationOfDuties, "separation of duties: the approver cannot be the requester"), nil
 	}
 	// Product admission floor: the role check above decided WHO may issue the action; if a
 	// registered provider OWNS this action, its Admit now decides whether THIS concrete request
@@ -205,7 +207,7 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	// per-provider drift test keeps them in lockstep.
 	if p := r.byAction[action]; p != nil {
 		if denied, reason := p.Admit(input.Intent, input.Subject.Roles); denied {
-			return deny(reason), nil
+			return deny(mantlekeep.DenialFloor, reason), nil
 		}
 	}
 	// Generic attribute floor: a product's IT-owned floor is DATA (grants/floors.json), applied
@@ -213,7 +215,7 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	// engine names no product concept — the param names + values live in the data. The OPA adapter
 	// mirrors this over the same data.floors, kept in lockstep by the parity test.
 	if denied, reason := admitFloor(action, input.Intent.Params, input.Subject.Roles); denied {
-		return deny(reason), nil
+		return deny(mantlekeep.DenialFloor, reason), nil
 	}
 	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: policyID("rbac")}, nil
 }
@@ -224,11 +226,11 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 // can demand that a DIFFERENT person triggers it than the one who authored it.
 type StepAuth struct {
 	Subject         mantlekeep.PolicySubject
-	Action          string      // the product action (audit context)
-	Step            string      // the step name
+	Action          string          // the product action (audit context)
+	Step            string          // the step name
 	RunAs           mantlekeep.Role // per-step minimum role; "" = inherit the product's floor
-	Author          string      // who authored/created this step
-	RequireApproval bool        // if true, the triggering subject must differ from Author
+	Author          string          // who authored/created this step
+	RequireApproval bool            // if true, the triggering subject must differ from Author
 }
 
 // EvaluateStep authorizes triggering ONE step. It reuses the EXACT rules the door uses
@@ -240,15 +242,15 @@ func (r *RBAC) EvaluateStep(in StepAuth) mantlekeep.Decision {
 	roles := rolesToStrings(in.Subject.Roles)
 	// Per-step role floor (a node may demand more authority than the flow).
 	if in.RunAs != "" && !holdsAtLeast(roles, in.RunAs) {
-		return deny("step " + in.Step + ": no role permits it (requires " + string(in.RunAs) + ")")
+		return deny(mantlekeep.DenialActionNotAllowed, "step "+in.Step+": no role permits it (requires "+string(in.RunAs)+")")
 	}
 	// Per-step separation of duties: the author cannot also trigger it.
 	if in.RequireApproval {
 		if in.Subject.IsAI {
-			return deny("step " + in.Step + ": AI agents cannot satisfy separation of duties")
+			return deny(mantlekeep.DenialSeparationOfDuties, "step "+in.Step+": AI agents cannot satisfy separation of duties")
 		}
 		if in.Author != "" && in.Author == in.Subject.ID {
-			return deny("separation of duties: the author of step " + in.Step + " cannot trigger it")
+			return deny(mantlekeep.DenialSeparationOfDuties, "separation of duties: the author of step "+in.Step+" cannot trigger it")
 		}
 	}
 	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: policyID("rbac")}
@@ -302,8 +304,16 @@ func holdsAtLeast(roles []string, need mantlekeep.Role) bool {
 	return false
 }
 
-func deny(reason string) mantlekeep.Decision {
-	return mantlekeep.Decision{Action: mantlekeep.ActionDeny, Reason: reason, PolicyID: policyID("rbac"), Warnings: []string{reason}}
+// deny builds a denial Decision stamped with its generic category, so the wire (and any
+// other consumer) branches on a stable value rather than parsing the human reason.
+func deny(category mantlekeep.DenialCategory, reason string) mantlekeep.Decision {
+	return mantlekeep.Decision{
+		Action:   mantlekeep.ActionDeny,
+		Reason:   reason,
+		Category: category,
+		PolicyID: policyID("rbac"),
+		Warnings: []string{reason},
+	}
 }
 
 func rolesToStrings(rs []mantlekeep.Role) []string {

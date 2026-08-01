@@ -38,10 +38,23 @@ public final class EmbeddedDoorClient implements DoorClient {
                 + "\"params\":" + JsonText.object(intent.parameters())
                 + "}";
         String resultJson = core.submitJson(intentJson);
-        boolean allowed = "allow".equals(JsonText.stringField(resultJson, "action"));
-        return allowed
-                ? Decision.allow(JsonText.stringField(resultJson, "token"))
-                : Decision.deny(JsonText.stringField(resultJson, "reason"));
+        // The native core emits the canonical Decision contract in snake_case — the same
+        // logical shape the HTTP wire carries in camelCase (docs/native-core-contract.md).
+        // Parse that contract exactly; a Rust core is parity-checked to produce it byte for
+        // byte against the Go oracle, so this path decodes one contract, not a guess.
+        List<Decision.Reason> reasons =
+                JsonText.objectsOfArray(JsonText.arrayField(resultJson, "reasons")).stream()
+                        .map(reasonJson -> new Decision.Reason(
+                                JsonText.stringField(reasonJson, "code"),
+                                JsonText.stringField(reasonJson, "message")))
+                        .toList();
+        return new Decision(
+                Decision.Outcome.fromWire(JsonText.stringField(resultJson, "outcome")),
+                JsonText.stringField(resultJson, "token"),
+                JsonText.stringField(resultJson, "policy_id"),
+                reasons,
+                JsonText.stringsOfArray(JsonText.arrayField(resultJson, "required_approvers")),
+                JsonText.stringField(resultJson, "expires_at"));
     }
 
     @Override

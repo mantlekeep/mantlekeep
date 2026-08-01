@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * Marks a method as a governed intent.
  *
  * <p>Before the annotated method's effect runs, the starter's aspect builds an
- * {@link dev.mantlekeep.springboot.door.Intent} and submits it through the
+ * {@link dev.mantlekeep.door.model.Intent} and submits it through the
  * {@link dev.mantlekeep.springboot.door.DoorClient}; the method proceeds only on ALLOW.
  * Governance becomes declarative — no hand-written door call per method.
  *

@@ -37,6 +37,16 @@
         <artifactId>mantlekeep-spring-boot-core</artifactId>
         <version>${project.version}</version>
       </dependency>
+
+      <!-- The pure-JDK door spine (Intent · Decision · DoorClient · DoorConfig), built by
+           the separate sdks/java build and consumed here from ~/.m2. The Gradle build
+           reaches the SAME artifact as a source composite (includeBuild); this pins the
+           version Maven resolves. Run `mvn install` in sdks/java first so it is present. -->
+      <dependency>
+        <groupId>dev.mantlekeep</groupId>
+        <artifactId>mantlekeep-door-client</artifactId>
+        <version>0.1.0-rc.2</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 </project>

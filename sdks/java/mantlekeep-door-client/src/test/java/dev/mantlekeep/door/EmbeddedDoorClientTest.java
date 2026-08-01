@@ -62,6 +62,56 @@ class EmbeddedDoorClientTest {
     }
 
     @Test
+    void embeddedDecodesTheRichNativeContract() {
+        try (EmbeddedDoorClient doorClient =
+                new EmbeddedDoorClient(new InMemoryNativeCore(List.of("service.deploy")))) {
+            Decision allow = doorClient.decide(Intent.of("job.promote", "ship it"));
+            assertEquals(Decision.Outcome.ALLOW, allow.outcome());
+            assertEquals("policy.test.allowlist", allow.policyId());
+            assertEquals("2026-08-01T00:00:00Z", allow.expiresAt());
+
+            Decision deny = doorClient.decide(Intent.of("service.deploy", "deploy"));
+            assertEquals(Decision.Outcome.DENY, deny.outcome());
+            assertEquals("policy.test.allowlist", deny.policyId());
+            assertEquals("DENY_ACTION_NOT_ALLOWED", deny.reasons().get(0).code());
+        }
+    }
+
+    @Test
+    void embeddedDecodesRequireApprovalFromTheNativeContract() {
+        // A native core that returns the third outcome — proving the embedded path is not
+        // a boolean in disguise: it decodes who-must-approve off the FFI boundary too.
+        NativeCore reviewCore = new NativeCore() {
+            @Override
+            public String submitJson(String intentJson) {
+                return "{\"outcome\":\"require_approval\",\"policy_id\":\"policy.test.allowlist\","
+                        + "\"required_approvers\":[\"L4-Approver\",\"security-officer\"],"
+                        + "\"reasons\":[{\"code\":\"REQUIRE_APPROVAL\",\"message\":\"needs a second signer\"}]}";
+            }
+
+            @Override
+            public String auditJson() {
+                return "[]";
+            }
+
+            @Override
+            public boolean verifyChain() {
+                return true;
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        try (EmbeddedDoorClient doorClient = new EmbeddedDoorClient(reviewCore)) {
+            Decision decision = doorClient.decide(Intent.of("release.cut", "cut 1.2"));
+            assertEquals(Decision.Outcome.REQUIRE_APPROVAL, decision.outcome());
+            assertFalse(decision.allowed());
+            assertEquals(List.of("L4-Approver", "security-officer"), decision.requiredApprovers());
+        }
+    }
+
+    @Test
     void closeReleasesTheCore() {
         InMemoryNativeCore core = new InMemoryNativeCore(List.of());
         new EmbeddedDoorClient(core).close();

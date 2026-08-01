@@ -12,6 +12,14 @@ pluginManagement {
     }
 }
 
+// The pure-JDK door spine (Intent · Decision · DoorClient · DoorConfig) is built by the
+// SEPARATE sdks/java Gradle build. Compose it in as source so the starter family consumes
+// the ONE definition directly: Gradle substitutes `dev.mantlekeep:mantlekeep-door-client`
+// (and its adapter-spi) with the local projects — no publish step, no drift between what we
+// build and what we consume. (The Maven build reaches the same artifact from ~/.m2 instead;
+// see mantlekeep-spring-boot-dependencies/pom.xml — mvn install sdks/java first.)
+includeBuild("../sdks/java")
+
 dependencyResolutionManagement {
     repositories {
         mavenCentral()

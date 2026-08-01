@@ -31,9 +31,17 @@ final class InMemoryNativeCore implements NativeCore {
                 + "\"action\":" + JsonText.quote(action) + ","
                 + "\"decision\":" + JsonText.quote(denied ? "deny" : "allow")
                 + "}");
+        // Emit the canonical native Decision contract (docs/native-core-contract.md):
+        // snake_case on the FFI boundary, the SAME logical shape the HTTP wire carries.
+        // This test double IS the reference a real c-shared/Rust core is parity-checked
+        // against, so it must speak the real contract, not a shorthand.
         return denied
-                ? "{\"action\":\"deny\",\"reason\":\"action '" + action + "' is denied by test policy\"}"
-                : "{\"action\":\"allow\",\"token\":\"TOK-" + chain.size() + "\"}";
+                ? "{\"outcome\":\"deny\",\"policy_id\":\"policy.test.allowlist\",\"required_approvers\":[],"
+                        + "\"reasons\":[{\"code\":\"DENY_ACTION_NOT_ALLOWED\","
+                        + "\"message\":\"action '" + action + "' is denied by test policy\"}]}"
+                : "{\"outcome\":\"allow\",\"token\":\"TOK-" + chain.size() + "\","
+                        + "\"policy_id\":\"policy.test.allowlist\",\"expires_at\":\"2026-08-01T00:00:00Z\","
+                        + "\"reasons\":[]}";
     }
 
     @Override

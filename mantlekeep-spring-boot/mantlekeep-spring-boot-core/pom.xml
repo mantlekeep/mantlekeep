@@ -17,6 +17,13 @@
   <description>Transport-agnostic governance contracts shared by every MantleKeep starter.</description>
 
   <dependencies>
+    <!-- The pure-JDK door spine — the ONE definition of Intent · Decision · DoorClient ·
+         DoorConfig. Version managed by the family BOM. -->
+    <dependency>
+      <groupId>dev.mantlekeep</groupId>
+      <artifactId>mantlekeep-door-client</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>io.projectreactor</groupId>
       <artifactId>reactor-core</artifactId>

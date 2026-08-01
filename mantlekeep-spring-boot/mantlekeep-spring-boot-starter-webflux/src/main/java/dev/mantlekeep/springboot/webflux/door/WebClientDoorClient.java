@@ -1,12 +1,11 @@
 package dev.mantlekeep.springboot.webflux.door;
 
-import dev.mantlekeep.springboot.door.Decision;
+import dev.mantlekeep.door.model.Decision;
+import dev.mantlekeep.door.model.Intent;
 import dev.mantlekeep.springboot.door.DoorClient;
 import dev.mantlekeep.springboot.door.DoorException;
 import dev.mantlekeep.springboot.door.DoorProperties;
-import dev.mantlekeep.springboot.door.Intent;
 import dev.mantlekeep.springboot.door.OnBehalfOf;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -14,11 +13,13 @@ import reactor.core.publisher.Mono;
 
 /**
  * Reactive {@link DoorClient} over Spring {@link WebClient}: POSTs the intent to the
- * door's govern endpoint and maps the response to a {@link Decision}.
+ * door's govern endpoint and maps the canonical response to a {@link Decision}.
  *
- * <p>On a governance denial (or any non-2xx status) the returned {@code Mono} errors
- * with a {@link DoorException} carrying the decision; a transport failure errors with a
- * {@code DoorException} wrapping the cause. It governs nothing itself — the door decides.
+ * <p>It carries the pure-JDK spine's {@link Intent} and {@link Decision} value types — the
+ * ONE definition — and adds only the {@code Mono} transport. On a governance denial (or any
+ * non-2xx status) the returned {@code Mono} errors with a {@link DoorException} carrying the
+ * decision; a transport failure errors with a {@code DoorException} wrapping the cause. It
+ * governs nothing itself — the door decides.
  *
  * <p>When the caller established an {@link OnBehalfOf} subject, it travels as a header so the
  * chain records who ACTED rather than merely which application called. It is read from the
@@ -50,6 +51,10 @@ public class WebClientDoorClient implements DoorClient {
     }
 
     private Mono<Decision> submit(Intent intent, String onBehalfOf) {
+        // env is read generically off the intent's parameters — the spine names no
+        // environment; it rides the wire's top-level `env` field the Go door reads.
+        Object environmentValue = intent.parameters().get("env");
+        String environment = environmentValue == null ? "" : environmentValue.toString();
         return webClient.post()
                 .uri(properties.governPath())
                 .headers(headers -> {
@@ -66,7 +71,7 @@ public class WebClientDoorClient implements DoorClient {
                     }
                 })
                 .bodyValue(new GovernRequest(
-                        intent.action(), intent.resource(), intent.goal(), intent.env(), intent.params()))
+                        intent.action(), intent.resource(), intent.goal(), environment, intent.parameters()))
                 .exchangeToMono(response -> response.bodyToMono(DoorResponse.class)
                         .defaultIfEmpty(DoorResponse.empty())
                         .map(body -> toDecision(response.statusCode().is2xxSuccessful(), body)))
@@ -79,25 +84,13 @@ public class WebClientDoorClient implements DoorClient {
     }
 
     private Decision toDecision(boolean success, DoorResponse body) {
-        return new Decision(mapOutcome(success, body), body.token(), parseExpiry(body.expires()),
-                body.policyId(), reasonsOf(body), body.requiredApprovers());
-    }
-
-    /** The door returns expiry as an RFC-3339 instant string (e.g. 2026-07-18T05:35:11Z). */
-    private static Instant parseExpiry(String expires) {
-        if (expires == null || expires.isBlank()) {
-            return null;
-        }
-        try {
-            return Instant.parse(expires);
-        } catch (java.time.format.DateTimeParseException ex) {
-            return null;
-        }
+        return new Decision(mapOutcome(success, body), body.token(), body.policyId(),
+                reasonsOf(body), body.requiredApprovers(), body.expiresAt());
     }
 
     private static Decision.Outcome mapOutcome(boolean success, DoorResponse body) {
-        String decision = body.decision() == null ? "" : body.decision().trim().toLowerCase();
-        return switch (decision) {
+        String outcome = body.outcome() == null ? "" : body.outcome().trim().toLowerCase();
+        return switch (outcome) {
             case "allow" -> Decision.Outcome.ALLOW;
             case "deny" -> Decision.Outcome.DENY;
             case "require_approval" -> Decision.Outcome.REQUIRE_APPROVAL;
@@ -105,12 +98,20 @@ public class WebClientDoorClient implements DoorClient {
         };
     }
 
-    private static List<String> reasonsOf(DoorResponse body) {
+    /**
+     * Maps the canonical typed reasons ({@code [{code,message}]}) to the spine's
+     * {@link Decision.Reason}. Falls back leniently to a single untyped reason from an
+     * older {@code reason}/{@code error} field, so a pre-canonical or error payload still
+     * yields a readable denial rather than an empty one.
+     */
+    private static List<Decision.Reason> reasonsOf(DoorResponse body) {
         if (body.reasons() != null && !body.reasons().isEmpty()) {
-            return body.reasons();
+            return body.reasons().stream()
+                    .map(reason -> new Decision.Reason(reason.code(), reason.message()))
+                    .toList();
         }
         String single = body.reason() != null ? body.reason() : body.error();
-        return single == null ? List.of() : List.of(single);
+        return single == null ? List.of() : List.of(new Decision.Reason("", single));
     }
 
     /**
@@ -118,11 +119,12 @@ public class WebClientDoorClient implements DoorClient {
      * {@code {action, resource, goal, env, params}}.
      *
      * <p>It is built explicitly rather than serialising the {@link Intent} record, because
-     * the record also carries a {@code scope} field the door drops — sending it is a silent
-     * divergence from the canonical shape. Identity never travels in the body; it is set as
-     * a header, because a body-supplied caller would be forgeable.
+     * the record also carries {@code id} and {@code subject} the door reads from headers,
+     * not the body — sending them is a silent divergence from the canonical shape. Identity
+     * never travels in the body; it is set as a header, because a body-supplied caller would
+     * be forgeable.
      */
     private record GovernRequest(
-            String action, String resource, String goal, String env, Map<String, Object> params) {
+            String action, String resource, String goal, String env, Map<String, ?> params) {
     }
 }
