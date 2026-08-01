@@ -12,8 +12,9 @@ consumer's gap report asked for, made structural rather than guessed.
 
 ### Added — a Python door client
 
-- **`sdks/python`** — a pure-standard-library Python door client, the Python analog of the
-  pure-JDK Java spine. Zero runtime dependencies (it speaks `/api/govern` with `urllib` + `json`),
+- **`sdks/python`** — a pure-standard-library Python door client: one more peer client over the
+  same `/api/govern` wire contract (Java and Python today, a Rust client to follow), each thin and
+  idiomatic in its own runtime. Zero runtime dependencies (it speaks `/api/govern` with `urllib` + `json`),
   so it adds nothing to an air-gapped image. Carries the same rich `Decision`, identity-as-header
   (never body), configurable rebrandable headers, and a `GovernedWorker` that runs work only on
   allow. Verified by running: the integration test builds and serves the Go door and drives

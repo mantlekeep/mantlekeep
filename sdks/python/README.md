@@ -1,12 +1,17 @@
 # MantleKeep — Python door client
 
-Govern before execute, from Python. The Python analog of the pure-JDK Java spine: submit an
-`Intent` to the one door, receive a rich `Decision`, and let `GovernedWorker` own the
-decide-then-dispatch so an effect cannot run outside governance.
+Govern before execute, from Python. Submit an `Intent` to the one door, receive a rich
+`Decision`, and let `GovernedWorker` own the decide-then-dispatch so an effect cannot run
+outside governance.
 
-**No runtime dependencies.** The client speaks the door's HTTP contract with the standard
-library alone (`urllib`, `json`, `dataclasses`) — the same near-zero-dependency guarantee the
-rest of the framework keeps, so it adds nothing to an air-gapped image.
+This is one of several **peer clients** over the same `/api/govern` wire contract — Java, Python,
+and a Rust client to come. None is derived from another; each is a thin client, idiomatic and
+dependency-light in its own runtime, over the one contract the core defines. (The Go core is the
+oracle today; a Rust core will take that role later, parity-gated.)
+
+**No runtime dependencies.** This client speaks the door's HTTP contract with the standard library
+alone (`urllib`, `json`, `dataclasses`) — the near-zero-dependency guarantee that matters most in
+an air-gapped image.
 
 ## Install
 

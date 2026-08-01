@@ -1,8 +1,10 @@
 """MantleKeep door client for Python — govern before execute, through one door.
 
-The Python analog of the pure-JDK Java spine: submit an :class:`Intent` to the door, receive
-a rich :class:`Decision`, and let :class:`GovernedWorker` own the decide-then-dispatch so an
-effect cannot run outside governance. Standard library only — no runtime dependencies.
+One of several peer clients over the same ``/api/govern`` wire contract (Java and Python today,
+a Rust client to follow); each is thin and idiomatic in its own runtime, and none is derived
+from another. Submit an :class:`Intent` to the door, receive a rich :class:`Decision`, and let
+:class:`GovernedWorker` own the decide-then-dispatch so an effect cannot run outside governance.
+Standard library only — no runtime dependencies.
 """
 
 from .door.config import DoorConfig

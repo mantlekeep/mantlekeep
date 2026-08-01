@@ -87,6 +87,8 @@ class AgainstRunningDoorTest(unittest.TestCase):
                 cls.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 cls.process.kill()
+            if cls.process.stdout:
+                cls.process.stdout.close()
         for path in (cls.binary, os.path.join(CONTROL_DIR, "audit-test.db")):
             if path and os.path.exists(path):
                 os.remove(path)
