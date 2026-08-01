@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mantlekeep"
+version = "0.1.0rc3"
+description = "MantleKeep door client for Python — govern before execute, through one door."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+# No runtime dependencies. The client speaks the door's HTTP contract with the standard
+# library alone (urllib, json, dataclasses) — the same near-zero-dependency guarantee the
+# Java spine keeps. A dependency here would be a dependency in every consumer's air-gapped
+# image; the framework refuses to impose one.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mantlekeep*"]
