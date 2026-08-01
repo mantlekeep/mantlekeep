@@ -126,13 +126,38 @@ const (
 	ActionRequireApproval DecisionAction = "require_approval"
 )
 
+// DenialCategory is the GENERIC reason a decision was not an allow — the same register
+// of core vocabulary as DecisionAction, Role and RiskLevel: it names governance shapes,
+// never a product, action, environment or role. It exists so a consumer can branch on a
+// STABLE value the engine stamps at the point of denial, instead of parsing the free-text
+// Reason (which a reword would silently reclassify). A wire adapter maps each category to
+// its transport code; the core owns the category, the boundary owns the code.
+//
+// Empty (DenialNone) on an allow, or on a Decision from an external evaluator that does not
+// set it — a wire adapter then falls back to its own classification for those.
+type DenialCategory string
+
+const (
+	DenialNone               DenialCategory = ""                     // an allow, or unclassified
+	DenialFloor              DenialCategory = "floor"                // a policy floor blocked it (a cap, a pin, an admission rule, failsafe read-only)
+	DenialSeparationOfDuties DenialCategory = "separation_of_duties" // the actor may not also be the approver — includes an AI attempting to approve
+	DenialIdentity           DenialCategory = "identity"             // the caller could not be resolved, or may not act for whom it claimed
+	DenialActionNotAllowed   DenialCategory = "action_not_allowed"   // no role or grant permits this action
+	DenialValidation         DenialCategory = "validation"           // the request itself is malformed or incomplete
+	DenialPolicyError        DenialCategory = "policy_error"         // the engine could not reach a verdict
+)
+
 // Decision is the policy verdict on an intent.
 type Decision struct {
-	Action            DecisionAction
-	Reason            string   // human-readable justification
-	RequiredApprovers []Role   // for require_approval — who may sign off
-	PolicyID          string   // which policy produced this (audit)
-	Warnings          []string // non-blocking flags (e.g. budget at 85%)
+	Action DecisionAction
+	Reason string // human-readable justification
+	// Category is the generic, stable classification of a non-allow (see DenialCategory).
+	// The engine sets it at the point of denial so a consumer never has to parse Reason.
+	// omitempty keeps an allow (and any pre-existing marshalled record) byte-identical.
+	Category          DenialCategory `json:"category,omitempty"`
+	RequiredApprovers []Role         // for require_approval — who may sign off
+	PolicyID          string         // which policy produced this (audit)
+	Warnings          []string       // non-blocking flags (e.g. budget at 85%)
 }
 
 // DecisionError carries the full Decision out of Submit when the outcome is not an allow.
@@ -269,7 +294,7 @@ type AuditRecord struct {
 	Action    string
 	Decision  DecisionAction
 	PolicyID  string
-	IsAI      bool   // AI-generated actions are flagged separately
+	IsAI      bool // AI-generated actions are flagged separately
 	// Via is the application that asserted SubjectID on someone's behalf; empty when
 	// the subject was the authenticated caller. `omitempty` is load-bearing: the hash
 	// is taken over the marshalled record, so an absent Via must serialise to exactly
@@ -277,7 +302,7 @@ type AuditRecord struct {
 	// chain would fail verification.
 	Via      string `json:"Via,omitempty"`
 	PrevHash string // SHA-256 of the previous record — the chain link
-	Hash      string // SHA-256 of this record (set by the logger)
+	Hash     string // SHA-256 of this record (set by the logger)
 }
 
 // AuditLogger appends decisions to the immutable trail. Impl: bbolt (MVP) →

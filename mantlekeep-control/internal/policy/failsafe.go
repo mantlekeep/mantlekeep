@@ -66,6 +66,7 @@ func (f *Failsafe) readOnly(input mantlekeep.PolicyInput) mantlekeep.Decision {
 	return mantlekeep.Decision{
 		Action:   mantlekeep.ActionDeny,
 		Reason:   "failsafe: read-only mode — writes are suspended",
+		Category: mantlekeep.DenialFloor, // an operational floor suspended writes
 		PolicyID: policyID("failsafe"),
 		Warnings: []string{"policy degraded to cached read-only mode"},
 	}

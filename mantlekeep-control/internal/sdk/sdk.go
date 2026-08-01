@@ -40,8 +40,9 @@ func (s *SDK) Submit(ctx context.Context, intent mantlekeep.Intent) (mantlekeep.
 	// refusal is a deny like any other — carry it as a Decision so the wire can type it.
 	if intent.Spec.Goal == "" {
 		return mantlekeep.ExecutionToken{}, &mantlekeep.DecisionError{Decision: mantlekeep.Decision{
-			Action: mantlekeep.ActionDeny,
-			Reason: "intent rejected: intent_spec.goal is required",
+			Action:   mantlekeep.ActionDeny,
+			Reason:   "intent rejected: intent_spec.goal is required",
+			Category: mantlekeep.DenialValidation,
 		}}
 	}
 
@@ -57,8 +58,9 @@ func (s *SDK) Submit(ctx context.Context, intent mantlekeep.Intent) (mantlekeep.
 	})
 	if err != nil {
 		return mantlekeep.ExecutionToken{}, &mantlekeep.DecisionError{Decision: mantlekeep.Decision{
-			Action: mantlekeep.ActionDeny,
-			Reason: fmt.Sprintf("intent rejected: unknown subject %q: %v", intent.Subject.ID, err),
+			Action:   mantlekeep.ActionDeny,
+			Reason:   fmt.Sprintf("intent rejected: unknown subject %q: %v", intent.Subject.ID, err),
+			Category: mantlekeep.DenialIdentity,
 		}}
 	}
 

@@ -26,8 +26,35 @@ type wireReason struct {
 	Message string `json:"message"`
 }
 
-// denialCode classifies a deny reason into a stable code. Order matters: the more specific
-// identity and separation-of-duties cases are matched before the general ones.
+// categoryToWireCode maps the engine's GENERIC denial category to this transport's stable
+// code. This is the authoritative path: the core stamps the category at the point of denial,
+// so a reword of the human reason can never reclassify it. The map is 1:1 and total over the
+// categories the core defines.
+var categoryToWireCode = map[mantlekeep.DenialCategory]string{
+	mantlekeep.DenialFloor:              codeFloor,
+	mantlekeep.DenialSeparationOfDuties: codeSeparationDuties,
+	mantlekeep.DenialIdentity:           codeIdentity,
+	mantlekeep.DenialActionNotAllowed:   codeActionNotAllowed,
+	mantlekeep.DenialValidation:         codeValidation,
+	mantlekeep.DenialPolicyError:        codePolicyError,
+}
+
+// wireCodeFor resolves a Decision to its transport code. It TRUSTS the stamped category when
+// the engine set one, and only falls back to classifying the free-text reason when it did not
+// — the case of an external PolicyEvaluator (OPA/Cedar/a host's own rules) that returns a bare
+// Decision. The built-in engine always stamps a category, so its denials never hit the fallback.
+func wireCodeFor(decision mantlekeep.Decision) string {
+	if code, ok := categoryToWireCode[decision.Category]; ok {
+		return code
+	}
+	return denialCode(decision.Reason)
+}
+
+// denialCode is the FALLBACK classifier for a Decision that carries no category — an external
+// policy engine that does not stamp one. The built-in engine stamps the category at the point
+// of denial (see wireCodeFor), so this substring matching is never on its path; it exists only
+// so a bare third-party Decision still lands on a sensible code instead of always DENY_POLICY_ERROR.
+// Order matters: the more specific identity and separation-of-duties cases are matched first.
 func denialCode(reason string) string {
 	r := strings.ToLower(reason)
 	switch {
@@ -92,14 +119,15 @@ func writeAllow(writer http.ResponseWriter, token mantlekeep.ExecutionToken) {
 // writeDecision emits a deny or require_approval from a Decision the engine produced.
 // intentId is passed separately because a non-allow yields no token.
 func writeDecision(writer http.ResponseWriter, decision mantlekeep.Decision, intentID string) {
+	code := wireCodeFor(decision)
 	body := map[string]any{
 		"outcome":  string(decision.Action),
 		"intentId": intentID,
 		"policyId": decision.PolicyID,
-		"reasons":  []wireReason{{Code: denialCode(decision.Reason), Message: decision.Reason}},
+		"reasons":  []wireReason{{Code: code, Message: decision.Reason}},
 	}
 
-	status := statusForDeny(denialCode(decision.Reason))
+	status := statusForDeny(code)
 	if decision.Action == mantlekeep.ActionRequireApproval {
 		// require_approval is not a refusal — it is "not yet". The approvers a second
 		// party would need are named so the caller can route it; the outcome is 200 and
