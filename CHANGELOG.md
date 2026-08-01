@@ -5,6 +5,54 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.0-rc.3] — 2026-08-01
+
+Consolidation and a typed denial contract, plus a third language SDK — the surface a real
+consumer's gap report asked for, made structural rather than guessed.
+
+### Added — a Python door client
+
+- **`sdks/python`** — a pure-standard-library Python door client, the Python analog of the
+  pure-JDK Java spine. Zero runtime dependencies (it speaks `/api/govern` with `urllib` + `json`),
+  so it adds nothing to an air-gapped image. Carries the same rich `Decision`, identity-as-header
+  (never body), configurable rebrandable headers, and a `GovernedWorker` that runs work only on
+  allow. Verified by running: the integration test builds and serves the Go door and drives
+  allow / policy-deny / validation-deny through it, and proves the worker refuses work on a deny.
+
+### Added — the denial is typed at its source, not guessed at the wire
+
+- **A generic `DenialCategory` on the engine `Decision`** (`floor` | `separation_of_duties` |
+  `identity` | `action_not_allowed` | `validation` | `policy_error`) — the same register of core
+  vocabulary as `DecisionAction` and `Role`, naming governance shapes and no product/action/env/role.
+  The engine stamps it at the point of denial; the wire maps each category to its transport code.
+  Substring-matching the human reason survives only as a fallback for an external evaluator
+  (OPA/Cedar) that returns a bare `Decision`.
+- **This fixed a real misclassification:** the sealed-floor denial "AI agents cannot approve"
+  matched no separation-of-duties substring and fell through to `DENY_POLICY_ERROR` — the least
+  specific code, for the single most important denial in the system. It is now
+  `DENY_SEPARATION_OF_DUTIES`, structurally, whatever the reason wording.
+
+### Changed — one Java surface, not two
+
+- **The Spring Boot family now consumes the pure-JDK door-client spine** — `springboot.door.Intent`
+  and `springboot.door.Decision` are deleted; there is one `Intent` and one `Decision`. A
+  cross-path wire-equality test asserts the blocking and reactive clients send byte-identical
+  requests, so the two paths can never silently diverge again (the cause of several rc.2 defects).
+  The reactive client keeps its own class for now — collapsing it onto the blocking interface needs
+  `OnBehalfOf` resolved reactively, and a blocking `.block()` would drop delegation attribution;
+  the wire-equality test guards against regression until then.
+- **The native/FFI `Decision` contract is pinned** (`docs/native-core-contract.md`) to the canonical
+  rich shape, with the Go core as the oracle — so a future Rust core produces byte-identical
+  decisions rather than a guessed shape.
+
+### Added — a publish gate
+
+- **CI** runs `go vet` + `staticcheck` + `govulncheck` + tests on the engine, a
+  **near-zero-dependency guard** (fails if direct non-stdlib deps exceed the baseline of 1, `bbolt`),
+  both Java build systems, and the Python SDK tests. A `sonar-project.properties` supports
+  open-source SonarQube scanning. The only govulncheck finding is a Go-stdlib advisory fixed in
+  go1.26.5, cleared by pinning the toolchain — no MantleKeep code or dependency is vulnerable.
+
 ## [0.1.0-rc.2] — 2026-08-01
 
 Driven by a real consumer: a regulated organisation built a governed SDLC service against `0.1.0-rc.1`
@@ -144,6 +192,7 @@ Adoption guides, the door's library and wire contracts, and the design notes tha
 layering a product across generic/domain/team, the template–behaviour–worker composition model, a shared
 audit chain for replication, federated doors across zones, and the execution unit.
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.2...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.3...HEAD
+[0.1.0-rc.3]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.2...v0.1.0-rc.3
 [0.1.0-rc.2]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...v0.1.0-rc.2
 [0.1.0-rc.1]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0-rc.1
