@@ -5,6 +5,75 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.1-rc.1] — 2026-08-01
+
+Driven by a real consumer: a regulated organisation built a governed SDLC service against `0.1.0-rc.1`
+with an in-house AI assistant, hit the framework's edges, and **failed closed rather than bypass
+governance** — then returned a gap spec. This candidate closes the gaps that were defects, and records
+the ones that are genuine new work. The bypass discipline holding under real pressure is the signal the RC
+existed to produce.
+
+### Fixed — identity reached the door, or it did not
+
+- **`ServiceDoorClient` sent no caller identity at all.** It dropped `Intent.subject` and set no header, so
+  the door saw an anonymous request and refused everything with `401` unless a dev-login cookie happened to
+  exist. Identity now travels as a header (never the body — a body-supplied caller is forgeable).
+- **`DoorClientFactory` dropped the configured header names**, so a branded deployment silently sent the
+  framework's default names and the door refused them.
+- **The identity header was `X-Mantlekeepkeep-User`** — a rename applied twice. Docs said `X-Mantlekeep-User`;
+  a caller following the docs got `401`. A test now pins the literal names.
+- **The on-behalf-of header was hardcoded** while its pair was configurable, so a rebrand renamed one and
+  not the other — the door authenticated the service and silently dropped the delegation, recording the
+  action against the service instead of the person. The pair now moves together.
+- **Refused callers are now logged, and malformed identities refused at the boundary.** A request refused
+  before the door produces no chain record, so this log is the only evidence it happened; and a caller name
+  with control characters is rejected rather than sanitised, because it would otherwise become the subject
+  on a tamper-evident record.
+
+### Fixed — floors could not fire
+
+- **`Intent.parameters` could not carry nested values,** so a `capped_map` resource floor — the primary
+  session floor — could never trigger from Java, and failed **silently** (finding no map, it allowed the
+  request). Parameters now carry arbitrary values; numbers and booleans keep their JSON types so a numeric
+  cap compares numbers. The component is `Map<String, ?>`, so existing `Map<String,String>` callers still
+  compile.
+- **The policy namespace was hardcoded `mantlekeep.rbac`,** putting the framework's name into every audit
+  record — the one place branding cannot be removed afterwards. It is now `MANTLEKEEP_POLICY_NAMESPACE`,
+  defaulting to the brand name, then to `mantlekeep`.
+
+### Added — govern-before-execute made structural
+
+- **`GovernedWorker`** — the framework now owns the decide-then-dispatch sequence (`final`), and the Spring
+  starter publishes it while **not** publishing the raw `WorkerPort`. A product can no longer casually
+  execute outside governance, because the unwrapped executor is not an injectable bean.
+- **`GovernedWorker.runUnder(approvalToken, work)`** — execute saga steps beneath a single transition-level
+  approval, so a run approved as a unit does not re-ask the door per step (which would turn transition
+  governance into phase governance). This was a real consumer's top blocker.
+- **`app.Brand` / `BrandPrefix`** — a product declares its own name and config prefix without naming any
+  framework variable; `frame.door.url` binds in `application.yml`, aliased at lowest precedence so an
+  explicit `mantlekeep.*` value still wins.
+
+### Corrected claims (the code no longer promises more than it delivers)
+
+- The `ExecutionToken` was described as a signed cryptographic capability; it is an opaque, unsigned value —
+  evidence of a decision, not a key. Said plainly now.
+- `WorkerPort`/`sdk` comments claimed "structural" / "No bypass"; in-process governance is enforced by the
+  framework owning the dispatch path, not by removing the ability to bypass it. See
+  `docs/credential-brokering.md` for the control that removes the capability.
+
+### Known limitations (unchanged from rc.1, restated)
+
+- Embedded mode is not usable from Java (no native library is built); use `mode: service`. The Go embedded
+  path via `doorkit` works today.
+- **The Java surface is duplicated across two module trees** (`DoorClient`, `Intent`, door config declared
+  twice; `Intent` three times, two disagreeing). A fix must be applied to both — the cause of several of the
+  defects above. Consolidation is scoped in `docs/java-consolidation.md`; it is cross-build and awaits a
+  build-topology decision.
+- Saga step evidence and a typed denial taxonomy are specified by the consumer's gap report but not yet
+  built. Design direction: saga records persist through `StorePort` (per-purpose bindable), correlated to
+  the chain head; recording verbosity is env-scaled policy (dev light, production full), while
+  govern-before-execute stays sealed at every level.
+
 ## [0.1.0-rc.1] — 2026-07-31
 
 The first release candidate. **The API is not frozen** — this line exists so the shape can be exercised
@@ -75,5 +144,6 @@ Adoption guides, the door's library and wire contracts, and the design notes tha
 layering a product across generic/domain/team, the template–behaviour–worker composition model, a shared
 audit chain for replication, federated doors across zones, and the execution unit.
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.1-rc.1...HEAD
+[0.1.1-rc.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...v0.1.1-rc.1
 [0.1.0-rc.1]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0-rc.1
