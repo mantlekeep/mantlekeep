@@ -30,6 +30,10 @@ type Event struct {
 	Step   string    `json:"step"`   // step name ("" for run-level events)
 	Kind   EventKind `json:"kind"`   //
 	Detail string    `json:"detail"` // human-readable note (reason, artifact, error)
+	// Chain is the audit chain head hash this saga record correlates to, when the store is
+	// wired with a correlation source. It ties the (off-chain) saga timeline to the
+	// tamper-evident chain without putting the timeline on the chain. Empty when uncorrelated.
+	Chain string `json:"chain,omitempty"`
 }
 
 // EventStore is the append-only sink for workflow events. Impl: in-memory (MVP)

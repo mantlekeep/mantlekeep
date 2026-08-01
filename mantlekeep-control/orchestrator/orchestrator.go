@@ -17,16 +17,28 @@ import (
 type Engine struct {
 	runner StepRunner
 	events EventStore
+	level  RecordingLevel
 	now    func() time.Time
 }
 
-// NewEngine wires a step runner and an event store into the spine.
+// NewEngine wires a step runner and an event store into the spine. The recording level
+// defaults to RecordSteps — the full per-step timeline the engine has always emitted — so
+// existing callers are unchanged. Use WithRecording to scale it down for a lighter run.
 func NewEngine(runner StepRunner, events EventStore) *Engine {
 	return &Engine{
 		runner: runner,
 		events: events,
+		level:  RecordSteps,
 		now:    func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// WithRecording sets how much of the run timeline is persisted (see RecordingLevel). It
+// changes only what is RECORDED, never whether a step is governed — the token gate and the
+// door decision are unaffected at every level. Returns the receiver to chain.
+func (e *Engine) WithRecording(level RecordingLevel) *Engine {
+	e.level = level
+	return e
 }
 
 // Run implements mantlekeep.WorkflowEngine.
@@ -104,5 +116,11 @@ func (e *Engine) Run(ctx context.Context, token mantlekeep.ExecutionToken, dag m
 }
 
 func (e *Engine) emit(ctx context.Context, run, step string, kind EventKind, detail string) {
+	// Recording is the tunable axis: at `none`/`decisions` no per-step timeline is kept.
+	// The door decision is already on the chain regardless — suppressing the timeline here
+	// never suppresses governance, only its durable trail (docs/recording-levels.md).
+	if !e.level.recordsTimeline() {
+		return
+	}
 	_, _ = e.events.Append(ctx, Event{At: e.now(), Run: run, Step: step, Kind: kind, Detail: detail})
 }
