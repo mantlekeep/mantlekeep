@@ -25,18 +25,27 @@ it delivers the reactive path the features already on the SDK side (e.g. transit
 
 ## Next — the maturity core (built once, on the consolidated spine)
 
-**3. A governed saga runner in the Java SDK.** The single highest-value primitive. It dispatches every step
+**3. Dogfood: reference products drive the framework — the primary integration test.** Build real governed
+services on MantleKeep (a delivery pipeline, a workload-session lifecycle, a registry crossing) and run them
+against the SDK the way any consumer would. This is not a nice-to-have: **unit tests cannot catch a defect
+in the seam between components — only a consuming product can**, and every integration bug found so far was
+found exactly this way. A reference product that depends on MantleKeep is the cheapest, most controllable
+real consumer there is; it catches a class of bug before any downstream consumer meets it, and it is a
+second independent witness for the promotion gate ("a real consumer has driven it end to end"). Do this
+right after consolidation, so the products import the final pure-JDK spine once.
+
+**4. A governed saga runner in the Java SDK.** The single highest-value primitive. It dispatches every step
 through `GovernedWorker` (a product cannot write a raw execute loop — the bypass hole closes by
 construction), compensates in reverse (the engine the Go core already proves), and emits step evidence at a
 configurable recording level (`docs/recording-levels.md`). One primitive: closes the bypass, delivers
 step-level evidence, and stops every product reinventing the loop.
 
-**4. Saga records + recording levels.** Persist step evidence through `StorePort` (per-purpose bindable — the
+**5. Saga records + recording levels.** Persist step evidence through `StorePort` (per-purpose bindable — the
 chain and the saga timeline can use different backends by config), correlated to the chain head so it is
 tamper-evident without being on the chain. Recording verbosity (`none | decisions | steps | full`) is
 env-scaled policy; govern-before-execute stays sealed at every level.
 
-**5. A typed denial taxonomy.** Stable denial codes (`DENY_FLOOR`, `DENY_SEPARATION_OF_DUTIES`,
+**6. A typed denial taxonomy.** Stable denial codes (`DENY_FLOOR`, `DENY_SEPARATION_OF_DUTIES`,
 `DENY_IDENTITY`, …) so a product maps refusals to `400/401/403/409` deterministically and never surfaces a
 `500`. Small, and it removes product-specific string parsing of deny reasons.
 
