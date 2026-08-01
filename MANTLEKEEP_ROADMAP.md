@@ -13,7 +13,7 @@ Everything below is the path to that gate, ordered so each step unblocks the nex
 
 ## Now — consolidate before adding
 
-**1. Cut and publish the accumulated candidate.** `0.1.1-rc.1` closes the gaps a real consumer's build
+**1. Cut and publish the accumulated candidate.** `0.1.0-rc.2` closes the gaps a real consumer's build
 surfaced (identity reaching the door, nested floor parameters, brandable policy namespace and headers,
 `GovernedWorker`). See `CHANGELOG.md`.
 

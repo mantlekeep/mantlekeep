@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
-## [0.1.1-rc.1] — 2026-08-01
+## [0.1.0-rc.2] — 2026-08-01
 
 Driven by a real consumer: a regulated organisation built a governed SDLC service against `0.1.0-rc.1`
 with an in-house AI assistant, hit the framework's edges, and **failed closed rather than bypass
@@ -144,6 +144,6 @@ Adoption guides, the door's library and wire contracts, and the design notes tha
 layering a product across generic/domain/team, the template–behaviour–worker composition model, a shared
 audit chain for replication, federated doors across zones, and the execution unit.
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.1-rc.1...HEAD
-[0.1.1-rc.1]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...v0.1.1-rc.1
+[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.2...HEAD
+[0.1.0-rc.2]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...v0.1.0-rc.2
 [0.1.0-rc.1]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0-rc.1

@@ -24,7 +24,7 @@
 
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-java-parent</artifactId>
-  <version>0.1.1-rc.1</version>
+  <version>0.1.0-rc.2</version>
   <packaging>pom</packaging>
 
   <name>MantleKeep Java SDK (parent)</name>
