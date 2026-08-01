@@ -84,6 +84,16 @@ metadata, pkg.go.dev.
   rather than merely visible (`docs/credential-brokering.md`).
 - **Multi-zone / data residency** — federated doors, a broker per zone, hashes cross boundaries not records
   (`docs/multi-zone.md`).
+- **Multi-language SDK generation from one source of truth.** Hand-written per-language clients are the
+  two-stacks drift problem at language scale — the Java and Python clients already encode the same contract
+  and the same behaviour twice, and nothing compares them across languages. Converge before a third client
+  is hand-written. The direction: a single schema (proto used as an IDL only) drives a generator that emits
+  **zero-dependency stdlib clients** — JSON over HTTP, no protobuf/gRPC runtime in the consuming language —
+  so the near-zero-dependency guarantee holds for every SDK. Wire types are generated; governance behaviour
+  (fail-closed, `require_approval` is not allow, decide-then-dispatch) lives in **one place** — a Rust core
+  wrapped by FFI, or server-side with thin clients — never re-implemented per language, because a divergence
+  there is a security divergence. Backward-compatibility is enforced by additive-only fields plus a
+  schema-diff test in CI.
 
 ---
 
