@@ -8,7 +8,9 @@
 // The contract it serves is the frozen one in docs/door.md:
 //
 //	POST /api/govern   {action, resource, goal, env, params}
-//	                   → {"decision":"allow","token":…} | {"decision":"deny","reason":…}
+//	   allow            → {"outcome":"allow","token":…,"policyId":…,"expiresAt":…,"reasons":[]}
+//	   deny             → {"outcome":"deny","reasons":[{"code":…,"message":…}],"policyId":…}
+//	   require_approval → {"outcome":"require_approval","requiredApprovers":[…],"reasons":[…]}
 //	GET  /api/audit    → {"intact":bool,"count":n,"records":[…]}
 //	POST /api/login    {"user":…}  — DEV identity only, off by default
 //
@@ -109,20 +111,26 @@ type governRequest struct {
 func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request) {
 	actor, err := s.resolveCaller(request)
 	if err != nil {
-		// No accountable actor means nothing to record and nothing to authorise; an
-		// overreaching delegator is refused outright rather than downgraded.
-		status, reason := http.StatusUnauthorized, err.Error()
+		// No accountable actor means nothing to record and nothing to authorise. This is
+		// an identity refusal (401); an overreaching delegator is refused outright (403)
+		// rather than downgraded to acting as itself.
+		status := http.StatusUnauthorized
 		if errors.Is(err, errDelegationRefused) {
 			status = http.StatusForbidden
 		}
-		writeJSON(writer, status, map[string]any{"decision": "deny", "reason": reason})
+		writeJSON(writer, status, map[string]any{
+			"outcome": "deny",
+			"reasons": []wireReason{{Code: codeIdentity, Message: err.Error()}},
+		})
 		return
 	}
 
 	var body governRequest
 	if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-		writeJSON(writer, http.StatusBadRequest,
-			map[string]any{"decision": "deny", "reason": "malformed request: " + err.Error()})
+		writeJSON(writer, http.StatusBadRequest, map[string]any{
+			"outcome": "deny",
+			"reasons": []wireReason{{Code: codeValidation, Message: "malformed request: " + err.Error()}},
+		})
 		return
 	}
 
@@ -136,8 +144,9 @@ func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request)
 		params["env"] = body.Env
 	}
 
+	intentID := newIntentID()
 	token, submitErr := s.door.Submitter.Submit(request.Context(), mantlekeep.Intent{
-		ID:      newIntentID(),
+		ID:      intentID,
 		Subject: actor.subject,
 		// Which application carried the claim. Empty when the subject acted itself.
 		Via:      actor.via,
@@ -147,18 +156,23 @@ func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request)
 		Params:   params,
 	})
 	if submitErr != nil {
-		// A deny is a normal, recorded outcome — not a server fault. 403 says the door
-		// answered and the answer was no.
-		writeJSON(writer, http.StatusForbidden,
-			map[string]any{"decision": "deny", "reason": submitErr.Error()})
+		// A deny or require_approval is a normal, recorded outcome carried as a
+		// DecisionError — the wire keeps the policy id, the typed reason, and who may
+		// sign off. Any other error is a genuine server fault (policy eval, audit write)
+		// and is the only thing that becomes a 500.
+		var decisionErr *mantlekeep.DecisionError
+		if errors.As(submitErr, &decisionErr) {
+			writeDecision(writer, decisionErr.Decision, intentID)
+			return
+		}
+		writeJSON(writer, http.StatusInternalServerError, map[string]any{
+			"outcome": "error",
+			"reasons": []wireReason{{Code: codePolicyError, Message: submitErr.Error()}},
+		})
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, map[string]any{
-		"decision": "allow",
-		"token":    token.Value,
-		"intentId": token.IntentID,
-	})
+	writeAllow(writer, token)
 }
 
 func writeJSON(writer http.ResponseWriter, status int, body any) {

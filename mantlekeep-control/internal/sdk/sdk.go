@@ -36,9 +36,13 @@ func New(id mantlekeep.IdentityResolver, pol mantlekeep.PolicyEvaluator, aud man
 
 // Submit implements mantlekeep.Submitter.
 func (s *SDK) Submit(ctx context.Context, intent mantlekeep.Intent) (mantlekeep.ExecutionToken, error) {
-	// Belt-and-suspenders: the policy also enforces this, but reject early.
+	// Belt-and-suspenders: the policy also enforces this, but reject early. A validation
+	// refusal is a deny like any other — carry it as a Decision so the wire can type it.
 	if intent.Spec.Goal == "" {
-		return mantlekeep.ExecutionToken{}, fmt.Errorf("intent rejected: intent_spec.goal is required")
+		return mantlekeep.ExecutionToken{}, &mantlekeep.DecisionError{Decision: mantlekeep.Decision{
+			Action: mantlekeep.ActionDeny,
+			Reason: "intent rejected: intent_spec.goal is required",
+		}}
 	}
 
 	// Identity is resolved SERVER-SIDE from the verified id and (for the SSO tier)
@@ -52,7 +56,10 @@ func (s *SDK) Submit(ctx context.Context, intent mantlekeep.Intent) (mantlekeep.
 		Groups: intent.Subject.ADGroups,
 	})
 	if err != nil {
-		return mantlekeep.ExecutionToken{}, fmt.Errorf("intent rejected: unknown subject %q: %w", intent.Subject.ID, err)
+		return mantlekeep.ExecutionToken{}, &mantlekeep.DecisionError{Decision: mantlekeep.Decision{
+			Action: mantlekeep.ActionDeny,
+			Reason: fmt.Sprintf("intent rejected: unknown subject %q: %v", intent.Subject.ID, err),
+		}}
 	}
 
 	// A run approval carries the original requester (for separation of duties), and an env-gated
@@ -100,7 +107,9 @@ func (s *SDK) Submit(ctx context.Context, intent mantlekeep.Intent) (mantlekeep.
 	}
 
 	if decision.Action != mantlekeep.ActionAllow {
-		return mantlekeep.ExecutionToken{}, fmt.Errorf("%s: %s", decision.Action, decision.Reason)
+		// Deny or require_approval: carry the full Decision so the wire keeps the policy
+		// id, the structured reason, and (for require_approval) who may sign off.
+		return mantlekeep.ExecutionToken{}, &mantlekeep.DecisionError{Decision: decision}
 	}
 
 	now := time.Now().UTC()
@@ -108,6 +117,7 @@ func (s *SDK) Submit(ctx context.Context, intent mantlekeep.Intent) (mantlekeep.
 		Value:     randToken(),
 		IntentID:  intent.ID,
 		Scope:     intent.Resource,
+		PolicyID:  decision.PolicyID, // surface WHICH policy authorised, for the wire + audit
 		IssuedAt:  now,
 		ExpiresAt: now.Add(2 * time.Hour),
 	}, nil

@@ -23,7 +23,7 @@ import (
 // input, the manifest schema, the wasm ABI); bump MINOR for additive, back-compatible
 // changes. Downstream pins this. The arch guard test enforces that the core stays
 // dependency-free so these ports never drag an adapter's concerns into the domain.
-const ContractVersion = "2.0.0"
+const ContractVersion = "3.0.0"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Identity — WHO is acting (RBAC). AD group is the single source of truth.
@@ -135,6 +135,19 @@ type Decision struct {
 	Warnings          []string // non-blocking flags (e.g. budget at 85%)
 }
 
+// DecisionError carries the full Decision out of Submit when the outcome is not an allow.
+// Submit returns (token, error); without this, a deny or require_approval would reach the
+// caller as a bare string and lose the fields an enterprise wire must surface — which
+// policy decided, who may approve, the structured reason. A caller type-asserts to recover
+// the Decision; a plain error still reads sensibly for callers that only log it.
+type DecisionError struct {
+	Decision Decision
+}
+
+func (e *DecisionError) Error() string {
+	return string(e.Decision.Action) + ": " + e.Decision.Reason
+}
+
 // PolicySubject is WHO is acting, as the policy sees it — resolved server-side.
 // Attrs carries verified ABAC attributes (department, clearance, region…) for
 // engines that need more than roles. A caller never sets Roles as input to the
@@ -194,6 +207,7 @@ type ExecutionToken struct {
 	Value     string // opaque random value; NOT signed — see the note above
 	IntentID  string // the intent it authorises
 	Scope     string // resource scope it is valid for
+	PolicyID  string // which policy authorised it — surfaced on the wire for audit
 	IssuedAt  time.Time
 	ExpiresAt time.Time
 }
