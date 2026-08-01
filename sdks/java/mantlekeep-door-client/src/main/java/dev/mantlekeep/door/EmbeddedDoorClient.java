@@ -38,21 +38,23 @@ public final class EmbeddedDoorClient implements DoorClient {
                 + "\"params\":" + JsonText.object(intent.parameters())
                 + "}";
         String resultJson = core.submitJson(intentJson);
-        // The native core speaks its own small contract ({action, token, reason}); shape it
-        // into the same rich Decision the service wire yields, so a product reads one type
-        // whichever mode it runs. Fields the native core does not (yet) emit — policyId,
-        // required approvers, expiry — default empty rather than being invented here.
-        String reason = JsonText.stringField(resultJson, "reason");
-        List<Decision.Reason> reasons = reason.isBlank()
-                ? List.of()
-                : List.of(new Decision.Reason("", reason));
+        // The native core emits the canonical Decision contract in snake_case — the same
+        // logical shape the HTTP wire carries in camelCase (docs/native-core-contract.md).
+        // Parse that contract exactly; a Rust core is parity-checked to produce it byte for
+        // byte against the Go oracle, so this path decodes one contract, not a guess.
+        List<Decision.Reason> reasons =
+                JsonText.objectsOfArray(JsonText.arrayField(resultJson, "reasons")).stream()
+                        .map(reasonJson -> new Decision.Reason(
+                                JsonText.stringField(reasonJson, "code"),
+                                JsonText.stringField(reasonJson, "message")))
+                        .toList();
         return new Decision(
-                Decision.Outcome.fromWire(JsonText.stringField(resultJson, "action")),
+                Decision.Outcome.fromWire(JsonText.stringField(resultJson, "outcome")),
                 JsonText.stringField(resultJson, "token"),
                 JsonText.stringField(resultJson, "policy_id"),
                 reasons,
                 JsonText.stringsOfArray(JsonText.arrayField(resultJson, "required_approvers")),
-                "");
+                JsonText.stringField(resultJson, "expires_at"));
     }
 
     @Override
