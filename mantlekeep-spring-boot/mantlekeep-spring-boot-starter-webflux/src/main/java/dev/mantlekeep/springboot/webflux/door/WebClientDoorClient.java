@@ -8,6 +8,7 @@ import dev.mantlekeep.springboot.door.Intent;
 import dev.mantlekeep.springboot.door.OnBehalfOf;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -64,7 +65,8 @@ public class WebClientDoorClient implements DoorClient {
                         headers.set(properties.onBehalfOfHeader(), onBehalfOf);
                     }
                 })
-                .bodyValue(intent)
+                .bodyValue(new GovernRequest(
+                        intent.action(), intent.resource(), intent.goal(), intent.env(), intent.params()))
                 .exchangeToMono(response -> response.bodyToMono(DoorResponse.class)
                         .defaultIfEmpty(DoorResponse.empty())
                         .map(body -> toDecision(response.statusCode().is2xxSuccessful(), body)))
@@ -109,5 +111,18 @@ public class WebClientDoorClient implements DoorClient {
         }
         String single = body.reason() != null ? body.reason() : body.error();
         return single == null ? List.of() : List.of(single);
+    }
+
+    /**
+     * The outbound body, matching the door's frozen wire contract exactly:
+     * {@code {action, resource, goal, env, params}}.
+     *
+     * <p>It is built explicitly rather than serialising the {@link Intent} record, because
+     * the record also carries a {@code scope} field the door drops — sending it is a silent
+     * divergence from the canonical shape. Identity never travels in the body; it is set as
+     * a header, because a body-supplied caller would be forgeable.
+     */
+    private record GovernRequest(
+            String action, String resource, String goal, String env, Map<String, Object> params) {
     }
 }
