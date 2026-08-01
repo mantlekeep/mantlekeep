@@ -36,6 +36,11 @@ or *execute* (→ a service, calls the door)? The core knows only the **port**; 
 knowledge lives in the **adapter** (`WorkerPort`, `AgentPort`, `StorePort`,
 `PolicyEvaluator`, …). Swap a backend by configuration, not by rewriting the core.
 
+## Roadmap
+
+See [MANTLEKEEP_ROADMAP.md](MANTLEKEEP_ROADMAP.md) — the path from release candidate to `0.1.0`, ordered
+so each step unblocks the next.
+
 ## Documentation
 
 Start here to adopt and build on MantleKeep:
