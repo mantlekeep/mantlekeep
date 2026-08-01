@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.mantlekeep.springboot.door.Decision;
+import dev.mantlekeep.door.model.Decision;
+import dev.mantlekeep.door.model.Intent;
 import dev.mantlekeep.springboot.door.DoorClient;
 import dev.mantlekeep.springboot.door.DoorException;
-import dev.mantlekeep.springboot.door.Intent;
 import dev.mantlekeep.springboot.intent.MantlekeepIntent;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,7 +43,8 @@ class MantlekeepIntentAspectTest {
     }
 
     private static Decision allow() {
-        return new Decision(Decision.Outcome.ALLOW, "tok", null, "p1", null, null);
+        // SDK Decision order: (outcome, token, policyId, reasons, requiredApprovers, expiresAt)
+        return new Decision(Decision.Outcome.ALLOW, "tok", "p1", null, null, null);
     }
 
     @Test
@@ -58,7 +59,8 @@ class MantlekeepIntentAspectTest {
     @Test
     void denyBlocksTheBody() {
         AtomicBoolean ran = new AtomicBoolean(false);
-        Decision deny = new Decision(Decision.Outcome.DENY, "", null, "p1", List.of("nope"), null);
+        Decision deny = new Decision(Decision.Outcome.DENY, "", "p1",
+                List.of(new Decision.Reason("DENY_ACTION_NOT_ALLOWED", "nope")), null, null);
         GovernedService svc = proxied(intent -> Mono.error(new DoorException("denied", deny)), ran);
 
         StepVerifier.create(svc.propose()).expectError(DoorException.class).verify();
