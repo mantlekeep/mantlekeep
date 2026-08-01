@@ -38,10 +38,21 @@ public final class EmbeddedDoorClient implements DoorClient {
                 + "\"params\":" + JsonText.object(intent.parameters())
                 + "}";
         String resultJson = core.submitJson(intentJson);
-        boolean allowed = "allow".equals(JsonText.stringField(resultJson, "action"));
-        return allowed
-                ? Decision.allow(JsonText.stringField(resultJson, "token"))
-                : Decision.deny(JsonText.stringField(resultJson, "reason"));
+        // The native core speaks its own small contract ({action, token, reason}); shape it
+        // into the same rich Decision the service wire yields, so a product reads one type
+        // whichever mode it runs. Fields the native core does not (yet) emit — policyId,
+        // required approvers, expiry — default empty rather than being invented here.
+        String reason = JsonText.stringField(resultJson, "reason");
+        List<Decision.Reason> reasons = reason.isBlank()
+                ? List.of()
+                : List.of(new Decision.Reason("", reason));
+        return new Decision(
+                Decision.Outcome.fromWire(JsonText.stringField(resultJson, "action")),
+                JsonText.stringField(resultJson, "token"),
+                JsonText.stringField(resultJson, "policy_id"),
+                reasons,
+                JsonText.stringsOfArray(JsonText.arrayField(resultJson, "required_approvers")),
+                "");
     }
 
     @Override

@@ -74,10 +74,28 @@ public final class ServiceDoorClient implements DoorClient {
                 + "\"params\":" + JsonText.object(intent.parameters())
                 + "}";
         String responseJson = post("/api/govern", governRequestJson, intent.subject().id());
-        boolean allowed = "allow".equals(JsonText.stringField(responseJson, "decision"));
-        return allowed
-                ? Decision.allow(JsonText.stringField(responseJson, "token"))
-                : Decision.deny(JsonText.stringField(responseJson, "reason"));
+        return parseDecision(responseJson);
+    }
+
+    /**
+     * Reads the canonical /api/govern response into the rich {@link Decision}: the outcome,
+     * the token and its expiry on allow, the policy that decided, the typed reasons, and the
+     * approvers a require_approval still needs.
+     */
+    private static Decision parseDecision(String responseJson) {
+        List<Decision.Reason> reasons =
+                JsonText.objectsOfArray(JsonText.arrayField(responseJson, "reasons")).stream()
+                        .map(reasonJson -> new Decision.Reason(
+                                JsonText.stringField(reasonJson, "code"),
+                                JsonText.stringField(reasonJson, "message")))
+                        .toList();
+        return new Decision(
+                Decision.Outcome.fromWire(JsonText.stringField(responseJson, "outcome")),
+                JsonText.stringField(responseJson, "token"),
+                JsonText.stringField(responseJson, "policyId"),
+                reasons,
+                JsonText.stringsOfArray(JsonText.arrayField(responseJson, "requiredApprovers")),
+                JsonText.stringField(responseJson, "expiresAt"));
     }
 
     @Override

@@ -1,11 +1,13 @@
 package dev.mantlekeep.door;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpServer;
 import dev.mantlekeep.door.model.AuditRecord;
+import dev.mantlekeep.door.model.Decision;
 import dev.mantlekeep.door.model.ExecutionToken;
 import dev.mantlekeep.door.model.Intent;
 import java.io.IOException;
@@ -21,7 +23,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Drives the REAL wire path against a JDK {@code com.sun.net.httpserver} stub of the
- * door — the same {@code /api/govern} + {@code /api/audit} contract the portal serves.
+ * door — the canonical {@code /api/govern} response: an outcome, the policy that decided,
+ * typed reasons, the approvers a require_approval needs, and when an allow expires.
  * No external HTTP library on either side.
  */
 class ServiceDoorClientTest {
@@ -37,10 +40,18 @@ class ServiceDoorClientTest {
             lastGovernRequestBody =
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             String action = JsonText.stringField(lastGovernRequestBody, "action");
-            String response = "service.deploy".equals(action)
-                    ? "{\"decision\":\"deny\",\"reason\":\"segregation of duties: the proposer cannot approve\"}"
-                    : "{\"decision\":\"allow\",\"token\":\"WIRE-TOKEN-1\",\"expires\":\"2026-07-26T00:00:00Z\"}";
-            respond(exchange, response);
+            respond(exchange, switch (action) {
+                case "service.deploy" -> "{\"outcome\":\"deny\",\"policyId\":\"policy.sdlc.v3\","
+                        + "\"reasons\":[{\"code\":\"DENY_SEPARATION_OF_DUTIES\","
+                        + "\"message\":\"segregation of duties: the proposer cannot approve\"}]}";
+                case "release.cut" -> "{\"outcome\":\"require_approval\",\"policyId\":\"policy.sdlc.v3\","
+                        + "\"requiredApprovers\":[\"L4-Approver\",\"security-officer\"],"
+                        + "\"reasons\":[{\"code\":\"REQUIRE_APPROVAL\","
+                        + "\"message\":\"a second approver must sign off\"}]}";
+                default -> "{\"outcome\":\"allow\",\"token\":\"WIRE-TOKEN-1\","
+                        + "\"policyId\":\"policy.sdlc.v3\",\"expiresAt\":\"2026-07-26T00:00:00Z\","
+                        + "\"reasons\":[]}";
+            });
         });
         doorStub.createContext("/api/audit", exchange -> respond(exchange,
                 "{\"intact\":true,\"count\":2,\"records\":["
@@ -72,10 +83,41 @@ class ServiceDoorClientTest {
     }
 
     @Test
+    void allowDecodesThePolicyAndExpiryTheAuditorAsksFor() {
+        Decision decision = doorClient.decide(
+                new Intent("", null, "job.promote", "project/demo", "ship 1.2", Map.of()));
+
+        assertEquals(Decision.Outcome.ALLOW, decision.outcome());
+        assertTrue(decision.allowed());
+        assertEquals("policy.sdlc.v3", decision.policyId());
+        assertEquals("2026-07-26T00:00:00Z", decision.expiresAt());
+    }
+
+    @Test
     void denyThrowsWithTheDoorsReason() {
         DoorDeniedException denial = assertThrows(DoorDeniedException.class,
                 () -> doorClient.submit(Intent.of("service.deploy", "deploy the service")));
         assertTrue(denial.reason().contains("segregation of duties"));
+    }
+
+    @Test
+    void denyCarriesTheTypedCode() {
+        Decision decision = doorClient.decide(Intent.of("service.deploy", "deploy the service"));
+
+        assertEquals(Decision.Outcome.DENY, decision.outcome());
+        assertFalse(decision.allowed());
+        assertEquals(1, decision.reasons().size());
+        assertEquals("DENY_SEPARATION_OF_DUTIES", decision.reasons().get(0).code());
+        assertTrue(decision.reasons().get(0).message().contains("segregation of duties"));
+    }
+
+    @Test
+    void requireApprovalNamesWhoMustSignOff() {
+        Decision decision = doorClient.decide(Intent.of("release.cut", "cut the 1.2 release"));
+
+        assertEquals(Decision.Outcome.REQUIRE_APPROVAL, decision.outcome());
+        assertFalse(decision.allowed());
+        assertEquals(List.of("L4-Approver", "security-officer"), decision.requiredApprovers());
     }
 
     @Test

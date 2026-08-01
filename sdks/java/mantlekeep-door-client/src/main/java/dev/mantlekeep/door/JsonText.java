@@ -153,6 +153,20 @@ final class JsonText {
     }
 
     /**
+     * Extracts the unescaped string elements of a JSON array of strings — the shape
+     * {@code requiredApprovers} arrives in. Objects inside the array are ignored; this
+     * reads scalar strings only, which is all a list of role names is.
+     */
+    static List<String> stringsOfArray(String json) {
+        List<String> values = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\"((?:[^\"\\\\]|\\\\.)*)\"").matcher(json);
+        while (matcher.find()) {
+            values.add(matcher.group(1).replace("\\\"", "\"").replace("\\\\", "\\"));
+        }
+        return values;
+    }
+
+    /**
      * Splits a JSON array of objects into the objects' raw text, by brace counting
      * (string-aware). Enough for the door's flat audit records; not a general parser.
      */
