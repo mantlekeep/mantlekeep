@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs / FindSecBugs exclusion filter for the MantleKeep Spring Boot starter family.
+
+  Every exclusion below carries a SPECIFIC justification. Never a blanket exclude:
+  SECURITY findings (FindSecBugs) are driven to zero by real fixes, not suppression;
+  only demonstrable false positives are listed here, each with the reason it is one.
+-->
+<FindBugsFilter>
+
+  <!--
+    COMMAND_INJECTION (SECURITY) on the Claude CLI runner. FALSE POSITIVE: every launch uses
+    ProcessBuilder(List<String>), which execs the argv vector DIRECTLY — no shell, so there is no
+    metacharacter/`;`/`|`/`$()` surface to inject through. The binary is operator configuration
+    (mantlekeep.ai.*), not runtime input; the prompt is a single, uninterpreted argv element passed
+    to `-p`. Shell-less argv exec is precisely the remediation FindSecBugs recommends for this rule.
+  -->
+  <Match>
+    <Class name="dev.mantlekeep.springboot.ai.agent.ProcessClaudeRunner"/>
+    <Bug pattern="COMMAND_INJECTION"/>
+  </Match>
+
+  <!--
+    IMPROPER_UNICODE (SECURITY) on WebClientDoorClient.mapOutcome. FALSE POSITIVE: the door outcome
+    is matched against a CLOSED lowercase-ASCII vocabulary (allow/deny/require_approval). The fold is
+    pinned to Locale.ROOT (see the code), and no Unicode case mapping folds a non-ASCII code point
+    INTO those ASCII targets, so a crafted value cannot masquerade as one. The case-insensitive match
+    is kept deliberately: it makes non-canonical casing like "DENY" fail CLOSED rather than fall
+    through to the status-based default — removing it to satisfy the detector would weaken that.
+  -->
+  <Match>
+    <Class name="dev.mantlekeep.springboot.webflux.door.WebClientDoorClient"/>
+    <Method name="mapOutcome"/>
+    <Bug pattern="IMPROPER_UNICODE"/>
+  </Match>
+
+  <!--
+    EI_EXPOSE_REP2 (MALICIOUS_CODE, low rank) on the WebClientDoorClient constructor. FALSE POSITIVE:
+    WebClient is an injected, thread-safe, effectively-immutable Spring singleton. Defensively copying
+    a DI-managed bean is neither possible (no copy API) nor correct — the whole point is to share the
+    one configured client. Storing the injected reference is the intended, idiomatic pattern.
+  -->
+  <Match>
+    <Class name="dev.mantlekeep.springboot.webflux.door.WebClientDoorClient"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!--
+    CRLF_INJECTION_LOGS (SECURITY) on CallerWebFilter. FALSE POSITIVE: EVERY request-derived value
+    interpolated into a log line is routed through safe(), which replaces ISO control characters
+    (CR/LF included) with '.' and truncates — a purpose-built log-forging sanitizer (see its javadoc).
+    FindSecBugs does not recognize the custom sanitizer, so the taint is reported despite being cleaned.
+  -->
+  <Match>
+    <Class name="dev.mantlekeep.springboot.webflux.identity.CallerWebFilter"/>
+    <Bug pattern="CRLF_INJECTION_LOGS"/>
+  </Match>
+
+  <!--
+    CRLF_INJECTION_LOGS (SECURITY) on the identity auto-configuration. FALSE POSITIVE: the only
+    interpolated value is mantlekeep.identity.dev-user, an OPERATOR configuration property read from
+    the application's own environment — not request or attacker input. A CR/LF there would be the
+    operator injecting into their own startup log; there is no untrusted-input path into this line.
+  -->
+  <Match>
+    <Class name="dev.mantlekeep.springboot.webflux.identity.MantlekeepIdentityAutoConfiguration"/>
+    <Bug pattern="CRLF_INJECTION_LOGS"/>
+  </Match>
+
+</FindBugsFilter>

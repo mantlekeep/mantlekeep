@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs / FindSecBugs exclusion filter for the MantleKeep Java SDK.
+
+  Every exclusion below carries a SPECIFIC justification. Never a blanket exclude:
+  SECURITY findings (FindSecBugs) are driven to zero by real fixes, not suppression;
+  only demonstrable false positives are listed here, each with the reason it is one.
+-->
+<FindBugsFilter>
+
+  <!--
+    THROWS_METHOD_THROWS_RUNTIMEEXCEPTION (BAD_PRACTICE, low priority) on the FFM binding.
+    This is the FFI boundary: every java.lang.invoke MethodHandle.invoke declares `throws Throwable`,
+    and the binding deliberately normalizes any such Throwable into an unchecked exception
+    (asRuntime: re-throw the original RuntimeException unchanged, else wrap in IllegalStateException)
+    so the NativeCore port stays checked-exception-free. The raw RuntimeException static type is
+    intentional — wrapping an already-unchecked cause in a new type would hide the real failure.
+    Justified false positive, scoped to this one class + this one rule.
+  -->
+  <Match>
+    <Class name="dev.mantlekeep.core.PanamaMantlekeepCore"/>
+    <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+  </Match>
+
+</FindBugsFilter>
