@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"mantlekeep.dev/control/internal/safeio"
 )
 
 // PolicyDirEnv names a list (OS path-list separated) of PRODUCT policy docs — files, or directories
@@ -67,7 +69,7 @@ func productDocs() ([]productDoc, error) {
 		if p == "" {
 			continue
 		}
-		info, err := os.Stat(p)
+		info, err := safeio.StatConfigPath(p)
 		if err != nil {
 			return nil, fmt.Errorf("policy source %q: %w", p, err)
 		}
@@ -88,7 +90,7 @@ func productDocs() ([]productDoc, error) {
 	sort.Strings(files)
 	docs := make([]productDoc, 0, len(files))
 	for _, f := range files {
-		b, err := os.ReadFile(f)
+		b, err := safeio.ReadConfigFile(f)
 		if err != nil {
 			return nil, err
 		}

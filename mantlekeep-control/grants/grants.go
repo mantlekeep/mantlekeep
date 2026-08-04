@@ -15,6 +15,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"mantlekeep.dev/control/internal/safeio"
 )
 
 // defaultDoc is the embedded default — now EMPTY. The core binary carries NO policy: the platform
@@ -118,7 +120,7 @@ func readOverride(v string) ([]byte, error) {
 	if len(v) > 0 && v[0] == '{' {
 		return []byte(v), nil // inline JSON
 	}
-	return os.ReadFile(v) // file path
+	return safeio.ReadConfigFile(v) // operator-set file path, read through the validated config door
 }
 
 // RoleActionsAny renders the role→action grants as the generic shape an OPA data store expects
