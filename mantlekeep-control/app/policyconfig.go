@@ -1,6 +1,9 @@
 package app
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,28 +35,30 @@ type layerFile struct {
 	Sealed      []string          `json:"sealed"`
 }
 
-// loadLayer reads a policy config layer from the file named by envVar. Returns
-// (zero, false) when the var is unset. A sealed key set HERE binds every layer applied
-// after it (see policy.Resolve): the platform layer's seals are the floor a team layer
-// cannot loosen.
+// loadLayer reads a policy config layer from the file named by envVar. It returns
+// (zero, false, nil) when the var is UNSET — no config is a legitimate choice, the defaults
+// apply. But when the var IS set, an unreadable / malformed / unknown-key file is a HARD
+// ERROR (zero, false, err), not a silent drop: a governance engine must never run on a law
+// its operator declared but that failed to load, because a dropped layer means policy weaker
+// than what was written. The caller propagates the error to a fail-closed refuse-to-start.
 //
-// verbose controls the "layer loaded" log line: true at boot (log once), false on the
-// hot-reload watcher's poll path (silent, so a poll every N seconds does not spam). A
-// bad-file / bad-JSON warning is ALWAYS emitted — a broken config the operator must see.
-func loadLayer(envVar, name string, verbose bool) (policy.Layer, bool) {
+// A sealed key set HERE binds every layer applied after it (see policy.Resolve): the platform
+// layer's seals are the floor a team layer cannot loosen.
+//
+// verbose controls the per-layer fingerprint log line: true at boot (log once), false on the
+// hot-reload watcher's poll path (silent, so a poll every N seconds does not spam).
+func loadLayer(envVar, name string, verbose bool) (policy.Layer, bool, error) {
 	path := os.Getenv(envVar)
 	if path == "" {
-		return policy.Layer{}, false
+		return policy.Layer{}, false, nil
 	}
 	data, err := safeio.ReadConfigFile(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "policy layer %s (%s): %v — ignored\n", name, path, err)
-		return policy.Layer{}, false
+		return policy.Layer{}, false, fmt.Errorf("policy layer %s (%s): %w", name, path, err)
 	}
-	var raw layerFile
-	if err := json.Unmarshal(data, &raw); err != nil {
-		fmt.Fprintf(os.Stderr, "policy layer %s (%s): bad JSON: %v — ignored\n", name, path, err)
-		return policy.Layer{}, false
+	raw, err := decodeLayerFile(data)
+	if err != nil {
+		return policy.Layer{}, false, fmt.Errorf("policy layer %s (%s): %w", name, path, err)
 	}
 	layer := policy.Layer{
 		Name:        name + ":" + filepath.Base(path),
@@ -62,10 +67,28 @@ func loadLayer(envVar, name string, verbose bool) (policy.Layer, bool) {
 		Roles:       raw.Roles,
 	}
 	if verbose {
-		fmt.Printf("policy: layer %q loaded (%d action, %d sealed)\n",
-			layer.Name, len(layer.ActionRoles), len(layer.Sealed))
+		// Fingerprint the RAW file bytes and log it so a config change is VISIBLE: an operator
+		// (or an auditor reading the boot log) can confirm WHICH file content is live from the
+		// hash, without trusting a path or a mtime. The bytes are the same ones parsed above.
+		sum := sha256.Sum256(data)
+		fmt.Printf("policy: layer %q loaded — sha256=%s… (%d actions, %d sealed, %d roles)\n",
+			name, short(hex.EncodeToString(sum[:])), len(layer.ActionRoles), len(layer.Sealed), len(layer.Roles))
 	}
-	return layer, true
+	return layer, true, nil
+}
+
+// decodeLayerFile parses a layer file and REJECTS an unknown key. DisallowUnknownFields turns a
+// typo — "actionRole" for "actionRoles", "seal" for "sealed" — into an error instead of a
+// silently ignored field, which would otherwise leave the intended binding or seal missing and
+// the policy quietly weaker than the author believed.
+func decodeLayerFile(data []byte) (layerFile, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	var raw layerFile
+	if err := decoder.Decode(&raw); err != nil {
+		return layerFile{}, fmt.Errorf("invalid layer config: %w", err)
+	}
+	return raw, nil
 }
 
 // NOTE: a product's attribute floor is now GENERIC DATA — a list of typed rules per action in the
