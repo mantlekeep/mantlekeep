@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // The embedded in-memory driver is ALWAYS available — no build tag, no external

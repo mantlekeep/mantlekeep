@@ -7,7 +7,7 @@ import (
 	"math"
 
 	bolt "go.etcd.io/bbolt"
-	"mantlekeep.dev/control/orchestrator"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/orchestrator"
 )
 
 var eventsBucket = []byte("events")

@@ -7,8 +7,8 @@ package tooltest
 import (
 	"context"
 
-	"mantlekeep.dev/control/internal/kernel"
-	"mantlekeep.dev/control/registry"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/kernel"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/registry"
 )
 
 // Run scans a draft tool's module with the given input and records the result on the

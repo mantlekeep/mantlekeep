@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/grants"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/grants"
 )
 
 // The GENERIC attribute-floor evaluator. A product's IT-owned floor is DATA (grants/floors.json,

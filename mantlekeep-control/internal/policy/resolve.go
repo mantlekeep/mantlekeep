@@ -1,7 +1,7 @@
 package policy
 
 import (
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // This file is the LAYERED CONFIG RESOLVER — MantleKeep's config cascade, the V3 model:

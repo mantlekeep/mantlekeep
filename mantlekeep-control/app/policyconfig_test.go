@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"mantlekeep.dev/control/internal/policy"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
 )
 
 // TestLayerFileCarriesRenamedRoleVocabulary proves the config seam a bank uses to rename its

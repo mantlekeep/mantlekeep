@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // Mock is a fixed in-memory resolver for development and the Week-1 smoke test.

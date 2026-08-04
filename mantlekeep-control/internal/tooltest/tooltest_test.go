@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"mantlekeep.dev/control/internal/kernel"
-	"mantlekeep.dev/control/registry"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/kernel"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/registry"
 )
 
 // fakeStore is an in-memory mantlekeep.Store.

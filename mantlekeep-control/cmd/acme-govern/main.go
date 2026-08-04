@@ -30,9 +30,9 @@ import (
 	"os"
 	"path/filepath"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/app"
-	"mantlekeep.dev/control/doorkit"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/app"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/doorkit"
 )
 
 // brandPrefix is the ONLY namespace your operators ever type. Change this one

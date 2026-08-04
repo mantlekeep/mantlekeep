@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/internal/config"
-	"mantlekeep.dev/control/internal/provider"
-	"mantlekeep.dev/control/internal/store"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/config"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/provider"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/store"
 )
 
 // runWiring demonstrates the Spring-style provider registry: several backends of

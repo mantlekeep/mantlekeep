@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"sync"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // RegisterSubprocess registers an OUT-OF-PROCESS store driver: a separate binary

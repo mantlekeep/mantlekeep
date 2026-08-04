@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"mantlekeep.dev/control/internal/safeio"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 )
 
 // DataDir returns MantleKeep's durable data directory — where the audit chain, run

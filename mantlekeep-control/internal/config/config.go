@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"mantlekeep.dev/control/internal/safeio"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 )
 
 // Config is the resolved runtime selection — all capabilities, uniformly.

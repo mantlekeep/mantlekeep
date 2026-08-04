@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // Gateway resolves a claims-based identity (asserted by an SSO gateway and

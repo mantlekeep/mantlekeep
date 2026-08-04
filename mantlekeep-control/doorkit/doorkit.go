@@ -10,13 +10,13 @@
 package doorkit
 
 import (
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/internal/audit"
-	"mantlekeep.dev/control/internal/identity"
-	"mantlekeep.dev/control/internal/policy"
-	"mantlekeep.dev/control/internal/sdk"
-	"mantlekeep.dev/control/internal/store"
-	"mantlekeep.dev/control/orchestrator"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/audit"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/identity"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/sdk"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/store"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/orchestrator"
 )
 
 // Failsafe is the read-only-mode control on an assembled door: trip it and the door serves

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"mantlekeep.dev/control/doorkit"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/doorkit"
 )
 
 // A service account frequently acts FOR a person: the service authenticates, the person

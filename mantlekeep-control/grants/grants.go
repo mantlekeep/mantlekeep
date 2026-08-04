@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 
-	"mantlekeep.dev/control/internal/safeio"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 )
 
 // defaultDoc is the embedded default — now EMPTY. The core binary carries NO policy: the platform

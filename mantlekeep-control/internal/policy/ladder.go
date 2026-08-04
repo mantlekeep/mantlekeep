@@ -1,7 +1,7 @@
 package policy
 
 import (
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // This file is ONE concern: the deployment's role vocabulary and the seniority checks over it.

@@ -12,12 +12,12 @@ import (
 	"context"
 	"sort"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // roleActions is the role→allowed-actions map. Only the generic L0-SuperAdmin wildcard lives in
 // the engine ("*" means all); every product/action grant is DATA, loaded from the shared grants
-// document (mantlekeep.dev/control/grants) so the engine names no product. loadRoleActions merges the
+// document (github.com/mantlekeep/mantlekeep/mantlekeep-control/grants) so the engine names no product. loadRoleActions merges the
 // wildcard with that document — see grants_load.go. The grants are EXPLICIT per-role sets, not a
 // seniority ladder: a role gets exactly the actions listed for it.
 //

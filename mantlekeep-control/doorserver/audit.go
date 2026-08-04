@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // recordLister is the optional ability to read the chain back. AuditLogger itself only
