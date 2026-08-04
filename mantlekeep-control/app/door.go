@@ -71,14 +71,18 @@ func DefaultPolicy() mantlekeep.PolicyEvaluator { return configuredRBAC() }
 //   - dyn (product registry)        the product layer, as the action-role fallback
 func configuredRBAC(dyn ...policy.ActionAuthorizer) *policy.RBAC {
 	base := currentLayers(false)
-	resolved := policy.Resolve(base...)
+	// The deployment's role vocabulary, declared once in a layer's `roles` map (default when none).
+	// The SAME ladder reaches the evaluator (WithRoleLadder) and every Resolve/ScopeResolver so a
+	// renamed-role deployment governs consistently — the core holds no hardcoded role names.
+	ladder := policy.LadderFrom(base...)
+	resolved := policy.Resolve(ladder, base...)
 	var fb policy.ActionAuthorizer
 	if len(dyn) > 0 && dyn[0] != nil {
 		resolved.WithFallback(dyn[0]) // the product registry — product layer of the cascade
 		fb = dyn[0]
 	}
 	// Optional per-scope tier (MANTLEKEEP_SCOPE_CONFIG); no-op when unset — default unchanged.
-	eng := attachScopes(policy.NewRBAC().WithResolved(resolved), base, fb, false)
+	eng := attachScopes(policy.NewRBAC().WithRoleLadder(ladder).WithResolved(resolved), base, fb, ladder, false)
 	// Product policy is DATA, read by the generic engine: role grants from the shared grants
 	// document and the IT-owned attribute floor (grants/floors.json, MANTLEKEEP_POLICY_FLOORS override).
 	// The core imports NO product — nothing to wire here; the engine applies the floor itself.
@@ -100,7 +104,10 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 	}
 
 	layers := currentLayers(true) // verbose: emit the per-layer boot log once
-	initial := policy.Resolve(layers...)
+	// The deployment's role vocabulary (default when no layer declares `roles`); threaded to the
+	// evaluator AND every rebuilt cascade so hot-reloads keep the same vocabulary.
+	ladder := policy.LadderFrom(layers...)
+	initial := policy.Resolve(ladder, layers...)
 	if fallback != nil {
 		initial.WithFallback(fallback)
 	}
@@ -111,7 +118,7 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 	src := policy.SourceFunc(func(context.Context) ([]policy.Layer, error) {
 		return currentLayers(false), nil
 	})
-	w := policy.NewWatcher(src, live, fallback, layers).
+	w := policy.NewWatcher(src, live, fallback, ladder, layers).
 		OnReload(func(revision string, _ *policy.Resolved) {
 			// A governance change is itself a governed, evidenced event. We log the
 			// revision (content hash) so a later decision is explainable after the fact;
@@ -130,7 +137,7 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 	// Optional per-scope tier (MANTLEKEEP_SCOPE_CONFIG). Known scopes resolve their own tier
 	// (static base snapshot); empty/unknown scopes fall through to the live hot-reload path,
 	// so this never disturbs base hot-reload. No-op when unset — the default path is unchanged.
-	eng := attachScopes(policy.NewRBAC().WithLive(live), layers, fallback, true)
+	eng := attachScopes(policy.NewRBAC().WithRoleLadder(ladder).WithLive(live), layers, fallback, ladder, true)
 	// Product policy is DATA (role grants + the IT-owned attribute floor), read by the generic
 	// engine — the core imports no product, so nothing is wired here. The floor doc has an env
 	// override (MANTLEKEEP_POLICY_FLOORS); a DB-backed source drops in behind grants.LoadFloors().

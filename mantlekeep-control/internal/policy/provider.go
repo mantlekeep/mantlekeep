@@ -38,6 +38,11 @@ type PolicyProvider interface {
 // authority ranking. It is EXPORTED so a product provider's attribute floor can gate an action
 // on seniority (e.g. an irreversible op) without duplicating the rank table — the ranking is a
 // generic governance concept and lives once, here in the core.
+//
+// This helper has no RBAC receiver, so it ranks against the DEFAULT ladder: a provider gating on
+// seniority reasons in the default vocabulary. The per-deployment configured ladder (set via
+// RBAC.WithRoleLadder) governs the actual door decisions inside RBAC — a deployment that renames
+// its tiers wires that ladder there, not here.
 func HoldsAtLeast(roles []mantlekeep.Role, need mantlekeep.Role) bool {
-	return holdsAtLeast(rolesToStrings(roles), need)
+	return DefaultRoleLadder().holdsAtLeast(rolesToStrings(roles), need)
 }

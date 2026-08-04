@@ -84,6 +84,7 @@ type Watcher struct {
 	src      Source
 	live     *LiveResolver
 	fallback ActionAuthorizer // the product registry, re-attached to every rebuilt *Resolved
+	ladder   RoleLadder       // the deployment's role vocabulary, passed to every rebuilt Resolve
 	lastHash string           // content hash of the last-applied layers — dedup so a flapping
 	// or unchanged source does not thrash the pointer every poll.
 	onReload func(revision string, res *Resolved) // optional hook (audit/log) fired on a real swap
@@ -91,12 +92,15 @@ type Watcher struct {
 
 // NewWatcher wires a watcher over an already-built LiveResolver. initial is the layer
 // set the caller used to build the seeded snapshot; hashing it here means the FIRST
-// poll of an unchanged source is a no-op (no needless re-swap on boot).
-func NewWatcher(src Source, live *LiveResolver, fallback ActionAuthorizer, initial []Layer) *Watcher {
+// poll of an unchanged source is a no-op (no needless re-swap on boot). ladder is the
+// deployment's role vocabulary — every rebuilt cascade resolves against the SAME ladder as
+// the seeded one, so a renamed-role deployment's seal checks stay consistent across reloads.
+func NewWatcher(src Source, live *LiveResolver, fallback ActionAuthorizer, ladder RoleLadder, initial []Layer) *Watcher {
 	return &Watcher{
 		src:      src,
 		live:     live,
 		fallback: fallback,
+		ladder:   ladder,
 		lastHash: hashLayers(initial),
 	}
 }
@@ -125,7 +129,7 @@ func (w *Watcher) Reload(ctx context.Context) (changed bool, err error) {
 	}
 	// Rebuild from scratch: Resolve() re-runs the sealed cascade, so a team layer that
 	// tries to loosen a sealed floor is rejected on THIS reload exactly as at boot.
-	res := Resolve(layers...)
+	res := Resolve(w.ladder, layers...)
 	if w.fallback != nil {
 		res.WithFallback(w.fallback) // re-attach the product registry (product layer)
 	}

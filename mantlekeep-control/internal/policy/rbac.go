@@ -64,11 +64,9 @@ func set(items ...string) map[string]bool {
 // guardrail logic stays generic in the engine and cannot drift from the Rego side.
 // approvalActions() (the lazy, merged accessor) is defined in grants_load.go.
 
-// roleRank orders authority (lower = more). A subject holding a role at least as
-// senior as an action's required role is permitted it.
-var roleRank = map[string]int{
-	"L0-SuperAdmin": 0, "L1-Architect": 1, "L2-Operator": 2, "L3-Consumer": 3, "AI-Agent": 4,
-}
+// The authority ranking that used to live here as a hardcoded `roleRank` package var now lives
+// in ladder.go as RoleLadder — a REPLACEABLE vocabulary, so a deployment can name its own tiers.
+// RBAC carries the deployment's ladder on its `ladder` field (default when unset).
 
 // ActionAuthorizer lets config-authored products carry their OWN authorization
 // binding. A product declared on the Canvas has an action the static map above
@@ -93,6 +91,10 @@ type RBAC struct {
 	providers           []PolicyProvider
 	byAction            map[string]PolicyProvider
 	providerRoleActions map[string]map[string]bool
+	// ladder is the deployment's role vocabulary (name→authority rank) used for every seniority
+	// check. A nil ladder means "use the default" — see rankLadder — so a zero-value &RBAC{}
+	// (tests, doorkit) still ranks the built-in tiers.
+	ladder RoleLadder
 }
 
 // liveSnapshot is the read side of a LiveResolver: the action authorizer read from an atomic
@@ -102,8 +104,29 @@ type liveSnapshot interface {
 	RequiredRole(action string) (mantlekeep.Role, bool)
 }
 
-// NewRBAC returns the default policy engine.
-func NewRBAC() *RBAC { return &RBAC{} }
+// NewRBAC returns the default policy engine, seeded with the built-in role ladder.
+func NewRBAC() *RBAC { return &RBAC{ladder: DefaultRoleLadder()} }
+
+// rankLadder returns the engine's role vocabulary, falling back to the default when unset so a
+// zero-value &RBAC{} (used in tests and doorkit) still ranks the built-in tiers.
+func (r *RBAC) rankLadder() RoleLadder {
+	if r.ladder == nil {
+		return DefaultRoleLadder()
+	}
+	return r.ladder
+}
+
+// WithRoleLadder replaces the deployment's role vocabulary (see RoleLadder). REPLACE semantics:
+// a non-nil, non-empty ladder becomes the engine's; a nil or empty one leaves the default in
+// place (so a deployment that declares no roles keeps the five built-in tiers unchanged). This
+// is how a config `roles` map, or a code-side product, renames the tiers without touching the
+// core. Returns the receiver to chain.
+func (r *RBAC) WithRoleLadder(l RoleLadder) *RBAC {
+	if len(l) > 0 {
+		r.ladder = l
+	}
+	return r
+}
 
 // WithDynamic attaches a runtime authorizer consulted when the static map does
 // not cover an action (a Canvas-authored product). Returns the receiver to chain.
@@ -214,7 +237,7 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	// by the generic evaluator (floor.go). An action with no floor rules passes untouched, so the
 	// engine names no product concept — the param names + values live in the data. The OPA adapter
 	// mirrors this over the same data.floors, kept in lockstep by the parity test.
-	if denied, reason := admitFloor(action, input.Intent.Params, input.Subject.Roles); denied {
+	if denied, reason := admitFloor(r.rankLadder(), action, input.Intent.Params, input.Subject.Roles); denied {
 		return deny(mantlekeep.DenialFloor, reason), nil
 	}
 	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: policyID("rbac")}, nil
@@ -241,7 +264,7 @@ type StepAuth struct {
 func (r *RBAC) EvaluateStep(in StepAuth) mantlekeep.Decision {
 	roles := rolesToStrings(in.Subject.Roles)
 	// Per-step role floor (a node may demand more authority than the flow).
-	if in.RunAs != "" && !holdsAtLeast(roles, in.RunAs) {
+	if in.RunAs != "" && !r.rankLadder().holdsAtLeast(roles, in.RunAs) {
 		return deny(mantlekeep.DenialActionNotAllowed, "step "+in.Step+": no role permits it (requires "+string(in.RunAs)+")")
 	}
 	// Per-step separation of duties: the author cannot also trigger it.
@@ -283,22 +306,7 @@ func (r *RBAC) actionAllowed(roles []string, action string, dyn ActionAuthorizer
 	// Fall back to the resolved/config-authored binding (team, project, or product RunAs).
 	if dyn != nil {
 		if need, ok := dyn.RequiredRole(action); ok {
-			return holdsAtLeast(roles, need)
-		}
-	}
-	return false
-}
-
-// holdsAtLeast reports whether any of the subject's roles is at least as senior
-// as need.
-func holdsAtLeast(roles []string, need mantlekeep.Role) bool {
-	nr, ok := roleRank[string(need)]
-	if !ok {
-		return false
-	}
-	for _, r := range roles {
-		if rk, ok := roleRank[r]; ok && rk <= nr {
-			return true
+			return r.rankLadder().holdsAtLeast(roles, need)
 		}
 	}
 	return false

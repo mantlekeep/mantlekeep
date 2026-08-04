@@ -20,11 +20,16 @@ import (
 // Layer is one tier's contribution to the effective policy config, applied in
 // precedence order (least specific first): DefaultLayer(), then product, then team.
 type Layer struct {
-	Name        string                 // audit/debug label: "mantlekeep", "product:example", "team:example"
+	Name        string                     // audit/debug label: "mantlekeep", "product:example", "team:example"
 	ActionRoles map[string]mantlekeep.Role // action → minimum role permitted to run it
 	// Sealed lists keys THIS layer locks as a floor. A later layer may only tighten
 	// them. Key form: "action:<name>", e.g. "action:service.deploy".
 	Sealed []string
+	// Roles, when non-empty, declares the deployment's role vocabulary (name→authority rank,
+	// lower = more senior). The FIRST layer that sets it defines the ladder (see LadderFrom);
+	// lower layers reference role names, they do not redefine the vocabulary. Empty on almost
+	// every layer — a deployment names its tiers once, in the platform/base layer, or not at all.
+	Roles map[string]int
 }
 
 // Resolved is the effective, cascaded policy config the engine reads. It implements
@@ -33,16 +38,25 @@ type Resolved struct {
 	actionRoles map[string]mantlekeep.Role
 	sealed      map[string]bool
 	fallback    ActionAuthorizer // consulted after the resolved action roles (e.g. the product registry)
+	ladder      RoleLadder       // the deployment's role vocabulary, used for the seal-tightening seniority check
 }
 
 // Resolve cascades layers in order. Most-specific wins per key, EXCEPT a sealed key:
 // once sealed by a layer, a later layer's override is accepted only if it is at least
 // as senior (stricter); a looser or absent override keeps the sealed value, and the
 // seal itself can never be lifted by a lower layer.
-func Resolve(layers ...Layer) *Resolved {
+//
+// ladder is the deployment's role vocabulary the seal-tightening check ranks against; a
+// nil/empty ladder falls back to the built-in default, so a deployment that names no roles
+// resolves exactly as before.
+func Resolve(ladder RoleLadder, layers ...Layer) *Resolved {
+	if len(ladder) == 0 {
+		ladder = DefaultRoleLadder()
+	}
 	r := &Resolved{
 		actionRoles: map[string]mantlekeep.Role{},
 		sealed:      map[string]bool{},
+		ladder:      ladder,
 	}
 	for _, l := range layers {
 		for action, need := range l.ActionRoles {
@@ -61,7 +75,7 @@ func Resolve(layers ...Layer) *Resolved {
 // upper layer, refuse any value that is not at least as senior as the current one.
 func (r *Resolved) apply(m map[string]mantlekeep.Role, key string, need mantlekeep.Role, sealKey string) {
 	if r.sealed[sealKey] {
-		if cur, ok := m[key]; ok && !atLeastAsSenior(need, cur) {
+		if cur, ok := m[key]; ok && !r.ladder.atLeastAsSenior(need, cur) {
 			return // a team cannot loosen a sealed floor — override rejected
 		}
 	}
@@ -102,16 +116,4 @@ func DefaultLayer() Layer {
 // teamLayer, ScopeLayer(...)).
 func ScopeLayer(scope string, actionRoles map[string]mantlekeep.Role, sealed []string) Layer {
 	return Layer{Name: "scope:" + scope, ActionRoles: actionRoles, Sealed: sealed}
-}
-
-// atLeastAsSenior reports whether role a is at least as senior as b (a can stand in
-// for b). Seniority is roleRank (lower = more senior). An unknown role is never senior
-// enough — so an unknown override can never loosen a sealed floor.
-func atLeastAsSenior(a, b mantlekeep.Role) bool {
-	ra, oka := roleRank[string(a)]
-	rb, okb := roleRank[string(b)]
-	if !oka || !okb {
-		return false
-	}
-	return ra <= rb
 }

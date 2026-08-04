@@ -17,10 +17,16 @@ import (
 // env-gating of an action is a product's floor DATA (grants/floors.json), not a layer key.
 //
 //	{
-//	  "actionRoles": { "service.deploy": "L1-Architect" },
+//	  "roles":       { "L0-SuperAdmin": 0, "L1-Super-Admin": 1, "L2-Engineer": 2 },
+//	  "actionRoles": { "service.deploy": "L1-Super-Admin" },
 //	  "sealed":      [ "action:service.deploy" ]
 //	}
+//
+// roles, when present, declares the deployment's role vocabulary (name→authority rank, lower =
+// more senior). It is the ONE place a bank renames the built-in tiers; the FIRST layer that sets
+// it wins (see policy.LadderFrom). Omit it and the built-in five tiers apply unchanged.
 type layerFile struct {
+	Roles       map[string]int    `json:"roles"`
 	ActionRoles map[string]string `json:"actionRoles"`
 	Sealed      []string          `json:"sealed"`
 }
@@ -52,6 +58,7 @@ func loadLayer(envVar, name string, verbose bool) (policy.Layer, bool) {
 		Name:        name + ":" + filepath.Base(path),
 		ActionRoles: toRoleMap(raw.ActionRoles),
 		Sealed:      raw.Sealed,
+		Roles:       raw.Roles,
 	}
 	if verbose {
 		fmt.Printf("policy: layer %q loaded (%d action, %d sealed)\n",
@@ -122,12 +129,12 @@ func loadScopes(envVar string, verbose bool) map[string]policy.Layer {
 // any scope layers. base is the shared cascade (default→platform→team); fallback is the
 // product registry, re-attached so per-scope resolutions keep runtime-added products' RunAs.
 // No scopes configured → the engine is returned untouched (the default path is unchanged).
-func attachScopes(eng *policy.RBAC, base []policy.Layer, fallback policy.ActionAuthorizer, verbose bool) *policy.RBAC {
+func attachScopes(eng *policy.RBAC, base []policy.Layer, fallback policy.ActionAuthorizer, ladder policy.RoleLadder, verbose bool) *policy.RBAC {
 	scopes := loadScopes("MANTLEKEEP_SCOPE_CONFIG", verbose)
 	if len(scopes) == 0 {
 		return eng
 	}
-	sr := policy.NewScopeResolver(base...)
+	sr := policy.NewScopeResolver(ladder, base...)
 	if fallback != nil {
 		sr.WithFallback(fallback)
 	}
