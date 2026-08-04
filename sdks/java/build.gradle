@@ -2,7 +2,15 @@
 // compiling untouched while the multi-module SDK grows in the subprojects below.
 // New work goes in mantlekeep-adapter-spi / mantlekeep-door-client / mantlekeep-spring-boot-starter /
 // mantlekeep-java-core; this flat client remains for the sidecar demo path.
-plugins { id 'java-library' }
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.Confidence
+
+plugins {
+    id 'java-library'
+    // SpotBugs static analysis + FindSecBugs security detectors. BUILD-only: drags nothing
+    // into the published jars. Applied to every java-library module in allprojects below.
+    id 'com.github.spotbugs' version '6.5.9' apply false
+}
 
 // MantleKeep's Java SDK uses ONLY the JDK (java.net.http) — no external dependencies,
 // so it drags nothing into a host's app. Compiled for JDK 17+ bytecode with whatever
@@ -25,6 +33,34 @@ tasks.register('run', JavaExec) {
 allprojects {
     group = 'dev.mantlekeep'
     version = '0.1.0-rc.3'
+
+    // SpotBugs + FindSecBugs on every java-library module. effort=max, reportLevel=low so the
+    // security scan sees everything; HTML (human) + XML (CI/machine) reports. The build FAILS
+    // on any remaining finding (spotbugs default) — false positives are justified out in
+    // spotbugs-exclude.xml, never blanket-suppressed.
+    plugins.withId('java-library') {
+        apply plugin: 'com.github.spotbugs'
+        spotbugs {
+            // valueOf, not Effort.MAX / Confidence.LOW: these Kotlin enums generate per-constant
+            // synthetic classes (Confidence$LOW …) that shadow the static field under Groovy.
+            effort = Effort.valueOf('MAX')
+            reportLevel = Confidence.valueOf('LOW')
+            excludeFilter = rootProject.file('spotbugs-exclude.xml')
+        }
+        dependencies {
+            spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0'
+        }
+        tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+            reports {
+                html { required = true }
+                xml { required = true }
+            }
+        }
+        // The security gate scans PRODUCTION (main) sources — the shipped surface. Test sources are
+        // not published and are out of scope; leaving spotbugsTest wired into `check` would make the
+        // unrelated `gradle build` break on test-only patterns. spotbugsMain remains the gate.
+        tasks.matching { it.name == 'spotbugsTest' }.configureEach { enabled = false }
+    }
 
     // Every java-library module (root flat client + the SDK subprojects) becomes publishable.
     // Sources jar included (cheap + useful); javadoc jar is deferred to the Maven Central step
