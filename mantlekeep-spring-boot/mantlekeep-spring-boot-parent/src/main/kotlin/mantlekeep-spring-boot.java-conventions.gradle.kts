@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "dev.mantlekeep"
-version = "0.1.0-rc.4"
+version = "0.1.0-rc.5"
 
 java {
     toolchain {

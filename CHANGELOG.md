@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.0-rc.5] — 2026-08-04
+
+Saga/timeline recording promoted into the framework — the runtime trail every governed service needs,
+now a shared primitive instead of hand-rolled per product.
+
+### Added
+
+- **Saga/timeline recording** (`dev.mantlekeep.springboot.saga`). `SagaRecorder` emits a governed
+  order's runtime steps (the environment + the real command + the outcome), gated by `RecordingLevel`
+  (`NONE` / `DECISIONS` / `STEPS` / `FULL`; config `mantlekeep.saga.recording`, default `STEPS`). This is
+  the trail of what an executor DID — distinct from the audit chain (the DECISION) and the operation
+  ledger (the STATE). `SagaTimeline` is a port (`InMemorySagaTimeline` is the default; a StorePort-backed,
+  chain-correlated adapter drops in later); both auto-configure and a product overrides by defining its
+  own bean. Recording tunes what lands on the timeline — it NEVER gates whether an order goes through the
+  door: a run can be silent but never ungoverned.
+
 ## [0.1.0-rc.4] — 2026-08-04
 
 Configurable authority, transition-level governance, and a release surface hardened to a clean

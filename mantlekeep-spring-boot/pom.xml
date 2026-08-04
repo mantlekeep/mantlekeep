@@ -22,7 +22,7 @@
 
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-spring-boot</artifactId>
-  <version>0.1.0-rc.4</version>
+  <version>0.1.0-rc.5</version>
   <packaging>pom</packaging>
 
   <name>MantleKeep Spring Boot (parent)</name>
