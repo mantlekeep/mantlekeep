@@ -81,10 +81,10 @@ jobs:
       # The SDK must install to the local repo BEFORE the spring-boot family builds — the
       # starter family depends on the SDK's published coordinates via the BOM.
       - name: sdk install (maven)
-        run: ./mvnw -B install
+        run: mvn -B install
         working-directory: sdks/java
       - name: spring-boot (maven)
-        run: ./mvnw -B install
+        run: mvn -B install
         working-directory: mantlekeep-spring-boot
 
   python:
