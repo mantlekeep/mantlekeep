@@ -61,7 +61,7 @@ jobs:
       - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
       - name: sdk (gradle)
         run: ./gradlew build --no-daemon
         working-directory: sdks/java
@@ -77,7 +77,7 @@ jobs:
       - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
       # The SDK must install to the local repo BEFORE the spring-boot family builds — the
       # starter family depends on the SDK's published coordinates via the BOM.
       - name: sdk install (maven)
