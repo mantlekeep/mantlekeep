@@ -39,6 +39,10 @@ security scan — the operability and integrity a real deployment needs to trust
 - **Java SDK + Spring Boot pass SpotBugs + FindSecBugs with zero security findings**, and a permanent
   `security.yml` CI gate now runs SpotBugs/FindSecBugs (Java) and gosec/staticcheck/govulncheck (Go)
   on every push and PR, failing on any finding.
+- **The WebFlux door client fails closed.** `allow` is trusted only on an explicit `outcome:"allow"`
+  over a 2xx response; an unrecognized or blank outcome maps to DENY (previously a 2xx with an
+  unknown outcome inferred ALLOW — a latent fail-open), and an `allow` claimed on a non-2xx is not
+  trusted.
 
 ## [0.1.0-rc.3] — 2026-08-01
 
