@@ -81,12 +81,16 @@ func (k *Kernel) Scan(ctx context.Context, modulePath string, input []byte) (Sca
 	if err != nil {
 		return ScanResult{}, err
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if _, err := f.Write(input); err != nil {
-		f.Close()
+		_ = f.Close() // write already failed; that error is what we return
 		return ScanResult{}, err
 	}
-	f.Close()
+	// The kernel reads this file by name next, so a failed Close (unflushed input) would
+	// feed it truncated data — surface it rather than scanning a half-written file.
+	if err := f.Close(); err != nil {
+		return ScanResult{}, err
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, k.timeout)
 	defer cancel()
@@ -118,7 +122,11 @@ func (k *Kernel) Verify(ctx context.Context, modulePath string) (bool, string) {
 
 func osRun(ctx context.Context, name string, args ...string) ([]byte, []byte, int) {
 	var o, e bytes.Buffer
-	cmd := exec.CommandContext(ctx, name, args...)
+	// args are internal/trusted, not request-derived: name is the operator-set kernel binary
+	// (MANTLEKEEP_KERNEL_BIN or the in-repo release path), args are literal subcommands plus
+	// internal module/temp-file paths. exec.CommandContext runs no shell, so there is no
+	// interpolation surface to inject through.
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- args are internal/trusted, not request-derived; no shell involved
 	cmd.Stdout = &o
 	cmd.Stderr = &e
 	err := cmd.Run()

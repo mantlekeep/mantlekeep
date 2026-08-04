@@ -9,6 +9,7 @@ import (
 
 	mantlekeep "mantlekeep.dev/control"
 	"mantlekeep.dev/control/internal/policy"
+	"mantlekeep.dev/control/internal/safeio"
 )
 
 // layerFile is the on-disk shape of a policy config layer (platform or team). It is
@@ -44,7 +45,7 @@ func loadLayer(envVar, name string, verbose bool) (policy.Layer, bool) {
 	if path == "" {
 		return policy.Layer{}, false
 	}
-	data, err := os.ReadFile(path)
+	data, err := safeio.ReadConfigFile(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "policy layer %s (%s): %v — ignored\n", name, path, err)
 		return policy.Layer{}, false
@@ -103,7 +104,7 @@ func loadScopes(envVar string, verbose bool) map[string]policy.Layer {
 			continue
 		}
 		name := strings.TrimSuffix(e.Name(), ".json")
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		data, err := safeio.ReadConfigFile(filepath.Join(dir, e.Name()))
 		if err != nil {
 			continue
 		}

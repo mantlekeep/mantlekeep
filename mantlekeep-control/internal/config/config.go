@@ -20,6 +20,8 @@ package config
 import (
 	"os"
 	"strings"
+
+	"mantlekeep.dev/control/internal/safeio"
 )
 
 // Config is the resolved runtime selection — all capabilities, uniformly.
@@ -53,9 +55,11 @@ func configPath() string {
 	return ".mantlekeep.conf"
 }
 
-// readFile returns the non-comment KEY=VALUE lines of a dotenv-style file.
+// readFile returns the non-comment KEY=VALUE lines of a dotenv-style file. The path is the
+// operator-set MANTLEKEEP_CONFIG (or the default .mantlekeep.conf), read through the validated
+// config door.
 func readFile(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
+	data, err := safeio.ReadConfigFile(path)
 	if err != nil {
 		return nil, err
 	}

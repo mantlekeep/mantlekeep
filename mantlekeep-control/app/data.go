@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"mantlekeep.dev/control/internal/safeio"
 )
 
 // DataDir returns MantleKeep's durable data directory — where the audit chain, run
@@ -23,7 +25,10 @@ func DataDir() string {
 	if d == "" {
 		d = "mantlekeep-data"
 	}
-	if err := os.MkdirAll(d, 0o755); err != nil {
+	// Create through the validated config door: 0o750 (owner+group, never world — this
+	// holds the audit chain and approvals) and traversal-rejected. Warn and continue on
+	// failure, exactly as before, so a read-only environment degrades rather than crashes.
+	if _, err := safeio.EnsureConfigDir(d); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: cannot create data dir %q: %v\n", d, err)
 	}
 	return d
