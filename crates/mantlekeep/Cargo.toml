@@ -1,0 +1,15 @@
+[package]
+name = "mantlekeep"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.75"
+description = "MantleKeep — a governance framework: one door, tamper-evident hash-chained audit, ports & adapters. Govern before execute. This umbrella crate is the entry point; the engine crates (mantlekeep-core, mantlekeep-kernel, …) land here as they stabilise."
+license = "Apache-2.0"
+repository = "https://github.com/mantlekeep/mantlekeep"
+homepage = "https://github.com/mantlekeep/mantlekeep"
+documentation = "https://docs.rs/mantlekeep"
+readme = "README.md"
+keywords = ["governance", "audit", "sandbox", "wasm", "security"]
+categories = ["development-tools", "wasm"]
+
+[dependencies]
