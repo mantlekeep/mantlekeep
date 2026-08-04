@@ -1,0 +1,68 @@
+name: security
+
+# The permanent security gate. Every push and PR to main is scanned in BOTH languages before it
+# can land: the Java surface with SpotBugs + FindSecBugs (security detectors), the Go engine with
+# gosec, staticcheck, and govulncheck. Any finding — or any known CVE — fails the job. This runs
+# alongside ci.yml (the build/test gate); keeping security in its own workflow makes a red gate
+# read as "unsafe to adopt", not "the build broke".
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # java-core binds the Rust ABI via java.lang.foreign (release 22) and the spring-boot family
+  # targets a Java 25 toolchain — 25 satisfies both and is auto-detected for the toolchain.
+  JAVA_VERSION: "25"
+  # Matches ci.yml: 1.26.5+ clears two stdlib-only advisories present in 1.26.4.
+  GO_VERSION: "1.26.x"
+
+jobs:
+  java-security:
+    name: java — spotbugs + findsecbugs (sdk + spring-boot)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      # spotbugsMain fails the build on any SpotBugs/FindSecBugs finding that the justified
+      # exclude filter (spotbugs-exclude.xml) does not cover — that is the gate.
+      - name: sdk — spotbugs + findsecbugs
+        run: ./gradlew spotbugsMain --no-daemon
+        working-directory: sdks/java
+      - name: spring-boot — spotbugs + findsecbugs
+        run: ./gradlew spotbugsMain --no-daemon
+        working-directory: mantlekeep-spring-boot
+
+  go-security:
+    name: go — gosec · staticcheck · govulncheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mantlekeep-control
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      # gosec — security-focused static analysis; exits non-zero on any finding.
+      - name: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          "$(go env GOPATH)/bin/gosec" ./...
+      # staticcheck — correctness/lint that also catches unsafe patterns.
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          "$(go env GOPATH)/bin/staticcheck" ./...
+      # govulncheck — fails on any KNOWN CVE reachable from the code.
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
