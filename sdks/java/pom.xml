@@ -29,7 +29,7 @@
 
   <name>MantleKeep Java SDK (parent)</name>
   <description>Governance SDK for MantleKeep — the door client, adapter SPI, and Spring Boot starter.</description>
-  <url>https://github.com/potkei/mantlekeep</url>
+  <url>https://github.com/mantlekeep/mantlekeep</url>
 
   <licenses>
     <license>
@@ -39,8 +39,8 @@
   </licenses>
 
   <scm>
-    <url>https://github.com/potkei/mantlekeep</url>
-    <connection>scm:git:https://github.com/potkei/mantlekeep.git</connection>
+    <url>https://github.com/mantlekeep/mantlekeep</url>
+    <connection>scm:git:https://github.com/mantlekeep/mantlekeep.git</connection>
   </scm>
 
   <!--
@@ -183,7 +183,7 @@
     <repository>
       <id>github</id>
       <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/potkei/mantlekeep</url>
+      <url>https://maven.pkg.github.com/mantlekeep/mantlekeep</url>
     </repository>
   </distributionManagement>
 </project>

@@ -39,7 +39,7 @@ allprojects {
             repositories {
                 maven {
                     name = 'GitHubPackages'
-                    url = uri('https://maven.pkg.github.com/potkei/mantlekeep')
+                    url = uri('https://maven.pkg.github.com/mantlekeep/mantlekeep')
                     credentials {
                         // set at publish time via env (GITHUB_ACTOR/GITHUB_TOKEN) or
                         // gradle.properties (gpr.user/gpr.key); lazy — local publish needs neither.

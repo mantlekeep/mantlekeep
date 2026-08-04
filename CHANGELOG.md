@@ -193,7 +193,7 @@ Adoption guides, the door's library and wire contracts, and the design notes tha
 layering a product across generic/domain/team, the template–behaviour–worker composition model, a shared
 audit chain for replication, federated doors across zones, and the execution unit.
 
-[Unreleased]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.3...HEAD
-[0.1.0-rc.3]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.2...v0.1.0-rc.3
-[0.1.0-rc.2]: https://github.com/potkei/mantlekeep/compare/v0.1.0-rc.1...v0.1.0-rc.2
-[0.1.0-rc.1]: https://github.com/potkei/mantlekeep/releases/tag/v0.1.0-rc.1
+[Unreleased]: https://github.com/mantlekeep/mantlekeep/compare/v0.1.0-rc.3...HEAD
+[0.1.0-rc.3]: https://github.com/mantlekeep/mantlekeep/compare/v0.1.0-rc.2...v0.1.0-rc.3
+[0.1.0-rc.2]: https://github.com/mantlekeep/mantlekeep/compare/v0.1.0-rc.1...v0.1.0-rc.2
+[0.1.0-rc.1]: https://github.com/mantlekeep/mantlekeep/releases/tag/v0.1.0-rc.1
