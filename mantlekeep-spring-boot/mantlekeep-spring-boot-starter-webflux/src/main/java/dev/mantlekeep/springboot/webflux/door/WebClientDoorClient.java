@@ -94,10 +94,10 @@ public class WebClientDoorClient implements DoorClient {
         // and a locale-sensitive fold (Turkish 'I'/'i') could misread "DENY" — silently fail OPEN.
         String outcome = body.outcome() == null ? "" : body.outcome().trim().toLowerCase(Locale.ROOT);
         return switch (outcome) {
-            case "allow" -> Decision.Outcome.ALLOW;
+            case "allow" -> success ? Decision.Outcome.ALLOW : Decision.Outcome.DENY; // an allow claimed on a non-2xx is not trusted
             case "deny" -> Decision.Outcome.DENY;
             case "require_approval" -> Decision.Outcome.REQUIRE_APPROVAL;
-            default -> success ? Decision.Outcome.ALLOW : Decision.Outcome.DENY; // fall back on the status
+            default -> Decision.Outcome.DENY; // unknown/unrecognized outcome fails CLOSED — never infer allow from HTTP status
         };
     }
 
