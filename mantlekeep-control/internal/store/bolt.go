@@ -34,7 +34,7 @@ func OpenBolt(path string) (*Bolt, error) {
 		_, e := tx.CreateBucketIfNotExists(kvBucket)
 		return e
 	}); err != nil {
-		db.Close()
+		_ = db.Close() // best-effort cleanup; the bucket-create error is what we report
 		return nil, err
 	}
 	return &Bolt{db: db}, nil

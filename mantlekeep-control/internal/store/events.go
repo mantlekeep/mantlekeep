@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	bolt "go.etcd.io/bbolt"
 	"mantlekeep.dev/control/orchestrator"
@@ -30,7 +31,7 @@ func OpenBoltEvents(path string) (*BoltEvents, error) {
 		_, e := tx.CreateBucketIfNotExists(eventsBucket)
 		return e
 	}); err != nil {
-		db.Close()
+		_ = db.Close() // best-effort cleanup; the bucket-create error is what we report
 		return nil, err
 	}
 	return &BoltEvents{db: db}, nil
@@ -42,6 +43,12 @@ func (s *BoltEvents) Append(_ context.Context, e orchestrator.Event) (orchestrat
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(eventsBucket)
 		seq, _ := bkt.NextSequence()
+		// bbolt's sequence is uint64; Event.Seq is int. Guard the narrowing so a run that
+		// somehow reached math.MaxInt events fails loudly instead of wrapping to a negative
+		// (and mis-ordering the timeline). In practice unreachable; correctness over trust.
+		if seq > math.MaxInt {
+			return fmt.Errorf("event sequence %d exceeds max int", seq)
+		}
 		e.Seq = int(seq)
 		val, err := json.Marshal(e)
 		if err != nil {
