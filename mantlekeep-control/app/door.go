@@ -70,11 +70,16 @@ func DefaultPolicy() mantlekeep.PolicyEvaluator { return configuredRBAC() }
 //     loosen a sealed floor
 //   - dyn (product registry)        the product layer, as the action-role fallback
 func configuredRBAC(dyn ...policy.ActionAuthorizer) *policy.RBAC {
-	base := currentLayers(false)
+	base, err := currentLayers(false)
+	must(err) // a SET-but-invalid config REFUSES startup — the engine will not govern on a broken law
 	// The deployment's role vocabulary, declared once in a layer's `roles` map (default when none).
 	// The SAME ladder reaches the evaluator (WithRoleLadder) and every Resolve/ScopeResolver so a
 	// renamed-role deployment governs consistently — the core holds no hardcoded role names.
 	ladder := policy.LadderFrom(base...)
+	// Fail CLOSED on a config that binds or seals an action under a role the ladder never defined —
+	// the main footgun of the config-driven ladder. A misspelled role must refuse startup here, not
+	// deny every request silently at runtime.
+	must(policy.ValidateLayers(ladder, base...))
 	resolved := policy.Resolve(ladder, base...)
 	var fb policy.ActionAuthorizer
 	if len(dyn) > 0 && dyn[0] != nil {
@@ -103,10 +108,14 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 		fallback = dyn[0]
 	}
 
-	layers := currentLayers(true) // verbose: emit the per-layer boot log once
+	layers, err := currentLayers(true) // verbose: emit the per-layer fingerprint log once
+	must(err)                          // a SET-but-invalid config REFUSES startup (fail closed)
 	// The deployment's role vocabulary (default when no layer declares `roles`); threaded to the
 	// evaluator AND every rebuilt cascade so hot-reloads keep the same vocabulary.
 	ladder := policy.LadderFrom(layers...)
+	// Same fail-closed role cross-check as the static build: an action bound/sealed under an
+	// undefined role refuses startup rather than surprising the first request.
+	must(policy.ValidateLayers(ladder, layers...))
 	initial := policy.Resolve(ladder, layers...)
 	if fallback != nil {
 		initial.WithFallback(fallback)
@@ -116,7 +125,9 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 	// The Source re-reads the env-configured files quietly on every poll; a Store-backed
 	// Source (bbolt/Postgres) drops in here unchanged for the HA story.
 	src := policy.SourceFunc(func(context.Context) ([]policy.Layer, error) {
-		return currentLayers(false), nil
+		// On a hot-reload poll an invalid edit returns an error; the watcher keeps the
+		// last-good snapshot (fail static, not open) rather than swapping to a broken law.
+		return currentLayers(false)
 	})
 	w := policy.NewWatcher(src, live, fallback, ladder, layers).
 		OnReload(func(revision string, _ *policy.Resolved) {
@@ -147,17 +158,23 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 // currentLayers reads the env-configured cascade (least specific first). It is called
 // both at boot (verbose=true, logs each layer once) and on every watcher poll
 // (verbose=false, silent) — the single source of truth for "what are the layers now".
-func currentLayers(verbose bool) []policy.Layer {
+func currentLayers(verbose bool) ([]policy.Layer, error) {
 	layers := []policy.Layer{policy.DefaultLayer()}
 
-	// Platform layer FIRST (so its seals bind the team layer that follows), then team.
-	if l, ok := loadLayer("MANTLEKEEP_PLATFORM_CONFIG", "platform", verbose); ok {
+	// Platform layer FIRST (so its seals bind the team layer that follows), then team. A
+	// SET-but-invalid layer is a hard error that propagates — the cascade is never built from
+	// a partially-loaded config.
+	if l, ok, err := loadLayer("MANTLEKEEP_PLATFORM_CONFIG", "platform", verbose); err != nil {
+		return nil, err
+	} else if ok {
 		layers = append(layers, l)
 	}
-	if l, ok := loadLayer("MANTLEKEEP_TEAM_CONFIG", "team", verbose); ok {
+	if l, ok, err := loadLayer("MANTLEKEEP_TEAM_CONFIG", "team", verbose); err != nil {
+		return nil, err
+	} else if ok {
 		layers = append(layers, l)
 	}
-	return layers
+	return layers, nil
 }
 
 // reloadInterval is the watcher poll period from MANTLEKEEP_POLICY_RELOAD (seconds),

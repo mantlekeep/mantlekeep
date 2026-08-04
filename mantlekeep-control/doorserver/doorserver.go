@@ -162,7 +162,17 @@ func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request)
 		// and is the only thing that becomes a 500.
 		var decisionErr *mantlekeep.DecisionError
 		if errors.As(submitErr, &decisionErr) {
-			writeDecision(writer, decisionErr.Decision, intentID)
+			decision := decisionErr.Decision
+			decisionLog{
+				outcome:  decision.Action,
+				action:   body.Action,
+				subject:  actor.subject.ID,
+				via:      actor.via,
+				policyID: decision.PolicyID,
+				category: decision.Category,
+				reason:   decision.Reason,
+			}.emit()
+			writeDecision(writer, decision, intentID)
 			return
 		}
 		writeJSON(writer, http.StatusInternalServerError, map[string]any{
@@ -172,6 +182,13 @@ func (s *Server) handleGovern(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
+	decisionLog{
+		outcome:  mantlekeep.ActionAllow,
+		action:   body.Action,
+		subject:  actor.subject.ID,
+		via:      actor.via,
+		policyID: token.PolicyID,
+	}.emit()
 	writeAllow(writer, token)
 }
 
