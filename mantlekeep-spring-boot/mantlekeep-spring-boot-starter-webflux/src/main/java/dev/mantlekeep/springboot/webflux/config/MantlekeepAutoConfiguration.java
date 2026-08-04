@@ -6,6 +6,8 @@ import dev.mantlekeep.springboot.door.DoorProperties;
 import dev.mantlekeep.springboot.webflux.door.WebClientDoorClient;
 import dev.mantlekeep.springboot.webflux.error.DoorExceptionHandler;
 import dev.mantlekeep.springboot.webflux.intent.MantlekeepIntentAspect;
+import dev.mantlekeep.springboot.webflux.scope.GovernedExecutionScope;
+import dev.mantlekeep.springboot.webflux.scope.ReactiveGovernedExecutionScope;
 import io.netty.channel.ChannelOption;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -74,6 +76,16 @@ public class MantlekeepAutoConfiguration {
     @ConditionalOnMissingBean
     public MantlekeepIntentAspect mantleIntentAspect(DoorClient doorClient) {
         return new MantlekeepIntentAspect(doorClient);
+    }
+
+    /**
+     * Runs transition-level work under one approval (the token the aspect carries on allow),
+     * with no per-step door re-submission and a fail-closed refusal when no approval scope exists.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public GovernedExecutionScope governedExecutionScope() {
+        return new ReactiveGovernedExecutionScope();
     }
 
     /**
