@@ -128,7 +128,11 @@ func (s *Server) handleDevLogin(writer http.ResponseWriter, request *http.Reques
 	}
 
 	token := s.sessions.create(body.User)
-	http.SetCookie(writer, &http.Cookie{
+	// Secure is intentionally omitted: this cookie exists ONLY on the credential-free dev-login
+	// path (registered solely when Options.DevLogin is set), which is served over plain local
+	// HTTP — a Secure cookie would never be stored there. HttpOnly + SameSite=Lax are set; the
+	// dev-only session is not a production credential.
+	http.SetCookie(writer, &http.Cookie{ // #nosec G124 -- dev-only credential-free login over local HTTP; HttpOnly+SameSite set, Secure would break dev use
 		Name:     sessionCookieName,
 		Value:    token,
 		Path:     "/",

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"mantlekeep.dev/control/app"
 	"mantlekeep.dev/control/doorkit"
@@ -71,7 +72,15 @@ func runServe() {
 	}
 	fmt.Println("  routes:   POST /api/govern · GET /api/audit")
 
-	log.Fatal(http.ListenAndServe(address, server.Handler()))
+	// An explicit server so we can bound how long a client may take to send its request
+	// headers — the Slowloris guard. ReadHeaderTimeout caps the header read without bounding
+	// the handler itself, so long audit reads are unaffected (no Write/Read body timeout).
+	httpServer := &http.Server{
+		Addr:              address,
+		Handler:           server.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	log.Fatal(httpServer.ListenAndServe())
 }
 
 // splitList parses a comma-separated env value, ignoring blanks and stray spaces.
