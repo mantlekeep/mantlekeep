@@ -6,6 +6,10 @@ import dev.mantlekeep.springboot.door.DoorProperties;
 import dev.mantlekeep.springboot.webflux.door.WebClientDoorClient;
 import dev.mantlekeep.springboot.webflux.error.DoorExceptionHandler;
 import dev.mantlekeep.springboot.webflux.intent.MantlekeepIntentAspect;
+import dev.mantlekeep.springboot.saga.InMemorySagaTimeline;
+import dev.mantlekeep.springboot.saga.RecordingLevel;
+import dev.mantlekeep.springboot.saga.SagaRecorder;
+import dev.mantlekeep.springboot.saga.SagaTimeline;
 import dev.mantlekeep.springboot.webflux.scope.GovernedExecutionScope;
 import dev.mantlekeep.springboot.webflux.scope.ReactiveGovernedExecutionScope;
 import io.netty.channel.ChannelOption;
@@ -24,7 +28,8 @@ import reactor.netty.http.client.HttpClient;
  * bean is {@link ConditionalOnMissingBean}, so an application can override any piece.
  */
 @AutoConfiguration
-@EnableConfigurationProperties({MantlekeepDoorProperties.class, MantlekeepBrandProperties.class})
+@EnableConfigurationProperties({MantlekeepDoorProperties.class, MantlekeepBrandProperties.class,
+        MantlekeepSagaProperties.class})
 public class MantlekeepAutoConfiguration {
 
     @Bean
@@ -86,6 +91,28 @@ public class MantlekeepAutoConfiguration {
     @ConditionalOnMissingBean
     public GovernedExecutionScope governedExecutionScope() {
         return new ReactiveGovernedExecutionScope();
+    }
+
+    /**
+     * The default saga timeline for every product on the starter — auto-configured (a starter's
+     * beans are wired here, not component-scanned from the app). A product supplies its own
+     * durable, chain-correlated adapter simply by defining its own SagaTimeline bean.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public SagaTimeline sagaTimeline() {
+        return new InMemorySagaTimeline();
+    }
+
+    /**
+     * The single saga-emission point every product shares, gated by {@code mantlekeep.saga.recording}
+     * ({@link RecordingLevel}, default {@code STEPS}). Recording tunes what lands on the timeline; it
+     * never affects whether an order goes through the door.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public SagaRecorder sagaRecorder(SagaTimeline sagaTimeline, MantlekeepSagaProperties props) {
+        return new SagaRecorder(sagaTimeline, RecordingLevel.from(props.recording()));
     }
 
     /**
