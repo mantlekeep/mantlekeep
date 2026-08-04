@@ -29,10 +29,10 @@ tasks.register('run', JavaExec) {
 // group is kept even on GitHub Packages — which verifies no namespace — so the SAME GAV
 // upgrades to Maven Central later, once mantlekeep.dev is owned + DNS-verified. An internal
 // artifact proxy mirrors GitHub Packages exactly as it would Central. Consume with:
-//   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0-rc.3"
+//   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0-rc.4"
 allprojects {
     group = 'dev.mantlekeep'
-    version = '0.1.0-rc.3'
+    version = '0.1.0-rc.4'
 
     // SpotBugs + FindSecBugs on every java-library module. effort=max, reportLevel=low so the
     // security scan sees everything; HTML (human) + XML (CI/machine) reports. The build FAILS

@@ -5,6 +5,41 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.0-rc.4] — 2026-08-04
+
+Configurable authority, transition-level governance, and a release surface hardened to a clean
+security scan — the operability and integrity a real deployment needs to trust the door.
+
+### Added
+
+- **Deployment-configurable role ladder.** The authority vocabulary is no longer hardcoded: a
+  deployment declares its own role names and ranks in a policy layer's `roles` map (or in code via
+  `WithRoleLadder`), so a host renames tiers in config with no fork. Default-preserving — omit
+  `roles` and the built-in five tiers apply unchanged. The core now holds no hardcoded role name
+  beyond the default it ships.
+- **Transition-level governed execution (`runUnder`).** `GovernedExecutionScope.runUnder(approvalToken,
+  work)` in the WebFlux SDK runs a saga's steps beneath ONE approval — approve the run once, steps
+  execute under it, no per-step door re-submission. Fails closed when no approval scope is present.
+- **Door decision logging.** One structured `slog` line per finalized decision (outcome, action,
+  subject, policyId, `via` when delegated, `category`+reason on a deny) — allow at info, deny at
+  warn. Metadata only: it never logs intent params or any token. Live operator view alongside the
+  tamper-evident audit chain.
+- **Policy-config fingerprint.** Each loaded policy layer logs a `sha256` over its raw bytes, so a
+  `policy.json` change is visible in the boot log without a separate schema file.
+
+### Changed — security & integrity
+
+- **Policy config is now fail-CLOSED.** A config file that is set but invalid refuses startup instead
+  of being silently ignored (the previous fail-open): unknown keys are rejected
+  (`DisallowUnknownFields`), and a role named in `actionRoles` but absent from the ladder is a hard
+  error. A hot-reload of an invalid edit keeps the last-good snapshot (fails static, never open).
+- **Go engine hardened to a clean security scan.** `gosec` and `staticcheck` are zero: operator
+  config reads route through a single validated `safeio` door (path cleaned, traversal rejected),
+  plus integer-overflow, HTTP-timeout, and error-handling fixes.
+- **Java SDK + Spring Boot pass SpotBugs + FindSecBugs with zero security findings**, and a permanent
+  `security.yml` CI gate now runs SpotBugs/FindSecBugs (Java) and gosec/staticcheck/govulncheck (Go)
+  on every push and PR, failing on any finding.
+
 ## [0.1.0-rc.3] — 2026-08-01
 
 Consolidation and a typed denial contract, plus a third language SDK — the surface a real
