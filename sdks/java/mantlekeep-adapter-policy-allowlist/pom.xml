@@ -8,7 +8,7 @@
   <parent>
     <groupId>dev.mantlekeep</groupId>
     <artifactId>mantlekeep-java-parent</artifactId>
-    <version>0.1.0-rc.4</version>
+    <version>0.1.0-rc.5</version>
   </parent>
 
   <artifactId>mantlekeep-adapter-policy-allowlist</artifactId>
