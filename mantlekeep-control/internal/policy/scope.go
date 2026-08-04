@@ -21,11 +21,14 @@ type ScopeResolver struct {
 	scopes   map[string]Layer     // scope key → its override layer
 	cache    map[string]*Resolved // scope key (or "") → resolved cascade
 	fallback ActionAuthorizer     // consulted after the resolved roles (e.g. the product registry)
+	ladder   RoleLadder           // the deployment's role vocabulary, passed to every per-scope Resolve
 }
 
-// NewScopeResolver seeds the shared base cascade (default → product → team).
-func NewScopeResolver(base ...Layer) *ScopeResolver {
-	return &ScopeResolver{base: base, scopes: map[string]Layer{}, cache: map[string]*Resolved{}}
+// NewScopeResolver seeds the shared base cascade (default → product → team). ladder is the
+// deployment's role vocabulary — every per-scope resolution ranks against the SAME ladder, so a
+// renamed-role deployment's per-scope seal checks use the same vocabulary as the base.
+func NewScopeResolver(ladder RoleLadder, base ...Layer) *ScopeResolver {
+	return &ScopeResolver{base: base, scopes: map[string]Layer{}, cache: map[string]*Resolved{}, ladder: ladder}
 }
 
 // WithFallback sets the authorizer every per-scope resolution chains to when a layer does not
@@ -77,7 +80,7 @@ func (p *ScopeResolver) For(scope string) *Resolved {
 	if l, ok := p.scopes[scope]; ok {
 		layers = append(layers, l)
 	}
-	res := Resolve(layers...)
+	res := Resolve(p.ladder, layers...)
 	if p.fallback != nil {
 		res.WithFallback(p.fallback) // keep the product-registry binding per scope
 	}

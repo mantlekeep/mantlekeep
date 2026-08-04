@@ -22,9 +22,9 @@ import (
 // admitFloor evaluates the floor rules for an action against the request params + caller roles.
 // It returns (true, reason) to DENY, (false, "") to allow. An action with no floor rules always
 // passes — the floor is action-scoped by the data, so the engine stays generic.
-func admitFloor(action string, params map[string]any, roles []mantlekeep.Role) (bool, string) {
+func admitFloor(ladder RoleLadder, action string, params map[string]any, roles []mantlekeep.Role) (bool, string) {
 	for _, rule := range floors().Floors[action] {
-		if reason := evalFloorRule(rule, params, roles); reason != "" {
+		if reason := evalFloorRule(ladder, rule, params, roles); reason != "" {
 			return true, reason
 		}
 	}
@@ -32,8 +32,9 @@ func admitFloor(action string, params map[string]any, roles []mantlekeep.Role) (
 }
 
 // evalFloorRule returns "" when the rule is satisfied, else a deny reason (the rule's Message,
-// sometimes with the offending detail appended).
-func evalFloorRule(rule grants.FloorRule, params map[string]any, roles []mantlekeep.Role) string {
+// sometimes with the offending detail appended). ladder is the deployment's role vocabulary,
+// used by the required_role_when rule so a seniority floor honours renamed tiers.
+func evalFloorRule(ladder RoleLadder, rule grants.FloorRule, params map[string]any, roles []mantlekeep.Role) string {
 	switch rule.Kind {
 	case "allowlist":
 		// The value must be a listed member. Absent/empty fails closed.
@@ -80,7 +81,7 @@ func evalFloorRule(rule grants.FloorRule, params map[string]any, roles []mantlek
 		// When a param equals a trigger value, the caller must hold a role at least as senior as
 		// the required one (uses the core's generic authority ranking).
 		if floorWhenMatches(params, rule.WhenParam, rule.WhenValue) &&
-			!holdsAtLeast(rolesToStrings(roles), mantlekeep.Role(rule.Role)) {
+			!ladder.holdsAtLeast(rolesToStrings(roles), mantlekeep.Role(rule.Role)) {
 			return rule.Message
 		}
 	}
