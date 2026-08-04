@@ -7,6 +7,7 @@ import dev.mantlekeep.springboot.door.DoorException;
 import dev.mantlekeep.springboot.door.DoorProperties;
 import dev.mantlekeep.springboot.door.OnBehalfOf;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -89,7 +90,9 @@ public class WebClientDoorClient implements DoorClient {
     }
 
     private static Decision.Outcome mapOutcome(boolean success, DoorResponse body) {
-        String outcome = body.outcome() == null ? "" : body.outcome().trim().toLowerCase();
+        // Locale.ROOT, never the default locale: the outcome tokens are a fixed ASCII vocabulary,
+        // and a locale-sensitive fold (Turkish 'I'/'i') could misread "DENY" — silently fail OPEN.
+        String outcome = body.outcome() == null ? "" : body.outcome().trim().toLowerCase(Locale.ROOT);
         return switch (outcome) {
             case "allow" -> Decision.Outcome.ALLOW;
             case "deny" -> Decision.Outcome.DENY;

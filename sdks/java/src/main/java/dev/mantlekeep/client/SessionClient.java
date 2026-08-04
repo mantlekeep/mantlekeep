@@ -165,12 +165,20 @@ public final class SessionClient {
      *  polling a refused, id-less order forever. */
     public record OperationHandle(String operationId, String status, String detail) {
         public boolean isTerminal() {
-            return "succeeded".equalsIgnoreCase(status) || "failed".equalsIgnoreCase(status)
-                    || "denied".equalsIgnoreCase(status);
+            return succeeded() || is("failed") || is("denied");
         }
 
         public boolean succeeded() {
-            return "succeeded".equalsIgnoreCase(status);
+            return is("succeeded");
+        }
+
+        /** {@code status} is a fixed, lowercase-ASCII protocol vocabulary (see the class doc).
+         *  Compare it EXACTLY — no Unicode case folding on a value that arrived over the network.
+         *  Case-insensitive matching would fold distinct code points together (e.g. the Kelvin sign
+         *  U+212A → 'k'), letting a crafted wire value masquerade as a terminal status; exact match
+         *  against the documented vocabulary is both stricter and spec-correct. */
+        private boolean is(String terminalStatus) {
+            return terminalStatus.equals(status);
         }
     }
 

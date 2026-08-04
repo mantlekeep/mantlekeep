@@ -1,5 +1,6 @@
 package dev.mantlekeep;
 
+import java.io.IOException;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -69,8 +70,13 @@ public final class MantlekeepClient {
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
             return r.body();
-        } catch (Exception e) {
-            throw new MantlekeepException("MantleKeep call failed: " + path, e);
+        } catch (IOException transportFailure) {
+            throw new MantlekeepException("MantleKeep call failed: " + path, transportFailure);
+        } catch (InterruptedException interrupted) {
+            // Restore the interrupt status the blocking send() cleared, then surface the failure —
+            // swallowing the interrupt would strand a caller trying to cancel this thread.
+            Thread.currentThread().interrupt();
+            throw new MantlekeepException("MantleKeep call interrupted: " + path, interrupted);
         }
     }
 

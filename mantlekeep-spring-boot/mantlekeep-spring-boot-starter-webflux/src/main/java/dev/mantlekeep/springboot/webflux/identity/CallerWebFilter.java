@@ -1,6 +1,7 @@
 package dev.mantlekeep.springboot.webflux.identity;
 
 import dev.mantlekeep.springboot.door.OnBehalfOf;
+import java.net.InetSocketAddress;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,9 +80,12 @@ public class CallerWebFilter implements WebFilter {
 
     private void logRefusal(ServerWebExchange exchange) {
         String asserted = exchange.getRequest().getHeaders().getFirst(identity.userHeader());
-        String method = String.valueOf(exchange.getRequest().getMethod());
+        // Everything interpolated below is request-derived, so all of it goes through safe():
+        // even values that cannot normally carry CR/LF (the method token, the remote address)
+        // are sanitized, so no path into the record depends on an upstream parser's good behaviour.
+        String method = safe(String.valueOf(exchange.getRequest().getMethod()));
         String path = safe(exchange.getRequest().getPath().value());
-        String from = remoteAddress(exchange);
+        String from = safe(remoteAddress(exchange));
 
         if (asserted == null || asserted.isBlank()) {
             log.warn("refused {} {} from {}: no {} header — the caller sent no identity",
@@ -93,9 +97,10 @@ public class CallerWebFilter implements WebFilter {
     }
 
     private static String remoteAddress(ServerWebExchange exchange) {
-        return exchange.getRequest().getRemoteAddress() == null
-                ? "unknown"
-                : String.valueOf(exchange.getRequest().getRemoteAddress().getAddress());
+        // Resolve ONCE into a local: calling getRemoteAddress() twice lets it return non-null for
+        // the guard and null for the dereference — a possible NPE the second call would hit.
+        InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
+        return remote == null ? "unknown" : String.valueOf(remote.getAddress());
     }
 
     /**
