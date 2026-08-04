@@ -3,7 +3,7 @@ package doorserver
 import (
 	"log/slog"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // This file is ONE concern: structured, console observability of door decisions.

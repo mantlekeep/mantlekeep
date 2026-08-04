@@ -10,7 +10,7 @@ package orchestrator
 import (
 	"fmt"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // Layers groups a DAG's steps into dependency levels: every step in level i

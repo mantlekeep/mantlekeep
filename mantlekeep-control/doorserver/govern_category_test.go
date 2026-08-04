@@ -3,7 +3,7 @@ package doorserver
 import (
 	"testing"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // The wire code for a denial must come from the category the ENGINE stamped, not from

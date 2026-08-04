@@ -137,7 +137,7 @@ Everything is config-driven. The conventions:
   deployment starts recording: a decision already on the chain cannot be relabelled.
 - Spring properties: `mantlekeep.*` (e.g. `mantlekeep.door.url`, `mantlekeep.brand`).
 - Identity headers at a service boundary: `X-Mantlekeep-User`, `X-Mantlekeep-Roles`.
-- Go module path: `mantlekeep.dev/control`. Java packages: `dev.mantlekeep.*`.
+- Go module path: `github.com/mantlekeep/mantlekeep/mantlekeep-control`. Java packages: `dev.mantlekeep.*`.
 
 ## Run the door as a service
 

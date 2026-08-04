@@ -24,8 +24,8 @@ import (
 	"errors"
 	"net/http"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/doorkit"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/doorkit"
 )
 
 // Options configures a door server. Door is required; the rest are opt-in.

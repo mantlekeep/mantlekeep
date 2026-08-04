@@ -12,7 +12,7 @@ import (
 	"time"
 
 	bolt "go.etcd.io/bbolt"
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 var bucket = []byte("audit")

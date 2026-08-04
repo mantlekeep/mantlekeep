@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"mantlekeep.dev/control/internal/safeio"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 )
 
 // PolicyDirEnv names a list (OS path-list separated) of PRODUCT policy docs — files, or directories

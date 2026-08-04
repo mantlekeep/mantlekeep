@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 const (

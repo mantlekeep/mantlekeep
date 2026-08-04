@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.0-rc.6] — 2026-08-04
+
+### Changed
+
+- **Go module path is now `github.com/mantlekeep/mantlekeep/mantlekeep-control`** (was
+  `mantlekeep.dev/control`). A github-based path resolves through a Nexus github proxy and public
+  `go install` with **no external-domain dependency in the build chain** — a vanity domain would need
+  `mantlekeep.dev` reachable or pre-cached, a fragility and audit surface in an air-gapped deployment.
+  `mantlekeep.dev` remains the brand/docs domain and Maven-Central verification, not the build path.
+  **Breaking for Go importers** — update imports to the new module path. (Java `dev.mantlekeep:*`
+  coordinates and the Python client are unaffected.)
+
 ## [0.1.0-rc.5] — 2026-08-04
 
 Saga/timeline recording promoted into the framework — the runtime trail every governed service needs,

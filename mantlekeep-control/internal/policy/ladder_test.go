@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // TestDefaultLadderPreservesTiers pins the built-in five-tier ranking: with NO config the engine

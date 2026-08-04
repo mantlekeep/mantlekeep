@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // This file makes the LAYERED CONFIG DYNAMIC — hot-reload with NO restart.

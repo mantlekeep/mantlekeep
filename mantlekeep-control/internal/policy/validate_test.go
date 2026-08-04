@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // TestValidateLayersRejectsUndefinedRole proves the fail-closed semantic cross-check: a layer

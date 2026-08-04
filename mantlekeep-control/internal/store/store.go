@@ -18,7 +18,7 @@ import (
 	"sort"
 	"sync"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // Opener builds a Store from a DSN/config string.

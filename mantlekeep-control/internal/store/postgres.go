@@ -18,7 +18,7 @@
 
 package store
 
-import mantlekeep "mantlekeep.dev/control"
+import mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 
 func init() { Register("postgres", openPostgres) }
 

@@ -10,7 +10,7 @@
 
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-spring-boot-dependencies</artifactId>
-  <version>0.1.0-rc.5</version>
+  <version>0.1.0-rc.6</version>
   <packaging>pom</packaging>
 
   <name>MantleKeep Spring Boot (BOM)</name>
@@ -45,7 +45,7 @@
       <dependency>
         <groupId>dev.mantlekeep</groupId>
         <artifactId>mantlekeep-door-client</artifactId>
-        <version>0.1.0-rc.5</version>
+        <version>0.1.0-rc.6</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

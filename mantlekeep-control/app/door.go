@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/internal/audit"
-	"mantlekeep.dev/control/internal/policy"
-	"mantlekeep.dev/control/internal/sdk"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/audit"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/sdk"
 )
 
 // BuildDoor assembles the one door (identity + policy + audit), wrapping the policy

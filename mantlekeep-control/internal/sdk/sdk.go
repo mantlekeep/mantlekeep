@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // SDK wires identity, policy, and audit into the single submission path.

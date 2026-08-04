@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/internal/policy"
-	"mantlekeep.dev/control/internal/safeio"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 )
 
 // layerFile is the on-disk shape of a policy config layer (platform or team). It is

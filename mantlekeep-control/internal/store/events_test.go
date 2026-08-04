@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"mantlekeep.dev/control/internal/store"
-	"mantlekeep.dev/control/orchestrator"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/store"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/orchestrator"
 )
 
 // The durable EventStore must survive a restart: append a run's timeline, CLOSE the

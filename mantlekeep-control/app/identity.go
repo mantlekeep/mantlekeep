@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/internal/identity"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/identity"
 )
 
 // BuildIdentity selects the identity resolver to pair with the authenticator, and —

@@ -22,13 +22,13 @@ import (
 	"os"
 	"path/filepath"
 
-	mantlekeep "mantlekeep.dev/control"
-	"mantlekeep.dev/control/internal/audit"
-	"mantlekeep.dev/control/internal/identity"
-	"mantlekeep.dev/control/internal/policy"
-	"mantlekeep.dev/control/internal/provider"
-	"mantlekeep.dev/control/internal/sdk"
-	"mantlekeep.dev/control/internal/store"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/audit"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/identity"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/provider"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/sdk"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/store"
 )
 
 // App is the assembled control plane — the SDK surface. Submit is the one door.

@@ -3,11 +3,11 @@ package policy
 import (
 	"sync"
 
-	"mantlekeep.dev/control/grants"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/grants"
 )
 
 // This file loads the role→action grants, approval actions, and the attribute floors from the
-// shared policy documents (mantlekeep.dev/control/grants). The vocabulary lives in the DATA (the core
+// shared policy documents (github.com/mantlekeep/mantlekeep/mantlekeep-control/grants). The vocabulary lives in the DATA (the core
 // baseline + each product's doc, merged), read here — so rbac.go/floor.go stay grep-clean of
 // product names. The OPA adapter reads the SAME merged documents, so the two engines cannot drift.
 //

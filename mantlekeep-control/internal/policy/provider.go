@@ -1,6 +1,6 @@
 package policy
 
-import mantlekeep "mantlekeep.dev/control"
+import mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 
 // PolicyProvider is the PORT a product's policy adapter implements. It is how the core stays
 // GENERIC: the engine holds no product action names, role grants, or attribute floors of its

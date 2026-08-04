@@ -3,7 +3,7 @@ package orchestrator
 import (
 	"context"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // StepRunner is the execution PORT the Engine depends on — the seam between DECIDING/sequencing

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"mantlekeep.dev/control/app"
-	"mantlekeep.dev/control/doorkit"
-	"mantlekeep.dev/control/doorserver"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/app"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/doorkit"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/doorserver"
 )
 
 // runServe runs the one door as a service: the mode every SDK client in `service` mode

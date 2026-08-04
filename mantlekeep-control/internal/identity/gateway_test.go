@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 func TestGatewayMapsGroupsToRoles(t *testing.T) {

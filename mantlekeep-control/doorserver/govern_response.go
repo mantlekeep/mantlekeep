@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // The typed denial taxonomy. A product maps these codes to HTTP status and behaviour

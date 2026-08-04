@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	mantlekeep "mantlekeep.dev/control"
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
 // Failsafe wraps a primary PolicyEvaluator with a resilience fallback. While the
