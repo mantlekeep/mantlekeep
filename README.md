@@ -67,7 +67,7 @@ Start here to adopt and build on MantleKeep:
 Requires Go 1.26+.
 
 ```bash
-git clone https://github.com/potkei/mantlekeep.git
+git clone https://github.com/mantlekeep/mantlekeep.git
 cd mantlekeep
 
 # From the repo root (a go.work covers the module):

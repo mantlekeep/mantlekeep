@@ -27,7 +27,7 @@
 
   <name>MantleKeep Spring Boot (parent)</name>
   <description>The MantleKeep Spring Boot starter family — governed door integration, reactive and AI adapters.</description>
-  <url>https://github.com/potkei/mantlekeep</url>
+  <url>https://github.com/mantlekeep/mantlekeep</url>
 
   <licenses>
     <license>
@@ -37,8 +37,8 @@
   </licenses>
 
   <scm>
-    <url>https://github.com/potkei/mantlekeep</url>
-    <connection>scm:git:https://github.com/potkei/mantlekeep.git</connection>
+    <url>https://github.com/mantlekeep/mantlekeep</url>
+    <connection>scm:git:https://github.com/mantlekeep/mantlekeep.git</connection>
   </scm>
 
   <modules>
@@ -107,7 +107,7 @@
     <repository>
       <id>github</id>
       <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/potkei/mantlekeep</url>
+      <url>https://maven.pkg.github.com/mantlekeep/mantlekeep</url>
     </repository>
   </distributionManagement>
 </project>
