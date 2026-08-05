@@ -22,7 +22,10 @@
 
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-spring-boot</artifactId>
-  <version>0.1.0-rc.7</version>
+  <!-- CI-friendly version: the ONE place the family version lives (a cut bumps just this). Children
+       reference it as ${revision}; flatten-maven-plugin resolves it into the deployed poms so no raw
+       ${revision} ever ships. Snapshot/release override with -Drevision=X (no versions:set needed). -->
+  <version>${revision}</version>
   <packaging>pom</packaging>
 
   <name>MantleKeep Spring Boot (parent)</name>
@@ -42,7 +45,11 @@
   </scm>
 
   <modules>
-    <module>mantlekeep-spring-boot-dependencies</module>
+    <!-- The family BOM (mantlekeep-spring-boot-dependencies) is NOT a Maven reactor module: nothing
+         imports it now (each module imports the EXTERNAL spring-boot-dependencies directly, so consumers
+         float Spring — see the dependencyManagement note below), and as pom-packaging it can't be
+         ci-friendly-flattened cleanly. It remains ONLY for the Gradle build's java-platform. A consumer
+         needs just the starters, whose flattened poms are self-contained. -->
     <module>mantlekeep-spring-boot-core</module>
     <module>mantlekeep-spring-boot-starter-webflux</module>
     <module>mantlekeep-spring-boot-starter-ai</module>
@@ -53,21 +60,19 @@
     <!-- Java 25, mirroring the Gradle convention plugin's toolchain. -->
     <maven.compiler.release>25</maven.compiler.release>
     <spring.boot.version>4.1.0</spring.boot.version>
+    <!-- The family version — the single source. A version cut bumps THIS (or pass -Drevision=X). -->
+    <revision>0.1.0-rc.7</revision>
   </properties>
 
-  <!-- Every module imports the family BOM, so modules declare deps WITHOUT versions
-       (the Maven equivalent of Gradle's `api(platform(project(":...-dependencies")))`). -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>dev.mantlekeep</groupId>
-        <artifactId>mantlekeep-spring-boot-dependencies</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  <!-- NO family-BOM import here. Two reasons:
+       1. A parent cannot import its own child BOM — Maven resolves parent-level imported BOMs during
+          model-building, before the reactor builds that child, so a clean Maven reactor cannot read it.
+       2. CVE-float: forcing the family BOM (which bundles Spring Boot's platform) on consumers would CAP
+          their Spring Boot version. Instead each module imports the EXTERNAL spring-boot-dependencies at
+          BUILD time only (dependencyManagement is not transitive), leaving Spring deps version-less in the
+          published pom so a consumer's own Spring Boot BOM floats them to any CVE-patched release.
+       MANTLE pins only its OWN artifacts (${revision}); it never pins Spring for consumers. -->
+
 
   <build>
     <pluginManagement>
@@ -97,6 +102,33 @@
           <execution>
             <id>attach-sources</id>
             <goals><goal>jar-no-fork</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- CI-friendly versions REQUIRE flatten: a deployed pom must never contain a raw ${revision}
+           (consumers can't resolve it). resolveCiFriendliesOnly substitutes ONLY revision/sha1/changelist
+           and leaves everything else exactly as authored — so MANTLE's own ${revision} deps become
+           concrete while the version-less Spring deps STAY version-less (the CVE-float guarantee).
+           updatePomFile=true applies it to the pom-packaging parent + BOM too, so they also ship
+           resolved. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>flatten-maven-plugin</artifactId>
+        <version>1.8.0</version>
+        <configuration>
+          <updatePomFile>true</updatePomFile>
+          <flattenMode>resolveCiFriendliesOnly</flattenMode>
+        </configuration>
+        <executions>
+          <execution>
+            <id>flatten</id>
+            <phase>process-resources</phase>
+            <goals><goal>flatten</goal></goals>
+          </execution>
+          <execution>
+            <id>flatten-clean</id>
+            <phase>clean</phase>
+            <goals><goal>clean</goal></goals>
           </execution>
         </executions>
       </plugin>

@@ -9,17 +9,33 @@
   <parent>
     <groupId>dev.mantlekeep</groupId>
     <artifactId>mantlekeep-spring-boot</artifactId>
-    <version>0.1.0-rc.7</version>
+    <version>${revision}</version>
   </parent>
 
   <artifactId>mantlekeep-spring-boot-starter-ai</artifactId>
   <name>MantleKeep Spring Boot starter (AI)</name>
   <description>AgentPort adapter over a local agent CLI — the BYOK seam, governed through the door.</description>
 
+  <!-- Spring Boot platform imported for BUILD-time versions only (dependencyManagement is not
+       transitive) → Spring deps below stay version-less in the published pom, so the consumer's Spring
+       Boot BOM floats them (CVE-patched releases). Only MANTLE's own artifact is pinned (${revision}). -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring.boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
       <groupId>dev.mantlekeep</groupId>
       <artifactId>mantlekeep-spring-boot-core</artifactId>
+      <version>${revision}</version>
     </dependency>
     <dependency>
       <!-- Mono/Flux on the AgentPort adapter surface -->

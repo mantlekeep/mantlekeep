@@ -10,7 +10,7 @@
 
   <groupId>dev.mantlekeep</groupId>
   <artifactId>mantlekeep-spring-boot-dependencies</artifactId>
-  <version>0.1.0-rc.7</version>
+  <version>${revision}</version>
   <packaging>pom</packaging>
 
   <name>MantleKeep Spring Boot (BOM)</name>
@@ -20,35 +20,22 @@
     <spring.boot.version>4.1.0</spring.boot.version>
   </properties>
 
+  <!-- This BOM manages ONLY MantleKeep's own artifacts — deliberately NOT Spring Boot. A consumer who
+       imports this BOM gets MANTLE's versions and brings their OWN Spring Boot BOM, so they float Spring
+       to any CVE-patched release. Pinning Spring here would cap them (the very thing to avoid). Versions
+       are ${revision} (the family version), resolved into the deployed pom by flatten. The two trees
+       release in LOCKSTEP, so door-client (built in sdks/java) follows the same ${revision}. -->
   <dependencyManagement>
     <dependencies>
-      <!-- Spring Boot's own platform supplies Reactor, Jackson, AspectJ, JUnit versions. -->
-      <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-dependencies</artifactId>
-        <version>${spring.boot.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-
-      <!-- MantleKeep module versions are pinned here as the family grows. -->
       <dependency>
         <groupId>dev.mantlekeep</groupId>
         <artifactId>mantlekeep-spring-boot-core</artifactId>
-        <version>${project.version}</version>
+        <version>${revision}</version>
       </dependency>
-
-      <!-- The pure-JDK door spine (Intent · Decision · DoorClient · DoorConfig), built by
-           the separate sdks/java build and consumed here from ~/.m2. The Gradle build
-           reaches the SAME artifact as a source composite (includeBuild); this pins the
-           version Maven resolves. Run `mvn install` in sdks/java first so it is present.
-           Pinned to ${project.version}: the two trees release in LOCKSTEP (a version cut
-           bumps both), so this must follow the family version — a hardcoded string would
-           drift on a bump and break the snapshot version-set (which routes -SNAPSHOT to both). -->
       <dependency>
         <groupId>dev.mantlekeep</groupId>
         <artifactId>mantlekeep-door-client</artifactId>
-        <version>${project.version}</version>
+        <version>${revision}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
