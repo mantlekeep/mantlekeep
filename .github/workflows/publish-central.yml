@@ -52,10 +52,18 @@ jobs:
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: mvn -B -P release -DskipTests deploy
-      # NOTE: the mantlekeep-spring-boot tree is DEFERRED from Central publishing. Its Maven poms
-      # (parent imports its own child BOM) cannot be built by a clean Maven reactor — a pre-existing
-      # issue latent because that tree's PRIMARY build is Gradle. The release profile is in place;
-      # re-enabling the deploy needs the BOM-import restructure first (tracked separately).
+      # Spring-boot starters (products + the Frame facade depend on starter-webflux). The tree uses
+      # ci-friendly ${revision}; pin it to the SDK's version so both trees publish the SAME GAV, and the
+      # starters' door-client:${revision} resolves the SDK just deployed to ~/.m2.
+      - name: deploy spring-boot starters to Central Portal
+        working-directory: mantlekeep-spring-boot
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          VER=$(cd ../sdks/java && mvn -B -q -N -Dexpression=project.version -DforceStdout help:evaluate)
+          mvn -B -P release -DskipTests -Drevision="$VER" deploy
 
   # ---- snapshot: manual dispatch → mutable Central snapshot repo -----------------------
   snapshot:
@@ -76,9 +84,10 @@ jobs:
       - name: set -SNAPSHOT version
         working-directory: sdks/java
         # Force a -SNAPSHOT coordinate (mutable) so pre-release testing never consumes an immutable
-        # release GAV. (SDK tree only — the spring-boot tree's Central publish is deferred; see below.)
+        # release GAV. Export it so the spring-boot tree publishes the same version via -Drevision.
         run: |
           BASE_VERSION=$(mvn -B -q -N -Dexpression=project.version -DforceStdout help:evaluate | sed -E 's/-(rc\.[0-9]+|SNAPSHOT)$//')
+          echo "SNAPSHOT_VERSION=${BASE_VERSION}-SNAPSHOT" >> "$GITHUB_ENV"
           echo "base=$BASE_VERSION → ${BASE_VERSION}-SNAPSHOT"
           mvn -B versions:set -DnewVersion="${BASE_VERSION}-SNAPSHOT" -DgenerateBackupPoms=false
       - name: deploy SDK snapshot to Central
@@ -88,5 +97,12 @@ jobs:
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: mvn -B -P release -DskipTests deploy
-      # NOTE: mantlekeep-spring-boot Central publish is DEFERRED (Maven reactor / self-imported BOM;
-      # tree is Gradle-primary). Re-enable after the BOM-import restructure.
+      # Spring-boot starters at the SAME -SNAPSHOT (ci-friendly ${revision}); door-client:${revision}
+      # resolves the SDK snapshot just installed to ~/.m2.
+      - name: deploy spring-boot snapshot to Central
+        working-directory: mantlekeep-spring-boot
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn -B -P release -DskipTests -Drevision="${SNAPSHOT_VERSION}" deploy

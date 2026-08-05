@@ -30,3 +30,6 @@ target/
 
 # built cmd binary (go build/install artifact)
 mantlekeep-control/mantlekeep
+
+# flatten-maven-plugin build artifacts
+**/.flattened-pom.xml
