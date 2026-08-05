@@ -38,6 +38,16 @@ public final class SagaRecorder {
         emit(operationId, subject, "executed", succeeded ? "succeeded" : "failed", detail);
     }
 
+    /**
+     * The order was ROUTED to an executor (e.g. an in-zone agent) but has not executed yet — the distinct
+     * middle phase between {@link #requested} and {@link #executed} when execution is dispatched, not
+     * in-process. {@code detail} should carry WHERE it went (the routing target). The operation stays
+     * non-terminal; its {@link #executed} step arrives later when the real outcome returns.
+     */
+    public void dispatched(String operationId, String subject, String detail) {
+        emit(operationId, subject, "dispatched", "routed", detail);
+    }
+
     /** The saga timeline for an operation — a read. */
     public List<SagaStep> forOperation(String operationId) {
         return timeline.forOperation(operationId);
