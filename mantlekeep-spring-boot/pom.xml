@@ -39,6 +39,16 @@
     </license>
   </licenses>
 
+  <!-- Maven Central REQUIRES <developers> on every published artifact (children inherit this).
+       Missing here is why the spring-boot bundle failed Central validation while the SDK passed. -->
+  <developers>
+    <developer>
+      <id>mantlekeep</id>
+      <name>The MantleKeep Project</name>
+      <url>https://github.com/mantlekeep</url>
+    </developer>
+  </developers>
+
   <scm>
     <url>https://github.com/mantlekeep/mantlekeep</url>
     <connection>scm:git:https://github.com/mantlekeep/mantlekeep.git</connection>
