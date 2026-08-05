@@ -199,6 +199,14 @@
       <name>GitHub Packages</name>
       <url>https://maven.pkg.github.com/mantlekeep/mantlekeep</url>
     </repository>
+    <!-- SNAPSHOT deploys go to the Central Portal snapshot repo (mutable), NOT GitHub Packages —
+         id `central` matches the server credentials setup-java writes, so snapshot metadata
+         resolves + uploads authenticate with the Central token instead of 401-ing against github. -->
+    <snapshotRepository>
+      <id>central</id>
+      <name>Central Portal Snapshots</name>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+    </snapshotRepository>
   </distributionManagement>
 
   <!--
