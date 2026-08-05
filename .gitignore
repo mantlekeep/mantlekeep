@@ -27,3 +27,6 @@ go.work.sum
 
 # Maven build output
 target/
+
+# built cmd binary (go build/install artifact)
+mantlekeep-control/mantlekeep
