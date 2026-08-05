@@ -1,6 +1,7 @@
-# Three-layer products — generic → domain → team
+# Extending and overriding across configuration layers
 
-**The model.** One service is built once and specialised twice, by **composition**, never by copying:
+A product is typically organised in layers so that shared logic is defined once and specialised through
+configuration rather than copies:
 
 ```
    Layer 3   team-sdlc          a specific team's pipeline    ← thin: order, values, one or two steps
@@ -10,18 +11,16 @@
    Layer 0   the framework      door · chain · floors · ports ← a binary dependency, untouched
 ```
 
-Each layer **adds and overrides**; none edits the layer below it. If a team needs a change in Layer 1, that
-change belongs in Layer 1 for everyone — not in a copy.
+Each layer adds to and overrides the layer below through configuration; it does not edit the layer below.
+A change needed by every team belongs in the shared layer, not in a copy.
 
-**The test for whether you got it right:** can Layer 1 ship a new version and every team pick it up by
-bumping a version? If a team has to re-apply its changes, the layering has already failed and you have
-forks wearing layer names.
+If Layer 1 ships a new version, a team should be able to pick it up by bumping a version rather than
+re-applying local changes.
 
-This applies identically to the backend and the UI. The mechanisms differ; the rule does not.
+This applies to both the backend and the UI; the mechanisms differ.
 
-> **Companion: `behaviours.md`** — templates, behaviours and workers. This doc says who owns what; that one
-> says how a pipeline is assembled, and is the more important of the two for a migration from an existing
-> CI system.
+> **Companion: `behaviours.md`** — templates, behaviours and workers: how a pipeline is assembled. Useful
+> when migrating from an existing CI system.
 
 ---
 
@@ -29,31 +28,29 @@ This applies identically to the backend and the UI. The mechanisms differ; the r
 
 | Layer | Owns | Must NOT contain |
 |---|---|---|
-| **1 · generic** | the flow (propose → approve → saga), states, the generic saga runner, the ports, the endpoints, the honest defaults | any domain vocabulary, any team's values, any specific tool |
+| **1 · generic** | the flow (propose → approve → saga), states, the generic saga runner, the ports, the endpoints, the defaults | any domain vocabulary, any team's values, any specific tool |
 | **2 · domain** | steps and floors shared by a whole domain; port implementations for that domain's tooling | any single team's thresholds, names, or order |
 | **3 · team** | step order, actual values (caps, registries, approvers), at most one or two team-only steps | anything another team would also want — that belongs in Layer 2 |
 
-**The smell test for a misplaced thing:** if two teams would both want it, it is Layer 2 or 1. If it names a
-specific team, it is Layer 3. A "generic" layer that mentions a business domain is mislabelled.
+Placement guide: if two teams would both want it, it belongs in Layer 2 or 1. If it names a specific team,
+it belongs in Layer 3.
 
-**Layering is a dependency relationship, not a directory one.** Sibling modules in one build, or one repo
-per layer publishing versioned artifacts — both are the same architecture. Most regulated organisations end
-up with a repo per layer, because layers have different owners and release cadences, and a version bump
-between them is an auditable event rather than a merge. That is how the framework itself reaches you: a
-pinned binary dependency, not source in your tree. **Never add a lower layer's source to your tree to make
-editing it easier** — that is a fork wearing a layout excuse.
+Layering is a dependency relationship, not a directory one. Sibling modules in one build, or one repo per
+layer publishing versioned artifacts, are both valid. Many regulated organisations use a repo per layer,
+because layers have different owners and release cadences and a version bump between them is an auditable
+event. The framework itself reaches you the same way: a pinned binary dependency, not source in your tree.
+Do not add a lower layer's source to your tree to make editing it easier — that produces a fork.
 
-## 2. The four seams (Spring)
+## 2. The four extension seams (Spring)
 
-Everything a higher layer does, it does through one of these four. There is no fifth, and there is no
-editing downward.
+A higher layer extends a lower one through one of these four mechanisms, without editing the lower layer.
 
 ### Seam A — override a bean (`@ConditionalOnMissingBean`)
 
 Layer 1 supplies a default; a higher layer declaring its own bean wins, with no change to Layer 1.
 
 ```java
-// Layer 1 — the honest default, marked overridable
+// Layer 1 — the default, marked overridable
 @Configuration
 class RunStoreConfig {
     @Bean
@@ -70,21 +67,16 @@ class TeamRunStoreConfig {
 }
 ```
 
-Apply it to **every port**: `RunStore`, `WorkerPort`, the step implementations. A port without this
-annotation is a port a higher layer cannot replace — which makes it an accidental fork point.
+Apply it to every port: `RunStore`, `WorkerPort`, the step implementations. A port without this annotation
+cannot be replaced by a higher layer.
 
-### Seam B — the behaviour (NOT a hardcoded list, and NOT merely a list of beans)
+### Seam B — the behaviour
 
-> **Read `behaviours.md` for this seam.** What follows is the minimum; the behaviour model there is the
-> real mechanism, because a *lifecycle* — which phases exist, with what parameters and release rules —
-> differs between building a service, applying infrastructure, and migrating a database. A flat list of
-> steps cannot express that. Use a **template-method behaviour** (`final run()` + `protected` hooks) and
-> select the behaviour family by repository style; treat the bean list below as the degenerate case for
-> one simple style.
-
-**This is the seam that has to be built before layering works at all.** A pipeline written as
-`private static final List<StepDef> STEPS = List.of(...)` cannot be extended by anyone — a team's only
-option is to copy the class, which is the fork the model exists to prevent.
+> **See `behaviours.md` for this seam.** What follows is the minimum. A lifecycle — which phases exist, with
+> what parameters and release rules — differs between building a service, applying infrastructure, and
+> migrating a database, and a flat list of steps cannot express that. Use a **template-method behaviour**
+> (`final run()` + `protected` hooks) and select the behaviour family by repository style; the bean list
+> below is the simple case for one style.
 
 Make a step a **named bean**, and the pipeline an **ordered list of names in configuration**:
 
@@ -104,10 +96,9 @@ acme:
     steps: [ scanStep, buildStep, complianceStep, verifyStep ]
 ```
 
-The runner resolves each name from the bean registry and runs them in the given order. Three properties
-follow from this, all of them the point: a team can **reorder** without code, a domain can **add** without
-touching Layer 1, and **an unknown step name must fail at startup** — never be skipped silently, or a
-pipeline quietly stops enforcing something.
+The runner resolves each name from the bean registry and runs them in the given order. This gives three
+properties: a team can **reorder** without code, a domain can **add** without touching Layer 1, and **an
+unknown step name fails at startup** rather than being skipped silently.
 
 ### Seam C — union the policy
 
@@ -119,20 +110,19 @@ ACME_POLICY_DIR=/policy/generic.json:/policy/domain.json:/policy/team.json
 ```
 
 A floor added by a lower layer **cannot be removed** by a higher one — that is what makes a floor a floor
-rather than a default. Tightening is always allowed; loosening is not, and a team document that tries it
-must fail loudly at load.
+rather than a default. Tightening is allowed; loosening is not, and a team document that tries it fails at
+load.
 
 ### Seam D — configuration and naming
 
 Values live in properties, layered by Spring profile (`application.yml` → `application-domain.yml` →
 `application-team.yml`). The property prefix is the product's own (`acme.*`), declared once in the launcher.
 
-**None of these four seams involves copying a file.** If you find yourself copying to specialise, you have
-left the model.
+None of these four seams involves copying a file.
 
-## 3. The same three layers in the UI
+## 3. The same layers in the UI
 
-Identical rule, different mechanism — the UI composes rather than inherits:
+Same rule, different mechanism — the UI composes rather than inherits:
 
 ```
    Layer 3   team-console       branding, which panels appear, labels
@@ -142,38 +132,35 @@ Identical rule, different mechanism — the UI composes rather than inherits:
    Layer 0   the door's API     /api/audit, /api/runs, /api/govern
 ```
 
-- **Layer 1** owns everything in the console blueprint: the chain view, run detail, the refusal rendering,
-  the accessibility guarantees. Domain-neutral throughout.
+- **Layer 1** owns the console blueprint: the chain view, run detail, the refusal rendering, the
+  accessibility guarantees. Domain-neutral throughout.
 - **Layer 2** registers additional panels and supplies domain wording. It does not modify Layer 1's files.
 - **Layer 3** is configuration: brand values, which panels are enabled, label overrides.
 
 Concretely, with the zero-build constraint: Layer 1 exposes a small registration point
 (`registerPanel(name, renderFn)`) and reads a config object for branding and enabled panels. Layers 2 and 3
-are additional `.js` files loaded after it that *register* things — never edited copies of it. If a domain
-needs a change inside Layer 1's chain view, that change is Layer 1's, for everyone.
+are additional `.js` files loaded after it that *register* things, rather than edited copies of it. A change
+needed inside Layer 1's chain view belongs in Layer 1.
 
 **The accessibility rules are Layer 1 and non-negotiable at every layer above.** A team layer may not
 introduce colour-only status, audio, or a control that cannot be reached by keyboard.
 
-## 4. Build order (do not invert this)
+## 4. Build order
 
-1. **Layer 1, alone, working end to end** — with the honest defaults, and every port marked
+1. **Layer 1, alone, working end to end** — with the defaults, and every port marked
    `@ConditionalOnMissingBean`.
-2. **Seam B** — steps as named beans plus a configured order, replacing any hardcoded list. Prove it by
+2. **Seam B** — steps as named beans plus a configured order, replacing any hardcoded list. Verify by
    reordering the pipeline **in configuration only**.
-3. **Layer 3 for one real team**, using only the four seams. Whatever you have to reach past a seam to do
-   is a missing seam in Layer 1 — fix it there.
-4. **Layer 2** last, extracted from what Layer 3 revealed is shared. A domain layer designed before any
-   team exists is guesswork; extracted afterwards, it is evidence.
+3. **Layer 3 for one real team**, using only the four seams. Anything you have to reach past a seam to do is
+   a missing seam in Layer 1 — add it there.
+4. **Layer 2** last, extracted from what Layer 3 showed is shared.
 
-## 5. Acceptance — how you know the layering is real
+## 5. Acceptance checks
 
 1. **Layer 1 upgrades cleanly:** bump Layer 1, rebuild the team app, and nothing in Layer 3 changes.
 2. **Reorder without code:** a team changes step order by editing configuration only.
 3. **Add without touching Layer 1:** a domain adds a step; Layer 1's source is untouched by the diff.
 4. **Override without touching Layer 1:** a team swaps the store or the worker; Layer 1's source is untouched.
-5. **Floors only tighten:** a team document attempting to loosen a lower floor fails at load, loudly.
+5. **Floors only tighten:** a team document attempting to loosen a lower floor fails at load.
 6. **A wrong step name fails at startup**, never silently skipped.
-7. **No duplicated files anywhere** — `diff` across the layers finds no copied class or copied page.
-
-If (1) fails, you do not have layers. Everything else is detail by comparison.
+7. **No duplicated files** — `diff` across the layers finds no copied class or copied page.
