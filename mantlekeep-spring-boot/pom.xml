@@ -110,4 +110,80 @@
       <url>https://maven.pkg.github.com/mantlekeep/mantlekeep</url>
     </repository>
   </distributionManagement>
+
+  <!-- The `release` profile re-routes deploy from GitHub Packages to the Sonatype Central
+       Portal, MIRRORING sdks/java so the spring-boot starters (which products + the Frame
+       facade depend on) publish to Central too — not just the SDK tree. Same javadoc + gpg +
+       central-publishing plumbing; sources are already attached by the base build above. -->
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <!-- Javadoc jar — Central REJECTS a release without one. doclint off so a lint nit
+               can never break a publish, but a REAL javadoc jar is produced. (Skipped on the
+               pom-packaging BOM/parent, which need none.) -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.11.2</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <phase>package</phase>
+                <goals><goal>jar</goal></goals>
+                <configuration>
+                  <doclint>none</doclint>
+                  <quiet>true</quiet>
+                  <failOnError>false</failOnError>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- GPG signatures on every artifact — Central requires them. Passphrase from the
+               MAVEN_GPG_PASSPHRASE env var (never a literal); loopback pinentry for headless CI. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+          </plugin>
+          <!-- The DEFAULT deploy (GitHub Packages) is skipped under release: this profile has
+               ONLY Central credentials in CI, so a GitHub-Packages deploy would 401. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-deploy-plugin</artifactId>
+            <configuration>
+              <skip>true</skip>
+            </configuration>
+          </plugin>
+          <!-- Uploads the signed bundle to the Central Portal (server id `central`).
+               autoPublish=false → upload only; a human publishes. 0.8.0+ also routes -SNAPSHOT
+               to the Central snapshot repository (mutable) for the pre-release smoke test. -->
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
