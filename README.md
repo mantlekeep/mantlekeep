@@ -7,9 +7,6 @@ the JVM, Go on the control plane) rather than rebuilding them — it adds only t
 governance primitives: the one **door**, the tamper-evident **hash-chain**, the
 **ports/adapters** seam, and the **sealed floor**.
 
-> MantleKeep : Spring :: Spring : the JVM — a framework in its own lane, standing on
-> the layer below.
-
 The one rule the whole design serves: **govern before you execute.** Every action —
 human or AI — is submitted to one door, decided against policy, and recorded on an
 append-only hash-chain *before* any side effect runs. A deny aborts before anything
@@ -50,8 +47,8 @@ Start here to adopt and build on MantleKeep:
 | [Why govern human + AI actions](docs/why-govern-ai.md) | The case for adopting: the problem, MantleKeep's answer, who it's for. |
 | [Architecture](docs/architecture.md) | One page: the decide-vs-execute rule, the core, the ports/adapters, the dependency direction — with a diagram and a full text description. |
 | [Build your first governed product](docs/build-your-first-product.md) | A runnable ~5-minute tutorial: write a `WorkerPort` adapter, wire the door, submit intents, and see govern-before-execute + the hash-chain. |
-| [Layering a product](docs/layering.md) | How one product is specialised twice — generic → domain → team — by composition rather than copying: the four seams, and the tests that prove it is layering and not forks. |
-| [Templates, behaviours and workers](docs/behaviours.md) | The composition model: a pipeline is a template instantiated with a behaviour whose phases workers execute. Sealed `run()`, behaviour selection by repository style, chains as a DAG, platform vs content. |
+| [Extending and overriding across layers](docs/layering.md) | Specialising shared logic through configuration layers: the four seams (override a bean, select a behaviour, configure steps), and the acceptance checks. |
+| [Templates, behaviours and workers](docs/behaviours.md) | A pipeline is a template instantiated with a behaviour whose phases workers execute. Sealed `run()`, behaviour selection by repository style, chains as a DAG, platform vs content. |
 | [The two Java stacks](docs/java-consolidation.md) | Known duplication: `DoorClient`, `Intent` and door config are declared in both module trees, so a fix must be made twice. The target shape, the migration order, and the one test that would prevent it recurring. |
 | [Reusable execution workers](docs/reusable-worker.md) | Node reuse, DinD, and Dagger as WorkerPort adapters — warm engines and caching for cost, without touching governance. The isolation profile is a floor decision. |
 | [Credential brokering](docs/credential-brokering.md) | **Read this before claiming governance is enforced.** Why in-process checks are advisory, and the one control that is structural: an executor that holds no credentials until the door releases short-lived, scoped ones. Covers air-gapped zones (the broker follows the door) and agent workers. |

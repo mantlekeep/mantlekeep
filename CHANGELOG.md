@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-08-05
+
+First stable release. Consolidates the rc.1–rc.7 line into the `0.1.0` API.
+
+### Added / Changed since rc.7
+
+- **Maven Central publishing** for both the Java SDK (`sdks/java`) and the Spring Boot starter
+  family (`mantlekeep-spring-boot`). Snapshot pipeline verified end-to-end (signing, snapshot repo,
+  namespace enablement).
+- **Spring CVE-float:** the starters pin only MantleKeep's own artifacts; Spring/reactor/platform
+  deps are version-less in the published pom, so a consumer's own Spring Boot BOM floats them to any
+  patched release — MantleKeep never caps the consumer's Spring version. Achieved via ci-friendly
+  `${revision}` versioning + `flatten-maven-plugin` (`resolveCiFriendliesOnly`).
+- **Docs:** the guides are matter-of-fact reference (how to use and extend) rather than design essays.
+- Dev-login session cookie sets `Secure` under TLS (CodeQL cookie-secure fix).
+
+### Guarantees (unchanged, the point of the framework)
+
+- **Govern before you execute.** Every human/AI action passes one door, decided against policy and
+  recorded on an append-only hash-chain, before any side effect.
+- **The sealed floor.** An AI can never approve its own work — structural, not configuration.
+
 ## [0.1.0-rc.7] — 2026-08-05
 
 ### Added

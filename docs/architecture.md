@@ -1,26 +1,23 @@
 # Architecture
 
-MantleKeep is a **governance framework**: it owns the *shape* of how human and AI
-actions are decided and recorded, and rides mature runtimes (Spring/Reactor on the
-JVM, Go on the control plane) rather than rebuilding them. This page is the whole
-picture on one screen — the diagram, then a full text description of the same thing.
+MantleKeep is a **governance framework**: it decides and records how human and AI
+actions are governed, and rides mature runtimes (Spring/Reactor on the JVM, Go on the
+control plane) rather than rebuilding them. This page is the whole picture on one
+screen — the diagram, then a full text description of the same thing.
 
 ---
 
-## The one routing question
+## Decide vs. execute
 
-Every piece of a MantleKeep system answers a single question:
+Every piece of a MantleKeep system is either a decider or an executor:
 
-> **Does this piece DECIDE, or does it EXECUTE?**
->
 > - It **decides** → it belongs in the **control plane** and embeds the core (the door,
 >   the hash-chain, policy).
 > - It **executes** → it belongs in a **service** and *calls the door* before doing the
 >   work.
 
-Deciding and executing never mix in the same place. That separation is what makes
-"govern before you execute" structural rather than a convention someone has to
-remember.
+Deciding and executing live in separate places, so "govern before you execute" is
+enforced by structure rather than convention.
 
 ---
 
