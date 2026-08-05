@@ -38,6 +38,23 @@ class SagaRecorderTest {
     }
 
     @Test
+    void dispatchedRecordsTheRoutingPhase() {
+        SagaTimeline timeline = new InMemorySagaTimeline();
+        SagaRecorder recorder = recorderAt(RecordingLevel.STEPS, timeline);
+
+        recorder.requested("op-d", "res-d", "begin");
+        recorder.dispatched("op-d", "res-d", "cluster-a via agent");   // routed, not yet executed
+        recorder.executed("op-d", "res-d", true, "ran in-zone");
+
+        List<SagaStep> steps = recorder.forOperation("op-d");
+        assertThat(steps).hasSize(3);
+        SagaStep dispatched = steps.get(1);
+        assertThat(dispatched.step()).isEqualTo("dispatched");
+        assertThat(dispatched.status()).isEqualTo("routed");
+        assertThat(dispatched.detail()).isEqualTo("cluster-a via agent");
+    }
+
+    @Test
     void stepsRecordsRequestedThenExecutedInOrder() {
         SagaTimeline timeline = new InMemorySagaTimeline();
         SagaRecorder recorder = recorderAt(RecordingLevel.STEPS, timeline);
