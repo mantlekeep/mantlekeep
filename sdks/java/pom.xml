@@ -38,9 +38,20 @@
     </license>
   </licenses>
 
+  <!-- Central REQUIRES a developer identity on every published artifact. Generic project
+       identity only — no personal names/emails (this is a public, leak-clean POM). -->
+  <developers>
+    <developer>
+      <id>mantlekeep</id>
+      <name>The MantleKeep Project</name>
+      <url>https://github.com/mantlekeep</url>
+    </developer>
+  </developers>
+
   <scm>
     <url>https://github.com/mantlekeep/mantlekeep</url>
     <connection>scm:git:https://github.com/mantlekeep/mantlekeep.git</connection>
+    <developerConnection>scm:git:https://github.com/mantlekeep/mantlekeep.git</developerConnection>
   </scm>
 
   <!--
@@ -178,7 +189,10 @@
   </build>
 
   <!-- Same host + coordinates as the Gradle publish, so either build produces the
-       identical GAV. Credentials come from ~/.m2/settings.xml (server id below). -->
+       identical GAV. Credentials come from ~/.m2/settings.xml (server id below).
+       This is the DEFAULT deploy target: `mvn deploy` (no profile) publishes here,
+       so a Maven-shop host keeps its GitHub Packages path. The `release` profile
+       below re-routes deploy to the Central Portal instead (see its comments). -->
   <distributionManagement>
     <repository>
       <id>github</id>
@@ -186,4 +200,96 @@
       <url>https://maven.pkg.github.com/mantlekeep/mantlekeep</url>
     </repository>
   </distributionManagement>
+
+  <!--
+    Maven Central release profile — ACTIVE ONLY under `-P release` (never in a normal
+    build/deploy). It layers on the four things the Central Portal requires that a plain
+    build does not: a sources jar, a javadoc jar, GPG signatures on every artifact, and
+    upload to the Central Portal. Run in CI as:
+
+        mvn -B -P release -DskipTests deploy
+
+    Sources jar: already produced UNCONDITIONALLY by the top-level build (the
+    `attach-sources` execution above, matching Gradle's withSourcesJar()), so every
+    release build carries it — no source-plugin execution is repeated here (a second
+    jar-no-fork binding would double-attach the same classifier and fail the deploy).
+
+    Central is IMMUTABLE per coordinate: a released GAV can never be replaced. autoPublish
+    is therefore false — CI only UPLOADS the signed bundle; a human clicks "Publish" in the
+    portal after review. Never publish an -rc/-SNAPSHOT coordinate as a release.
+  -->
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <!-- Javadoc jar — Central REJECTS a release without one. doclint off so a
+               lint nit can never break a publish, but a REAL javadoc jar is produced. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.11.2</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <phase>package</phase>
+                <goals><goal>jar</goal></goals>
+                <configuration>
+                  <doclint>none</doclint>
+                  <quiet>true</quiet>
+                  <failOnError>false</failOnError>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- GPG signatures on every artifact — Central requires them. The passphrase is
+               read non-interactively from the MAVEN_GPG_PASSPHRASE env var (never a literal);
+               loopback pinentry lets it sign in a headless CI runner. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+          </plugin>
+
+          <!-- The DEFAULT deploy (GitHub Packages, via distributionManagement above) is
+               skipped under release: this profile has ONLY Central credentials in CI, so a
+               GitHub-Packages deploy would 401. Central Portal is the sole target here. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-deploy-plugin</artifactId>
+            <configuration>
+              <skip>true</skip>
+            </configuration>
+          </plugin>
+
+          <!-- Uploads the signed bundle to the Central Portal (server id `central` in
+               ~/.m2/settings.xml). autoPublish=false → upload only; a human publishes. -->
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.7.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
