@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.0-rc.7] — 2026-08-05
+
+### Added
+
+- **`SagaRecorder.dispatched(operationId, subject, detail)`** — a first-class saga step for the
+  ROUTING phase: between `requested` and `executed`, for when execution is dispatched (routed to an
+  executor such as an in-zone agent) rather than run in-process. Records `step="dispatched"`,
+  `status="routed"`; `detail` carries the routing target. Products modelling an async/routed phase
+  record it instead of overloading `executed`.
+
+### Fixed
+
+- Removed a stray build binary (`mantlekeep-control/mantlekeep`) accidentally tracked, and gitignored it.
+
 ## [0.1.0-rc.6] — 2026-08-04
 
 ### Changed
