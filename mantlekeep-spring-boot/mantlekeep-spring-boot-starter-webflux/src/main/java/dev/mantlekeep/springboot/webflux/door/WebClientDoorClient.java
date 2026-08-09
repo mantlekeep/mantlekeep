@@ -80,6 +80,11 @@ public class WebClientDoorClient implements DoorClient {
                         ? Mono.just(decision)
                         : Mono.error(new DoorException(
                                 "door denied intent '" + intent.action() + "'", decision)))
+                // Fail closed on a HUNG door: bound the wait at the client using its configured
+                // responseTimeout (default 10s). A timeout is a transport failure (no decision), so it
+                // maps to a DoorException below and the governed method never runs. This guarantee is
+                // intrinsic to the client, independent of how the injected WebClient was built.
+                .timeout(properties.responseTimeout())
                 .onErrorMap(ex -> ex instanceof DoorException ? ex
                         : new DoorException("door call failed for '" + intent.action() + "'", ex));
     }
