@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-08-09
+
+Patch — the door client now fails **closed** on a hung door.
+
+### Fixed
+- **`WebClientDoorClient` now applies its `responseTimeout`** (default 10s, `mantlekeep.door.response-timeout`).
+  The property was declared but never applied, so a HUNG door — one that never answers, as opposed to erroring —
+  would hang the governed call instead of failing closed. A timeout is now treated as a transport failure and
+  mapped to a `DoorException`, so the governed method never runs while the door is unresponsive.
+
+### Adopt
+- Bump `0.1.0 → 0.1.1`. **No API change, no new required config** (safe default) — a pure, drop-in patch.
+
 ## [0.1.0] — 2026-08-05
 
 First stable release. Consolidates the rc.1–rc.7 line into the `0.1.0` API.

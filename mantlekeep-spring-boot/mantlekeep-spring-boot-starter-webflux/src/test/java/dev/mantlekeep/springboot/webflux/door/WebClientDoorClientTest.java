@@ -9,6 +9,7 @@ import dev.mantlekeep.door.model.Decision;
 import dev.mantlekeep.door.model.Intent;
 import dev.mantlekeep.springboot.door.DoorException;
 import dev.mantlekeep.springboot.door.DoorProperties;
+import java.time.Duration;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -88,5 +89,21 @@ class WebClientDoorClientTest {
         StepVerifier.create(client.submit(Intent.of("loop.propose", "draft")))
                 .expectError(DoorException.class)
                 .verify();
+    }
+
+    @Test
+    void aHungDoorFailsClosedWithinTheResponseTimeout() {
+        // 0.1.1: submit() now APPLIES its responseTimeout. A hung door (never answers) must fail CLOSED —
+        // a DoorException within the timeout — not hang. Prove-fail-first: without .timeout() in submit(),
+        // Mono.never() never completes and this verify() times out.
+        DoorProperties fast = new DoorProperties(
+                "http://door.local", "/api/govern", "", "session-service", null, null, null, Duration.ofMillis(50));
+        WebClient webClient = WebClient.builder().baseUrl(fast.baseUrl())
+                .exchangeFunction(request -> Mono.never()).build();
+        WebClientDoorClient client = new WebClientDoorClient(webClient, fast);
+
+        StepVerifier.create(client.submit(Intent.of("session.deploy", "deploy a session")))
+                .expectError(DoorException.class)
+                .verify(Duration.ofSeconds(2));
     }
 }
