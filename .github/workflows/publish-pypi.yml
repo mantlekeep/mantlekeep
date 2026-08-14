@@ -38,7 +38,7 @@ jobs:
       - name: build sdist + wheel
         working-directory: sdks/python
         run: |
-          python -m pip install --upgrade build
+          python -m pip install build==1.2.2
           python -m build
       - name: publish to PyPI (API token)
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1

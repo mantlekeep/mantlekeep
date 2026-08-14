@@ -26,6 +26,11 @@ Go **stdlib CVEs**. Go-only; no API change.
   off-by-default (`Options.DevLogin`), and already set `HttpOnly` + `SameSite=Lax`.
 
 ### CI — keep it CVE-clean by construction
+- **Pinned CI tool + build versions** (SonarQube **S8545 / S8544**, supply-chain). The `go install`
+  security tools are pinned exact — gosec `v2.28.0`, staticcheck `v0.7.0`, govulncheck `v1.7.0` — and
+  the PyPI `build` is pinned, instead of `@latest` / unpinned. A compromised upstream `@latest` can no
+  longer enter the pipeline silently; Dependabot bumps them under the gate. (govulncheck's vuln DB is
+  still fetched live, so pinning the tool does not blind it.)
 - **Weekly security re-scan** (`security.yml` cron) so a CVE disclosed *after* the last commit reds the
   gate within the week, on unchanged code — not only on the next push.
 - **Dependabot** opens weekly dependency + pinned-Action update PRs; the security gate proves each bump
