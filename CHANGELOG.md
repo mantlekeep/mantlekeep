@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-08-14
+
+Patch — hardens the Go engine against a consumer's **SonarQube Quality Gate**. Go-only; no API change.
+
+### Security
+- **No audit DB opened in a predictable shared-temp path** (SonarQube **S5443**). Three sites opened
+  an audit/door DB at `os.TempDir()/<fixed-name>`; each now creates a unique **owner-only** directory
+  via `os.MkdirTemp("", "…-*")` and removes it on exit — closing a symlink / pre-create race on a
+  world-writable path. Sites: `cmd/mantlekeep`, `cmd/acme-govern`, `internal/app`.
+- **Dev-login session cookie is now always `Secure`** (SonarQube cookie security hotspot). It was
+  `Secure: request.TLS != nil`; it is now a literal `true`. Browsers still store a `Secure` cookie for
+  `http://localhost`, so the loopback dev-login path is unaffected; this cookie is dev-only,
+  off-by-default (`Options.DevLogin`), and already set `HttpOnly` + `SameSite=Lax`.
+
+### Adopt
+- Bump `0.1.1 → 0.1.2`. **Go module only** — dual tag `v0.1.2` + `mantlekeep-control/v0.1.2`. No Java
+  re-publish (no findings in the Java surface). Drop-in; no API change, no new required config.
+
 ## [0.1.1] — 2026-08-09
 
 Patch — the door client now fails **closed** on a hung door.
