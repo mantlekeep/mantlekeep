@@ -60,10 +60,12 @@ func main() {
 	// 3. The SAME door as the stock binary — assembled through the public seam.
 	//    Nothing here is branded: the brand is the face, never the engine.
 	ctx := context.Background()
-	auditPath := filepath.Join(os.TempDir(), "acme-govern-audit.db")
-	_ = os.Remove(auditPath)
+	// Unique 0700 dir, not a predictable shared-temp name (avoids a symlink/pre-create attack).
+	dir, err := os.MkdirTemp("", "acme-govern-*")
+	must(err)
+	defer func() { _ = os.RemoveAll(dir) }()
 
-	door, err := doorkit.NewInMemoryDoor(auditPath)
+	door, err := doorkit.NewInMemoryDoor(filepath.Join(dir, "audit.db"))
 	must(err)
 	defer func() { _ = door.Audit.(interface{ Close() error }).Close() }()
 

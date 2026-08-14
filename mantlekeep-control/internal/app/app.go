@@ -77,9 +77,12 @@ func New(ctx context.Context, opts ...Option) (*App, error) {
 		a.policy = policy.NewFailsafe(policy.NewRBAC())
 	}
 	if a.audit == nil {
-		p := filepath.Join(os.TempDir(), "mantlekeep-sdk-audit.db")
-		_ = os.Remove(p)
-		aud, err := audit.Open(p)
+		// Unique 0700 dir, not a predictable shared-temp name (avoids a symlink/pre-create attack).
+		dir, err := os.MkdirTemp("", "mantlekeep-sdk-*")
+		if err != nil {
+			return nil, err
+		}
+		aud, err := audit.Open(filepath.Join(dir, "audit.db"))
 		if err != nil {
 			return nil, err
 		}

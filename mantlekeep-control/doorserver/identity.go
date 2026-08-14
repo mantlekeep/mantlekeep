@@ -128,16 +128,17 @@ func (s *Server) handleDevLogin(writer http.ResponseWriter, request *http.Reques
 	}
 
 	token := s.sessions.create(body.User)
-	// Secure follows the transport: set whenever this dev-login is served over TLS, and only omitted
-	// on the plain-local-HTTP dev path (a Secure cookie would never be stored there). This cookie
-	// exists ONLY on the credential-free dev-login path (registered solely when Options.DevLogin is
-	// set); HttpOnly + SameSite=Lax are always set, and the dev session is not a production credential.
-	http.SetCookie(writer, &http.Cookie{ // #nosec G124 -- Secure follows transport (set under TLS); gosec wants a literal true, which the plain-HTTP dev-login path cannot use. Dev-only, credential-free, HttpOnly+SameSite set.
+	// Secure is ALWAYS set — the cookie is only ever sent back over HTTPS. Browsers still store a
+	// Secure cookie for http://localhost, so the dev-login path (served on loopback) keeps working;
+	// a non-loopback plain-HTTP deployment of dev-login is unsupported by design. This cookie exists
+	// ONLY on the credential-free dev-login path (registered solely when Options.DevLogin is set);
+	// HttpOnly + SameSite=Lax are always set, and the dev session is not a production credential.
+	http.SetCookie(writer, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   request.TLS != nil,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 	writeJSON(writer, http.StatusOK, map[string]any{"user": body.User})
