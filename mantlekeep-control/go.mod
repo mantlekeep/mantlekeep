@@ -1,6 +1,6 @@
 module github.com/mantlekeep/mantlekeep/mantlekeep-control
 
-go 1.26.4
+go 1.26.6
 
 require go.etcd.io/bbolt v1.5.0
 

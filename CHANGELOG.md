@@ -7,9 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [0.1.2] — 2026-08-14
 
-Patch — hardens the Go engine against a consumer's **SonarQube Quality Gate**. Go-only; no API change.
+Patch — a **security-hygiene** release: clears a consumer's **SonarQube Quality Gate** and a batch of
+Go **stdlib CVEs**. Go-only; no API change.
 
 ### Security
+- **Go toolchain bumped `1.26.4 → 1.26.6`** (go.mod `go` directive + CI). Clears four `govulncheck`
+  standard-library advisories reachable from the engine — **GO-2026-6090 / 6089 / 5972** (crypto/tls,
+  net/http, encoding/asn1; fixed in 1.26.6) and **GO-2026-5856** (crypto/tls; fixed in 1.26.5). With
+  `GOTOOLCHAIN=auto` a consumer on an older 1.26 patch auto-fetches 1.26.6 — no manual step. Verified:
+  `govulncheck ./...` → *No vulnerabilities found*.
 - **No audit DB opened in a predictable shared-temp path** (SonarQube **S5443**). Three sites opened
   an audit/door DB at `os.TempDir()/<fixed-name>`; each now creates a unique **owner-only** directory
   via `os.MkdirTemp("", "…-*")` and removes it on exit — closing a symlink / pre-create race on a
@@ -18,6 +24,12 @@ Patch — hardens the Go engine against a consumer's **SonarQube Quality Gate**.
   `Secure: request.TLS != nil`; it is now a literal `true`. Browsers still store a `Secure` cookie for
   `http://localhost`, so the loopback dev-login path is unaffected; this cookie is dev-only,
   off-by-default (`Options.DevLogin`), and already set `HttpOnly` + `SameSite=Lax`.
+
+### CI — keep it CVE-clean by construction
+- **Weekly security re-scan** (`security.yml` cron) so a CVE disclosed *after* the last commit reds the
+  gate within the week, on unchanged code — not only on the next push.
+- **Dependabot** opens weekly dependency + pinned-Action update PRs; the security gate proves each bump
+  CVE-clean before it can merge (automation proposes, the gate decides).
 
 ### Adopt
 - Bump `0.1.1 → 0.1.2`. **Go module only** — dual tag `v0.1.2` + `mantlekeep-control/v0.1.2`. No Java

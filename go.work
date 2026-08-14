@@ -1,6 +1,6 @@
 // Go workspace — lets every go command run from the repo root (build, test, vet)
 // without cd-ing into the module. mantlekeep-control is also a standalone module:
 // building from inside it works exactly the same.
-go 1.26.4
+go 1.26.6
 
 use ./mantlekeep-control
