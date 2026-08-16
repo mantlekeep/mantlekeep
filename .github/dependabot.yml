@@ -1,0 +1,48 @@
+version: 2
+
+# "Always keep it updated." Dependabot opens weekly PRs so a patched dependency or a newer pinned
+# GitHub Action never lags silently. The security.yml gate (govulncheck + gosec + FindSecBugs) runs
+# on each PR, so a bump only merges once it is proven CVE-clean — automation proposes, the gate decides.
+# Note: Dependabot bumps module dependencies and Actions; the Go TOOLCHAIN itself (go.mod `go`
+# directive + GO_VERSION) is bumped by hand when the weekly security scan flags a stdlib CVE.
+updates:
+  # Go module — the engine's dependency surface (kept deliberately tiny).
+  - package-ecosystem: gomod
+    directory: /mantlekeep-control
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # Pinned GitHub Actions (we pin by SHA) — keep them current and re-pinned.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  # Java SDK (Gradle).
+  - package-ecosystem: gradle
+    directory: /sdks/java
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+
+  # Spring Boot starter family (Gradle).
+  - package-ecosystem: gradle
+    directory: /mantlekeep-spring-boot
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+
+  # Python SDK.
+  - package-ecosystem: pip
+    directory: /sdks/python
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"

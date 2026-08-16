@@ -13,9 +13,10 @@ permissions:
   contents: read
 
 env:
-  # 1.26.5+ clears two stdlib-only advisories present in 1.26.4 (crypto/tls, os) while honouring
-  # the module's `go 1.26.4` directive. No project dependency is affected by them.
-  GO_VERSION: "1.26.x"
+  # Pinned to go1.26.6 — the patched toolchain that clears the crypto/tls, net/http and
+  # encoding/asn1 stdlib advisories (GO-2026-6090/6089/5972/5856) govulncheck flags on 1.26.4.
+  # Kept in lockstep with mantlekeep-control/go.mod's `go` directive; bump both on the next CVE.
+  GO_VERSION: "1.26.6"
 
 jobs:
   go:
@@ -33,11 +34,11 @@ jobs:
         run: go vet ./...
       - name: staticcheck
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
           "$(go env GOPATH)/bin/staticcheck" ./...
       - name: govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           "$(go env GOPATH)/bin/govulncheck" ./...
       - name: go test
         run: go test ./...

@@ -49,9 +49,12 @@ func main() {
 
 	ctx := context.Background()
 
-	dbPath := filepath.Join(os.TempDir(), "mantlekeep-audit.db")
-	_ = os.Remove(dbPath)
-	aud, err := audit.Open(dbPath)
+	// Unique 0700 dir (not a predictable shared-temp name) — avoids a symlink/pre-create attack on
+	// the audit file. os.MkdirTemp creates it owner-only; we clean it up on exit.
+	dir, err := os.MkdirTemp("", "mantlekeep-*")
+	must(err)
+	defer func() { _ = os.RemoveAll(dir) }()
+	aud, err := audit.Open(filepath.Join(dir, "audit.db"))
 	must(err)
 	defer aud.Close()
 

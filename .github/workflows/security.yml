@@ -10,6 +10,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Weekly re-scan on UNCHANGED code: a stdlib/dependency CVE disclosed after the last commit only
+  # surfaces on a push otherwise. This makes "keep the framework CVE-clean" self-maintaining — a new
+  # advisory reds this gate within the week, prompting a toolchain/dep bump even with no code change.
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
 
 permissions:
   contents: read
@@ -18,8 +23,10 @@ env:
   # java-core binds the Rust ABI via java.lang.foreign (release 22) and the spring-boot family
   # targets a Java 25 toolchain — 25 satisfies both and is auto-detected for the toolchain.
   JAVA_VERSION: "25"
-  # Matches ci.yml: 1.26.5+ clears two stdlib-only advisories present in 1.26.4.
-  GO_VERSION: "1.26.x"
+  # Pinned to the exact patched toolchain, not a floating "1.26.x": go1.26.6 clears the crypto/tls,
+  # net/http and encoding/asn1 stdlib advisories (GO-2026-6090/6089/5972/5856) that govulncheck flags
+  # on 1.26.4. Bump this in lockstep with mantlekeep-control/go.mod's `go` directive on the next CVE.
+  GO_VERSION: "1.26.6"
 
 jobs:
   java-security:
@@ -54,15 +61,15 @@ jobs:
       # gosec — security-focused static analysis; exits non-zero on any finding.
       - name: gosec
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           "$(go env GOPATH)/bin/gosec" ./...
       # staticcheck — correctness/lint that also catches unsafe patterns.
       - name: staticcheck
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
           "$(go env GOPATH)/bin/staticcheck" ./...
       # govulncheck — fails on any KNOWN CVE reachable from the code.
       - name: govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           "$(go env GOPATH)/bin/govulncheck" ./...
