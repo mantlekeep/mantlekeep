@@ -9,7 +9,7 @@ plugins {
     id 'java-library'
     // SpotBugs static analysis + FindSecBugs security detectors. BUILD-only: drags nothing
     // into the published jars. Applied to every java-library module in allprojects below.
-    id 'com.github.spotbugs' version '6.5.9' apply false
+    id 'com.github.spotbugs' version '6.5.10' apply false
 }
 
 // MantleKeep's Java SDK uses ONLY the JDK (java.net.http) — no external dependencies,
