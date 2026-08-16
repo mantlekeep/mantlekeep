@@ -37,7 +37,7 @@ jobs:
       - name: note when unconfigured
         if: ${{ env.SONAR_TOKEN == '' }}
         run: echo "SONAR_TOKEN not set — skipping. See this file's header for one-time setup."
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.SONAR_TOKEN != '' }}
         with:
           # Sonar needs full history to attribute new-code / blame; a shallow clone weakens the gate.
