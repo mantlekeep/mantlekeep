@@ -39,8 +39,10 @@ Go **stdlib CVEs**. Go-only; no API change.
   CVE-clean before it can merge (automation proposes, the gate decides).
 
 ### Adopt
-- Bump `0.1.1 → 0.1.2`. **Go module only** — dual tag `v0.1.2` + `mantlekeep-control/v0.1.2`. No Java
-  re-publish (no findings in the Java surface). Drop-in; no API change, no new required config.
+- Bump `0.1.1 → 0.1.2`. **Go module only** — tag `mantlekeep-control/v0.1.2`. The bare `v0.1.2` is
+  intentionally **not** cut: it would trigger the Java Maven Central publish, but the Java surface is
+  unchanged (no findings there) and stays `0.1.1`. Go resolves `@v0.1.2` through the prefixed tag.
+  Drop-in; no API change, no new required config.
 
 ## [0.1.1] — 2026-08-09
 
