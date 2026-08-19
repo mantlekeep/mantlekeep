@@ -1,8 +1,9 @@
 name: security
 
-# The permanent security gate. Every push and PR to main is scanned in BOTH languages before it
-# can land: the Java surface with SpotBugs + FindSecBugs (security detectors), the Go engine with
-# gosec, staticcheck, and govulncheck. Any finding — or any known CVE — fails the job. This runs
+# The permanent security gate. Every push and PR to main is scanned in ALL THREE languages before
+# it can land: the Java surface with SpotBugs + FindSecBugs (security detectors), the Go engine with
+# gosec, staticcheck, and govulncheck, and the Rust crates with clippy + cargo-audit. Any finding —
+# or any known CVE — fails the job. This runs
 # alongside ci.yml (the build/test gate); keeping security in its own workflow makes a red gate
 # read as "unsafe to adopt", not "the build broke".
 on:
@@ -27,6 +28,9 @@ env:
   # net/http and encoding/asn1 stdlib advisories (GO-2026-6090/6089/5972/5856) that govulncheck flags
   # on 1.26.4. Bump this in lockstep with mantlekeep-control/go.mod's `go` directive on the next CVE.
   GO_VERSION: "1.26.6"
+  # Pinned so a toolchain bump is a reviewed commit, not a silent change in what clippy accepts —
+  # a new stable can add lints that red this gate with no code change. Raise it deliberately.
+  RUST_VERSION: "1.96.1"
 
 jobs:
   java-security:
@@ -73,3 +77,38 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           "$(go env GOPATH)/bin/govulncheck" ./...
+
+  rust-security:
+    name: rust — clippy · cargo-audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/mantlekeep
+    # Rust carries its own gate because CodeQL cannot cover it: GitHub's default setup rejects
+    # `rust` outright (actions, c-cpp, csharp, go, java-kotlin, javascript-typescript, python,
+    # ruby, swift only). Without this job the Rust tree — which is where the sovereign kernel
+    # lands — would be the one component with no static analysis at all, while the Security tab
+    # still read as green. A gate nothing runs is worse than no gate, because it is believed.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # rustup ships on the runner image, so pinning the toolchain here adds no third-party
+      # action to the supply chain — the same reason the Go job installs its tools with `go
+      # install` rather than a marketplace action.
+      - name: toolchain
+        run: |
+          rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy
+          rustup default "${RUST_VERSION}"
+      # clippy — lint and unsafe-pattern analysis. `-D warnings` is the gate: any lint fails the
+      # job, matching gosec's exit-non-zero-on-any-finding on the Go side. --all-targets covers
+      # tests and benches, where unsafe code is as real as it is in src/.
+      - name: clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      # cargo-audit — fails on any advisory affecting the LOCKED dependency graph: vulnerabilities
+      # (the default), plus unsound APIs and yanked crates, which are defects with a known fix.
+      # Deliberately NOT `--deny warnings`, which also reds the gate on UNMAINTAINED crates —
+      # those have no fix to apply, so they would block every branch on an upstream that may
+      # never move, and a gate a team cannot keep green is a gate it learns to bypass.
+      - name: cargo-audit
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit --deny unsound --deny yanked
