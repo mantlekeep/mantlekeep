@@ -23,6 +23,7 @@ extend MantleKeep. It is licensed under **Apache-2.0**.
 | Path | What it is |
 |------|------------|
 | `mantlekeep-control/` | The **core** — a generic Go governance engine. The one door, the hash-chain audit, the policy/RBAC resolver, the orchestrator/saga spine, and the port interfaces. Knows zero product, action, environment, or role names. |
+| `mantlekeep-kafka/` | The **Kafka adapter** — applies an approved grant to an Apache Kafka cluster. Two deliberately asymmetric operations: `OnboardTeam` (rare, gated — PREFIXED ACLs + a byte-rate quota, and no `CREATE`) and `Provision` (frequent, instant — one topic inside a namespace the team already owns). Its own Go module, so the Kafka client never enters the core. |
 | `sdks/java/` | The **Java SDK** — a config-driven door client (`MantlekeepClient`), the adapter SPI, an in-memory store adapter, an allow-list policy adapter, and a Spring Boot starter. The socket products plug into. |
 | `mantlekeep-spring-boot/` | The **Spring Boot starter family** — reactive (WebFlux) door client, the `@MantlekeepIntent` aspect, identity resolution, and an AI/agent starter (BYOK adapter behind a port). |
 | `docs/build-your-first-product.md`, `docs/examples/FirstProduct.java` | The **worked example** — a runnable tutorial that builds a governed product against the SDK (write a `WorkerPort`, wire the door, submit intents). This is MantleKeep's example. |
@@ -67,7 +68,7 @@ Requires Go 1.26+.
 git clone https://github.com/mantlekeep/mantlekeep.git
 cd mantlekeep
 
-# From the repo root (a go.work covers the module):
+# From the repo root (a go.work covers the modules):
 go build -o mantlekeep ./mantlekeep-control/cmd/mantlekeep
 go test ./mantlekeep-control/...
 
@@ -85,6 +86,11 @@ On Windows use `.\` and an `.exe` name — `go build -o mantlekeep.exe .\cmd\man
 Two rules worth knowing: pass the **package path** (`./cmd/mantlekeep`), not just `-o`; and
 from the repo root, patterns must name the module (`./mantlekeep-control/...`) — a bare
 `./...` at the root matches no module and fails.
+
+**One module per dependency tree.** The core links only bbolt; each adapter module
+(`mantlekeep-kafka/`, and any that follow) carries its own heavy client dependency. That is
+what keeps a CVE — or a registry quarantine — in an adapter's tree from blocking the
+engine's build, and it is enforced by the dependency guard in CI, per module.
 
 The smoke demo submits a batch of intents to the door, prints each verdict, and
 verifies the audit hash-chain is intact — then runs the orchestrator spine, including

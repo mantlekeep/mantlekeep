@@ -43,6 +43,32 @@ jobs:
       - name: go test
         run: go test ./...
 
+  go-kafka:
+    name: go (kafka adapter) — vet · staticcheck · govulncheck · test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mantlekeep-kafka
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+          "$(go env GOPATH)/bin/staticcheck" ./...
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+          "$(go env GOPATH)/bin/govulncheck" ./...
+      # No broker is started, and none is needed: the cluster is behind an interface, so
+      # every rule in the adapter is decided without one.
+      - name: go test
+        run: go test ./...
+
   go-dep-guard:
     name: go — near-zero-dependency guard
     runs-on: ubuntu-latest
@@ -51,8 +77,14 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: dependency count guard
+      # The core's budget is 1 (bbolt) and must stay there. This is the check that proves
+      # an adapter's client library did not creep into the engine.
+      - name: dependency count guard — core
         run: bash scripts/check-deps.sh mantlekeep-control
+      # The Kafka adapter's own budget: the core, plus the three franz-go modules (kadm,
+      # kerr via franz-go, kmsg). Raise it in a commit that says why.
+      - name: dependency count guard — kafka adapter
+        run: MANTLEKEEP_DEP_BASELINE=4 bash scripts/check-deps.sh mantlekeep-kafka
 
   java-gradle:
     name: java — gradle build (sdk + spring-boot)
