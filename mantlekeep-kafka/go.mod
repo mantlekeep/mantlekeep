@@ -23,4 +23,3 @@ require (
 // `replace` applies only to the main module, so a downstream consumer of this module
 // still resolves the required version from the proxy — this cannot leak a local path
 // into someone else's build.
-replace github.com/mantlekeep/mantlekeep/mantlekeep-control => ../mantlekeep-control
