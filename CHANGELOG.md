@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-29
+
+Minor — the first **adapter module**. `mantlekeep-kafka` applies an already approved grant to an Apache
+Kafka cluster; the engine itself is untouched (`mantlekeep-control` is byte-identical to 0.1.2 and still
+links only bbolt). Additive throughout — nothing that already shipped changed shape. A minor rather than
+a patch because a new module, with a new dependency tree and a new surface to adopt, is more than a
+patch admits to.
+
 ### Added
 - **`mantlekeep-kafka` — the governed-grant adapter for Apache Kafka.** A new Go module, sibling to
   `mantlekeep-control`, that applies an **already approved** grant to a Kafka cluster through the
@@ -38,6 +46,50 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
   dependency tree separately from the engine's. **No broker is required to run the tests**: the
   cluster sits behind an `Admin` interface, so prefix refusal, ACL shape, quota shape and
   already-exists idempotency are all decided — and asserted — without one.
+
+### Security — the Rust tree is no longer unanalysed
+- **clippy and cargo-audit now gate the Rust crates** (`security.yml`, merged as **#15**). Rust was the
+  one tree in this repository with no static analysis at all. CodeQL cannot cover it — GitHub's default
+  setup accepts actions, c-cpp, csharp, go, java-kotlin, javascript-typescript, python, ruby and swift,
+  and rejects `rust` outright — so turning on code scanning left the Security tab reading green over an
+  unanalysed crate. That is the worst shape a control can have: believed, and enforcing nothing. It
+  matters more as the sovereign kernel lands there, since that is the component whose whole job is
+  containing untrusted code.
+  - **clippy** runs `-D warnings` over `--all-targets`, matching gosec's exit-non-zero-on-any-finding on
+    the Go side; tests and benches are included because unsafe code is as real there as in `src/`.
+  - **cargo-audit** fails on vulnerabilities, unsound APIs and yanked crates — defects with a known fix.
+    Deliberately **not** `--deny warnings`, which also reds the gate on *unmaintained* crates: those have
+    no fix to apply, so they would block every branch on an upstream that may never move, and a gate a
+    team cannot keep green is a gate it learns to bypass.
+  - The toolchain is **pinned** (a new stable can add lints that red the gate with no code change) and
+    installed with rustup, which ships on the runner image — so this adds no third-party action to the
+    supply chain, the same reason the Go job uses `go install` rather than a marketplace action.
+  - Both gates were verified to **fail before being trusted to pass**: clippy exit 101 on a planted
+    `ptr_arg` lint and 0 once reverted; cargo-audit exit 1 on RUSTSEC-2020-0071 in a synthetic lockfile
+    and 0 on ours.
+
+### Not verified — the adapter has never met a broker
+- **`mantlekeep-kafka` has never been run against a live Kafka cluster.** Say it plainly, because the
+  test count does not. Every test in the module runs against a **fake admin client** behind the `Admin`
+  interface: prefix refusal, the ACL shape, `CREATE`'s absence, the quota shape, the apply order,
+  read-back-over-echo and already-exists idempotency are all asserted without a broker — and the
+  already-exists mapping is asserted against Kafka's real `TOPIC_ALREADY_EXISTS` error value rather than
+  a stub. So the **decisions** are proven. What is **not** proven is the wire behaviour of the franz-go
+  calls against a real cluster: the `franz/` package is the untested edge. It needs an integration run
+  against a broker before anyone puts it in front of production, and this release does not claim
+  otherwise.
+
+### Adopt
+- Bump `0.1.2 → 0.2.0`. **Go only**, and one new tag: **`mantlekeep-kafka/v0.2.0`**. Nothing else needs
+  a tag — the engine has not changed since `mantlekeep-control/v0.1.2` and stays there, which is exactly
+  what `mantlekeep-kafka/go.mod` already requires.
+- The bare `v0.2.0` is intentionally **not** cut, for the reason it was skipped at 0.1.2: it triggers the
+  Maven Central and PyPI publishes, and both the Java (`0.1.1`) and Python (`0.1.1`) surfaces are
+  unchanged. A coordinate on either registry is immutable and must not be spent on a no-op.
+- **Nothing to adopt if you do not use Kafka.** Existing consumers of `mantlekeep-control` are entirely
+  unaffected: the engine did not change, and the adapter's dependency tree never enters their build.
+- **If you do:** `go get github.com/mantlekeep/mantlekeep/mantlekeep-kafka@v0.2.0`, and read the
+  "not verified" note above before you rely on it.
 
 ## [0.1.2] — 2026-08-14
 
