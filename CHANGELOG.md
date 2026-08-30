@@ -68,6 +68,27 @@ patch admits to.
     `ptr_arg` lint and 0 once reverted; cargo-audit exit 1 on RUSTSEC-2020-0071 in a synthetic lockfile
     and 0 on ours.
 
+### Added — provenance: the framework records HOW a fact was learned
+
+A governance system frequently cannot observe what it governs. The zone is air-gapped and
+nothing crosses live; work ran on a worker that reports its own result; the clusters belong to
+another control plane and no credentials exist for them. A fact still has to be recorded, and
+the honest question is not whether to record it but whether the record admits how it was
+obtained.
+
+`Provenance`, `Observation`, `Observed`, `ReportedBy`, `Prefer` and `Disagree` make that
+structural. Four rules, each tested by breaking it first:
+
+- a reported observation MUST name the principal that reported it — an anonymous report cannot
+  be attributed, corrected or disbelieved, and recording one as fact launders a guess
+- testimony never claims to be verified; flattening the two lets a report be read as proof
+- firsthand evidence always wins over testimony, even when the testimony is newer. A platform
+  that prefers the convenient source has become a record of what it was told
+- a disagreement between evidence and testimony is a FINDING, kept rather than resolved. It is
+  the only signal that a reporter's records are wrong
+
+Additive: no existing type or signature changed.
+
 ### Not verified — the adapter has never met a broker
 - **`mantlekeep-kafka` has never been run against a live Kafka cluster.** Say it plainly, because the
   test count does not. Every test in the module runs against a **fake admin client** behind the `Admin`
