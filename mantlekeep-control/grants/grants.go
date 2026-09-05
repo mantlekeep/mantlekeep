@@ -44,9 +44,29 @@ type Grants struct {
 	ApprovalActions []string `json:"approval_actions"`
 }
 
-// Load reads the grant document: the MANTLEKEEP_POLICY_GRANTS override if set, else the embedded
-// default.
+// Load reads the grant document and composes the three layers onto it: the embedded (or
+// overridden) baseline, then IT's PLATFORM policy — which is exempt from the seal and
+// DEFINES it — then each PRODUCT doc, which is subject to it.
 func Load() (*Grants, error) {
+	g, err := baselineGrants()
+	if err != nil {
+		return nil, err
+	}
+	sealed, err := applyPlatformLayer(g)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyProductLayers(g, sealed); err != nil {
+		return nil, err
+	}
+	return g, nil
+}
+
+// baselineGrants reads the starting document — the MANTLEKEEP_POLICY_GRANTS override if set,
+// else the embedded default — as a value the layers above can merge onto. RoleActions is
+// guaranteed non-nil: a document that simply omits the key (`{}` is enough) unmarshals it
+// as nil, and the platform merge's first write to a nil map panics.
+func baselineGrants() (*Grants, error) {
 	doc := defaultDoc
 	if v := os.Getenv(EnvOverride); v != "" {
 		b, err := readOverride(v)
@@ -62,49 +82,73 @@ func Load() (*Grants, error) {
 	if g.RoleActions == nil {
 		g.RoleActions = map[string][]string{}
 	}
-	// LAYER 1 — the IT-owned PLATFORM policy (MANTLEKEEP_PLATFORM_POLICY): the sealing layer, EXEMPT from
-	// the seal. Its grants + approval actions merge in; its sealed_actions become the seal the product
-	// layer must respect. Absent ⇒ no platform grants (fail-closed).
-	sealed := map[string]bool{}
-	if plat, err := platformDoc(); err != nil {
-		return nil, fmt.Errorf("policy grants: %w", err)
-	} else if plat != nil {
-		for role, acts := range plat.RoleActions {
-			// Auto-seal every verb the platform GRANTS: a product may never grant a platform
-			// action, even if IT forgot to list it in sealed_actions. Fail CLOSED, not open —
-			// the seal cannot depend on IT remembering a list.
-			for _, a := range acts {
-				sealed[a] = true
-			}
-			g.RoleActions[role] = unionStrings(g.RoleActions[role], acts)
-		}
-		g.ApprovalActions = unionStrings(g.ApprovalActions, plat.ApprovalActions)
-		// sealed_actions ADDS extra sealed verbs — ones IT forbids products from granting even
-		// though the platform itself does not grant them.
-		for _, a := range plat.SealedActions {
-			sealed[a] = true
-		}
-	}
+	return &g, nil
+}
 
-	// LAYER 2 — the PRODUCT docs (MANTLEKEEP_POLICY_DIR): SUBJECT to the seal. A product may add ONLY its
-	// own actions; if it grants a sealed platform action, the load FAILS FAST — a policy reaching for
-	// platform power is noticed, not silently trimmed.
-	docs, err := productDocs()
+// applyPlatformLayer merges LAYER 1 — the IT-owned PLATFORM policy
+// (MANTLEKEEP_PLATFORM_POLICY) — and returns the SEAL it defines.
+//
+// The seal is the point: every verb the platform GRANTS is sealed automatically, so a
+// product may never grant a platform action even if IT forgot to list it in
+// sealed_actions. Fail CLOSED, not open — the seal cannot depend on IT remembering a list.
+// sealed_actions then ADDS verbs IT forbids products from granting even though the
+// platform itself does not grant them.
+//
+// Absent ⇒ no platform grants and an empty seal (fail-closed: an action no one is granted
+// is denied anyway).
+func applyPlatformLayer(g *Grants) (map[string]bool, error) {
+	sealed := map[string]bool{}
+	plat, err := platformDoc()
 	if err != nil {
 		return nil, fmt.Errorf("policy grants: %w", err)
 	}
+	if plat == nil {
+		return sealed, nil
+	}
+	for role, acts := range plat.RoleActions {
+		for _, a := range acts {
+			sealed[a] = true
+		}
+		g.RoleActions[role] = unionStrings(g.RoleActions[role], acts)
+	}
+	g.ApprovalActions = unionStrings(g.ApprovalActions, plat.ApprovalActions)
+	for _, a := range plat.SealedActions {
+		sealed[a] = true
+	}
+	return sealed, nil
+}
+
+// applyProductLayers merges LAYER 2 — the PRODUCT docs (MANTLEKEEP_POLICY_DIR), which are
+// SUBJECT to the seal. A product may add ONLY its own actions; granting a sealed platform
+// action FAILS THE LOAD — a policy reaching for platform power is noticed, not silently
+// trimmed.
+func applyProductLayers(g *Grants, sealed map[string]bool) error {
+	docs, err := productDocs()
+	if err != nil {
+		return fmt.Errorf("policy grants: %w", err)
+	}
 	for _, d := range docs {
 		for role, acts := range d.RoleActions {
-			for _, a := range acts {
-				if sealed[a] {
-					return nil, fmt.Errorf("product policy %q grants sealed platform action %q (role %q) — a product may not grant a platform verb", d.Source, a, role)
-				}
+			if err := refuseSealedActions(d.Source, role, acts, sealed); err != nil {
+				return err
 			}
 			g.RoleActions[role] = unionStrings(g.RoleActions[role], acts)
 		}
 		g.ApprovalActions = unionStrings(g.ApprovalActions, d.ApprovalActions)
 	}
-	return &g, nil
+	return nil
+}
+
+// refuseSealedActions is the seal itself, in one place: the refusal a product doc earns by
+// granting a verb the platform owns. Named so the rule is one thing a reader can find,
+// rather than a condition buried in the merge loop.
+func refuseSealedActions(source, role string, acts []string, sealed map[string]bool) error {
+	for _, a := range acts {
+		if sealed[a] {
+			return fmt.Errorf("product policy %q grants sealed platform action %q (role %q) — a product may not grant a platform verb", source, a, role)
+		}
+	}
+	return nil
 }
 
 // MustLoad is Load or panic — used where a malformed grant document is a configuration/build

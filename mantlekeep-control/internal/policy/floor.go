@@ -37,57 +37,101 @@ func admitFloor(ladder RoleLadder, action string, params map[string]any, roles [
 func evalFloorRule(ladder RoleLadder, rule grants.FloorRule, params map[string]any, roles []mantlekeep.Role) string {
 	switch rule.Kind {
 	case "allowlist":
-		// The value must be a listed member. Absent/empty fails closed.
-		if !floorContains(rule.Values, floorParamString(params, rule.Param)) {
-			return rule.Message
-		}
+		return denyUnlessValueIsListed(rule, params)
 	case "prefix_allowlist":
-		// A named value must start with an approved prefix; an empty value skips the rule.
-		if v := floorParamString(params, rule.Param); v != "" && !floorHasPrefix(v, rule.Values) {
-			return rule.Message
-		}
+		return denyUnlessValueCarriesAnApprovedPrefix(rule, params)
 	case "required_pattern_when_in":
-		// When another param is in a set, the named value must contain a required pattern; an
-		// empty value skips the rule.
-		v := floorParamString(params, rule.Param)
-		if v != "" && floorContains(rule.WhenIn, floorParamString(params, rule.WhenParam)) &&
-			!strings.Contains(v, rule.Pattern) {
-			return rule.Message
-		}
+		return denyUnlessRequiredPatternIsPresent(rule, params)
 	case "capped_map":
-		// Every entry in the request map must have a configured cap AND be at or below it. An
-		// uncapped, NON-STRING, or unparseable entry fails closed — a value sent as a JSON number
-		// (not a k8s-quantity string) is refused, matching providers/floor.rego where q() is
-		// undefined for a non-string and the entry becomes a violation. Dropping non-strings here
-		// would let a numeric value skip its cap.
-		for res, raw := range floorParamRawMap(params, rule.Param) {
-			cap, ok := rule.Caps[res]
-			if !ok {
-				return rule.Message + " (" + res + " has no configured cap)"
-			}
-			want, isString := raw.(string)
-			if !isString {
-				return rule.Message + " (non-string quantity for " + res + ")"
-			}
-			le, ok := quantityLessOrEqual(want, cap)
-			if !ok {
-				return rule.Message + " (unparseable quantity for " + res + ")"
-			}
-			if !le {
-				return rule.Message + " (" + res + "=" + want + " exceeds cap " + cap + ")"
-			}
-		}
+		return denyUnlessEveryEntryIsWithinItsCap(rule, params)
 	case "require_approval_when":
 		// Never a deny, and stated here rather than left to the default so a reader is not
 		// left wondering whether it was forgotten. It is evaluated by approvalGate, AFTER
-		// every deny rule — including this loop — has finished.
+		// every deny rule — including this switch — has finished.
 	case "required_role_when":
-		// When a param equals a trigger value, the caller must hold a role at least as senior as
-		// the required one (uses the core's generic authority ranking).
-		if floorWhenMatches(params, rule.WhenParam, rule.WhenValue) &&
-			!ladder.holdsAtLeast(rolesToStrings(roles), mantlekeep.Role(rule.Role)) {
-			return rule.Message
+		return denyUnlessCallerHoldsTheRequiredRole(ladder, rule, params, roles)
+	}
+	// An unknown kind is not a deny: the data may name a rule a newer engine understands,
+	// and an old binary must not start refusing everything it has not met.
+	return ""
+}
+
+// denyUnlessValueIsListed: the value must be a listed member. Absent/empty fails CLOSED —
+// an absent value is not "no opinion", it is simply not on the list.
+func denyUnlessValueIsListed(rule grants.FloorRule, params map[string]any) string {
+	if !floorContains(rule.Values, floorParamString(params, rule.Param)) {
+		return rule.Message
+	}
+	return ""
+}
+
+// denyUnlessValueCarriesAnApprovedPrefix: a named value must start with an approved
+// prefix; an empty value SKIPS the rule (unlike allowlist above — the rule constrains the
+// shape of a value that was supplied, it does not require one).
+func denyUnlessValueCarriesAnApprovedPrefix(rule grants.FloorRule, params map[string]any) string {
+	if v := floorParamString(params, rule.Param); v != "" && !floorHasPrefix(v, rule.Values) {
+		return rule.Message
+	}
+	return ""
+}
+
+// denyUnlessRequiredPatternIsPresent: when another param is in a set, the named value must
+// contain a required pattern; an empty value skips the rule.
+func denyUnlessRequiredPatternIsPresent(rule grants.FloorRule, params map[string]any) string {
+	v := floorParamString(params, rule.Param)
+	if v != "" && floorContains(rule.WhenIn, floorParamString(params, rule.WhenParam)) &&
+		!strings.Contains(v, rule.Pattern) {
+		return rule.Message
+	}
+	return ""
+}
+
+// denyUnlessEveryEntryIsWithinItsCap: every entry in the request map must clear the cap
+// check. The first entry that does not is the refusal — map iteration order is random, so
+// which one is reported can vary between runs when several are bad; that they are refused
+// does not.
+func denyUnlessEveryEntryIsWithinItsCap(rule grants.FloorRule, params map[string]any) string {
+	for resource, raw := range floorParamRawMap(params, rule.Param) {
+		if reason := denyUnlessEntryIsWithinItsCap(rule, resource, raw); reason != "" {
+			return reason
 		}
+	}
+	return ""
+}
+
+// denyUnlessEntryIsWithinItsCap judges ONE entry. Every way of not being comparable is a
+// refusal, not a skip: an uncapped, NON-STRING, or unparseable entry fails CLOSED. A value
+// sent as a JSON number (not a k8s-quantity string) is refused, matching
+// providers/floor.rego where q() is undefined for a non-string and the entry becomes a
+// violation. Dropping non-strings here would let a numeric value skip its cap.
+func denyUnlessEntryIsWithinItsCap(rule grants.FloorRule, resource string, raw any) string {
+	limit, capped := rule.Caps[resource]
+	if !capped {
+		return rule.Message + " (" + resource + " has no configured cap)"
+	}
+	want, isString := raw.(string)
+	if !isString {
+		return rule.Message + " (non-string quantity for " + resource + ")"
+	}
+	withinCap, comparable := quantityLessOrEqual(want, limit)
+	if !comparable {
+		return rule.Message + " (unparseable quantity for " + resource + ")"
+	}
+	if !withinCap {
+		return rule.Message + " (" + resource + "=" + want + " exceeds cap " + limit + ")"
+	}
+	return ""
+}
+
+// denyUnlessCallerHoldsTheRequiredRole: when a param equals a trigger value, the caller
+// must hold a role at least as senior as the required one, per THIS deployment's ladder —
+// so a seniority floor keeps working when the tiers are renamed.
+func denyUnlessCallerHoldsTheRequiredRole(ladder RoleLadder, rule grants.FloorRule,
+	params map[string]any, roles []mantlekeep.Role) string {
+
+	if floorWhenMatches(params, rule.WhenParam, rule.WhenValue) &&
+		!ladder.holdsAtLeast(rolesToStrings(roles), mantlekeep.Role(rule.Role)) {
+		return rule.Message
 	}
 	return ""
 }

@@ -133,31 +133,46 @@ func (r *RBAC) WithDynamic(a ActionAuthorizer) *RBAC { r.dyn = a; return r }
 // imports no provider.
 func (r *RBAC) WithProviders(ps ...PolicyProvider) *RBAC {
 	for _, p := range ps {
+		// A deployable may wire an adapter conditionally and pass nil when it is not built in.
 		if p == nil {
 			continue
 		}
 		r.providers = append(r.providers, p)
-		if r.byAction == nil {
-			r.byAction = map[string]PolicyProvider{}
-		}
-		for _, a := range p.Actions() {
-			r.byAction[a] = p
-		}
-		if r.providerRoleActions == nil {
-			r.providerRoleActions = map[string]map[string]bool{}
-		}
-		for role, acts := range p.RoleActions() {
-			m := r.providerRoleActions[string(role)]
-			if m == nil {
-				m = map[string]bool{}
-				r.providerRoleActions[string(role)] = m
-			}
-			for _, a := range acts {
-				m[a] = true
-			}
-		}
+		r.indexProviderActions(p)
+		r.foldInProviderRoleActions(p)
 	}
 	return r
+}
+
+// indexProviderActions records which provider OWNS each action, so a decision on that
+// action routes to that provider's Admit — the product's attribute floor.
+func (r *RBAC) indexProviderActions(p PolicyProvider) {
+	if r.byAction == nil {
+		r.byAction = map[string]PolicyProvider{}
+	}
+	for _, a := range p.Actions() {
+		r.byAction[a] = p
+	}
+}
+
+// foldInProviderRoleActions merges the provider's role grants into the engine's own role
+// check, so a product's actions are authorized by the SAME rule as the core's — one engine,
+// not two. Grants ACCUMULATE: several products may grant the same role different actions,
+// and a later provider must never drop an earlier one's.
+func (r *RBAC) foldInProviderRoleActions(p PolicyProvider) {
+	if r.providerRoleActions == nil {
+		r.providerRoleActions = map[string]map[string]bool{}
+	}
+	for role, acts := range p.RoleActions() {
+		granted := r.providerRoleActions[string(role)]
+		if granted == nil {
+			granted = map[string]bool{}
+			r.providerRoleActions[string(role)] = granted
+		}
+		for _, a := range acts {
+			granted[a] = true
+		}
+	}
 }
 
 // WithScopes wires per-scope resolution: each decision reads the intent's Scope (a generic
