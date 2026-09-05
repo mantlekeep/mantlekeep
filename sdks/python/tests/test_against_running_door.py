@@ -130,12 +130,13 @@ class AgainstRunningDoorTest(unittest.TestCase):
             ran["executed"] = True
             return "done"
 
+        # Built outside the assertRaises block: only worker.run is under test, so a
+        # DecisionError from anywhere else cannot be mistaken for the deny.
+        denied = Intent(action="job.run", resource="project/demo", goal="x", subject="dev-alice")
+
         # A denied action must never execute the work — the whole point of decide-then-dispatch.
         with self.assertRaises(DecisionError):
-            worker.run(
-                Intent(action="job.run", resource="project/demo", goal="x", subject="dev-alice"),
-                effect,
-            )
+            worker.run(denied, effect)
         self.assertFalse(ran["executed"], "work ran despite a deny — governance was bypassed")
 
     def test_governed_worker_runs_work_on_allow(self):
