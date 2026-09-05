@@ -95,7 +95,7 @@ func TestWithProvidersSkipsNilProviders(t *testing.T) {
 
 func TestWithProvidersReturnsTheReceiverToChain(t *testing.T) {
 	r := NewRBAC()
-	if got := r.WithProviders(fakeProvider{name: "x"}); got != r {
+	if r.WithProviders(fakeProvider{name: "x"}) != r {
 		t.Error("WithProviders did not return the receiver, so the builder chain breaks")
 	}
 }
