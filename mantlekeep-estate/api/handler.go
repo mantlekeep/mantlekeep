@@ -1,4 +1,4 @@
-// Package web is the estate API — a thin transport adapter over the estate control plane.
+// Package api is the estate's HTTP transport — a thin adapter, not a UI.
 //
 // It parses, resolves WHO is calling, delegates, and encodes the answer. It decides nothing.
 // Every governance question belongs to the [estate.Manager] behind it, which submits each change
@@ -9,7 +9,7 @@
 // routing queries through it buries them in traffic — an auditor reading the chain would have
 // to find a handful of changes among thousands of page loads. So writes go through the manager
 // and reads go straight to the service.
-package web
+package api
 
 import (
 	"encoding/json"

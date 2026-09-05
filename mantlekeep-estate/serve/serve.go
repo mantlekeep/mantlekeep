@@ -24,10 +24,10 @@ import (
 	"time"
 
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/api"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/config"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/doorclient"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/fleet"
-	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/web"
 )
 
 // Options are what a binary chooses that is not read from configuration.
@@ -160,7 +160,7 @@ func Run(options Options) error {
 	}()
 
 	mux := http.NewServeMux()
-	web.New(manager, service, web.HeaderCallers{}).Routes(mux)
+	api.New(manager, service, api.HeaderCallers{}).Routes(mux)
 
 	server := &http.Server{
 		Addr:              *addr,
