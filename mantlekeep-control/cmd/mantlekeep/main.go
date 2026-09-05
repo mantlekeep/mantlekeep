@@ -96,7 +96,12 @@ func main() {
 			fmt.Printf("  ✗ %-9s %-22s %-22s DENIED  — %v\n", in.Subject.ID, in.Action, in.ID, err)
 			continue
 		}
-		fmt.Printf("  ✓ %-9s %-22s %-22s ALLOWED — token %s…\n", in.Subject.ID, in.Action, in.ID, tok.Value[:8])
+		// The INTENT id, never the token. Value is the capability the door issued; a
+		// prefix of it is still a fragment of a live credential, and stdout in a container
+		// is a log aggregator. The intent id identifies the same decision and can be looked
+		// up on the chain, which the token cannot.
+		fmt.Printf("  ✓ %-9s %-22s %-22s ALLOWED — intent %s\n",
+			in.Subject.ID, in.Action, in.ID, tok.IntentID)
 	}
 
 	ok, err := aud.Verify(ctx)
@@ -120,7 +125,7 @@ func main() {
 		Spec:    mantlekeep.IntentSpec{Goal: "run the generic spine demo"},
 	})
 	must(err)
-	fmt.Printf("  door issued execution token %s… for intent %s\n", token.Value[:8], token.IntentID)
+	fmt.Printf("  door issued an execution token for intent %s\n", token.IntentID)
 
 	runner := demoRunner{}
 	runChain(ctx, "clean run", runner, token, demoDAG(false))
