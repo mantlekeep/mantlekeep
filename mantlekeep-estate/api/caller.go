@@ -8,13 +8,13 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
-// Callers resolves WHO is calling, from the call itself.
+// CallerResolver resolves WHO is calling, from the call itself.
 //
 // An interface because the answer is deployment-specific — a header from a trusted gateway
 // here, a verified JWT there — and because the one thing that must never vary is where the
 // answer comes FROM. It is always the transport. A body-asserted actor is an unauthenticated
 // change wearing a name: the request says "this person did it", and nothing checked.
-type Callers interface {
+type CallerResolver interface {
 	// Caller returns the authenticated subject, or an error when there is none. Absence is an
 	// error rather than an anonymous subject: a request with no identity must fail closed, and
 	// a caller called "anonymous" is one that ends up on the chain as if it were somebody.
@@ -38,7 +38,7 @@ const UserHeader = "X-Caller"
 // rather than the behaviour you get by default.
 type HeaderCallers struct{}
 
-var _ Callers = HeaderCallers{}
+var _ CallerResolver = HeaderCallers{}
 
 // Caller returns the subject named by the header.
 func (HeaderCallers) Caller(request *http.Request) (mantlekeep.Subject, error) {

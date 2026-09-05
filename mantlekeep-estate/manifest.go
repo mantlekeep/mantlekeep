@@ -203,6 +203,11 @@ func ParseManifest(document []byte) (Manifest, error) {
 	return manifest, nil
 }
 
+// validate checks the manifest's own fields, then each section's.
+//
+// Split by section rather than written as one pass: the checks share nothing but the
+// manifest's tier, and a reader asking "what makes an app declaration invalid" should not
+// have to walk past Kafka and Postgres to find out.
 func (m Manifest) validate() error {
 	if !name.MatchString(m.Team) {
 		return fmt.Errorf("manifest: team %q is not a valid name", m.Team)
@@ -214,47 +219,8 @@ func (m Manifest) validate() error {
 		return fmt.Errorf("manifest: tier %q is not one of dev, shared, prod", m.Tier)
 	}
 	for _, app := range m.Apps {
-		if !name.MatchString(app.Name) {
-			return fmt.Errorf("manifest: app %q is not a valid name", app.Name)
-		}
-		if !app.Runtime.wellFormed() {
-			return fmt.Errorf(
-				"manifest: app %q has runtime %q, which is not a valid runtime name — the "+
-					"runtime decides how the platform deploys it, so there is no safe default",
-				app.Name, app.Runtime)
-		}
-		if app.Image == "" {
-			return fmt.Errorf("manifest: app %q needs an image repository", app.Name)
-		}
-		// A tag or digest here would let a team pin what gets deployed, bypassing the digest
-		// the approval binds to. The reference is resolved at approval, not declared.
-		if strings.ContainsAny(app.Image, ":@") {
-			return fmt.Errorf(
-				"manifest: app %q image %q must not carry a tag or digest — the digest is "+
-					"resolved at approval and recorded, so what deploys is what was approved",
-				app.Name, app.Image)
-		}
-		if app.Tier != "" && !app.Tier.valid() {
-			return fmt.Errorf("manifest: app %q has tier %q, not one of dev, shared, prod",
-				app.Name, app.Tier)
-		}
-		if app.Placement.Env == "" {
-			return fmt.Errorf(
-				"manifest: app %q has no placement — it must declare at least an environment, "+
-					"and a residency, so the platform can choose a cluster that is permitted",
-				app.Name)
-		}
-		if app.Placement.Residency == "" {
-			// Silence must not become permission. This is the one refusal whose absence is
-			// unrecoverable: data placed in the wrong jurisdiction cannot be un-placed.
-			return fmt.Errorf(
-				"manifest: app %q declares no residency — a claim nobody has ruled on must not "+
-					"become permission by omission", app.Name)
-		}
-		if app.Tier != "" && app.Tier.rank() < m.Tier.rank() {
-			return fmt.Errorf(
-				"manifest: app %q lowers the tier to %q below the manifest's %q — an item may "+
-					"RAISE its consequence, never lower it", app.Name, app.Tier, m.Tier)
+		if err := m.validateApp(app); err != nil {
+			return err
 		}
 	}
 	if m.Kafka != nil {
@@ -272,18 +238,84 @@ func (m Manifest) validate() error {
 		}
 	}
 	for _, bind := range m.Postgres {
-		if bind.Cluster == "" || bind.Database == "" {
-			return fmt.Errorf("manifest: a postgres binding needs both a cluster and a database")
+		if err := m.validatePostgres(bind); err != nil {
+			return err
 		}
-		if bind.Tier != "" && !bind.Tier.valid() {
-			return fmt.Errorf("manifest: postgres tier %q is not one of dev, shared, prod", bind.Tier)
-		}
-		if bind.Tier != "" && bind.Tier.rank() < m.Tier.rank() {
-			return fmt.Errorf(
-				"manifest: postgres binding %s/%s lowers the tier to %q below the manifest's %q — "+
-					"an item may RAISE its consequence, never lower it",
-				bind.Cluster, bind.Database, bind.Tier, m.Tier)
-		}
+	}
+	return nil
+}
+
+// validateApp checks one app declaration.
+func (m Manifest) validateApp(app App) error {
+	if !name.MatchString(app.Name) {
+		return fmt.Errorf("manifest: app %q is not a valid name", app.Name)
+	}
+	if !app.Runtime.wellFormed() {
+		return fmt.Errorf(
+			"manifest: app %q has runtime %q, which is not a valid runtime name — the "+
+				"runtime decides how the platform deploys it, so there is no safe default",
+			app.Name, app.Runtime)
+	}
+	if app.Image == "" {
+		return fmt.Errorf("manifest: app %q needs an image repository", app.Name)
+	}
+	// A tag or digest here would let a team pin what gets deployed, bypassing the digest the
+	// approval binds to. The reference is resolved at approval, not declared.
+	if strings.ContainsAny(app.Image, ":@") {
+		return fmt.Errorf(
+			"manifest: app %q image %q must not carry a tag or digest — the digest is "+
+				"resolved at approval and recorded, so what deploys is what was approved",
+			app.Name, app.Image)
+	}
+	if err := m.checkTier("app "+app.Name, app.Tier); err != nil {
+		return err
+	}
+	return validatePlacement(app)
+}
+
+// validatePlacement checks an app declared where it belongs, and in which jurisdiction.
+func validatePlacement(app App) error {
+	if app.Placement.Env == "" {
+		return fmt.Errorf(
+			"manifest: app %q has no placement — it must declare at least an environment, "+
+				"and a residency, so the platform can choose a cluster that is permitted",
+			app.Name)
+	}
+	if app.Placement.Residency == "" {
+		// Silence must not become permission. This is the one refusal whose absence is
+		// unrecoverable: data placed in the wrong jurisdiction cannot be un-placed.
+		return fmt.Errorf(
+			"manifest: app %q declares no residency — a claim nobody has ruled on must not "+
+				"become permission by omission", app.Name)
+	}
+	return nil
+}
+
+// validatePostgres checks one database binding.
+func (m Manifest) validatePostgres(bind PostgresBind) error {
+	if bind.Cluster == "" || bind.Database == "" {
+		return fmt.Errorf("manifest: a postgres binding needs both a cluster and a database")
+	}
+	return m.checkTier("postgres binding "+bind.Cluster+"/"+bind.Database, bind.Tier)
+}
+
+// checkTier holds the one rule every section shares: a declared tier must be valid, and it
+// may RAISE consequence but never lower it.
+//
+// Written once because it is a floor. Repeating it per section is how one copy eventually
+// drifts, and the drift would let a team declare a production thing to be a playground and
+// take its gate away.
+func (m Manifest) checkTier(what string, tier Tier) error {
+	if tier == "" {
+		return nil
+	}
+	if !tier.valid() {
+		return fmt.Errorf("manifest: %s has tier %q, not one of dev, shared, prod", what, tier)
+	}
+	if tier.rank() < m.Tier.rank() {
+		return fmt.Errorf(
+			"manifest: %s lowers the tier to %q below the manifest's %q — an item may RAISE "+
+				"its consequence, never lower it", what, tier, m.Tier)
 	}
 	return nil
 }

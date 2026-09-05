@@ -68,6 +68,17 @@ const (
 	OperationUpgradeKubernetes FleetOperation = "upgrade-kubernetes"
 )
 
+// The names the default floor and the fleet's own items use, written once so a rename is a
+// single edit rather than a search — and so a typo in one of them fails to compile rather
+// than silently describing a different thing.
+const (
+	kindControlPlane = "control-plane"
+
+	instanceStandard2 = "standard-2"
+	instanceStandard4 = "standard-4"
+	instanceStandard8 = "standard-8"
+)
+
 // fleetConsequences classifies every operation. This table IS the governance model for
 // runtime changes — everything else in the file reads from it.
 var fleetConsequences = map[FleetOperation]Consequence{
@@ -243,13 +254,13 @@ func DefaultFleetFloor() FleetFloor {
 		NodePool: map[Tier]NodePoolLimits{
 			// A playground may go to zero — that IS the cost saving, and nothing depends on it.
 			TierDev: {MinNodes: 0, MaxNodes: 5,
-				AllowedInstanceTypes: []string{"standard-2", "standard-4"}},
+				AllowedInstanceTypes: []string{instanceStandard2, instanceStandard4}},
 			TierShared: {MinNodes: 1, MaxNodes: 20,
-				AllowedInstanceTypes: []string{"standard-2", "standard-4", "standard-8"}},
+				AllowedInstanceTypes: []string{instanceStandard2, instanceStandard4, instanceStandard8}},
 			// Three is the smallest pool that survives losing a node while still spreading a
 			// replica set; below that, one drain is an outage.
 			TierProd: {MinNodes: 3, MaxNodes: 50,
-				AllowedInstanceTypes: []string{"standard-4", "standard-8", "standard-16"}},
+				AllowedInstanceTypes: []string{instanceStandard4, instanceStandard8, "standard-16"}},
 		},
 		KubernetesVersions: []string{"1.28", "1.29"},
 	}
@@ -315,6 +326,11 @@ func (f FleetManifest) validate() error {
 		return fmt.Errorf("fleet manifest: ingress controller %q is not a valid name",
 			f.IngressController)
 	}
+	return f.validateNodePools()
+}
+
+// validateNodePools checks the pools as a set, which is where the uniqueness rule lives.
+func (f FleetManifest) validateNodePools() error {
 	seen := make(map[string]bool, len(f.NodePools))
 	for _, pool := range f.NodePools {
 		if !name.MatchString(pool.Name) {
@@ -417,8 +433,8 @@ func ResolveFleet(cluster FleetManifest, floor Floor) (Desired, error) {
 	}
 	upgradeTier := TierForFleetOperation(OperationUpgradeKubernetes, cluster.Tier)
 	add(DesiredItem{
-		Asset: "fleet", Kind: "control-plane", Name: cluster.Cluster + "/control-plane",
-		Slot: Slot{Cluster: cluster.Cluster, Name: "control-plane"},
+		Asset: "fleet", Kind: kindControlPlane, Name: cluster.Cluster + "/" + kindControlPlane,
+		Slot: Slot{Cluster: cluster.Cluster, Name: kindControlPlane},
 		Tier: upgradeTier, Gate: floor.GateFor(upgradeTier), Cluster: cluster.Cluster,
 		Limits: ControlPlaneLimits{AllowedKubernetesVersions: floor.Fleet.KubernetesVersions},
 		State:  controlPlaneState,
@@ -505,97 +521,131 @@ func (change FleetChange) AsChange(cluster FleetManifest, floor Floor) (DesiredI
 	tier := TierForFleetOperation(change.Operation, cluster.Tier)
 	item := DesiredItem{Asset: "fleet", Cluster: cluster.Cluster, Tier: tier, Gate: floor.GateFor(tier)}
 
+	// One function per kind of change. The dispatch stays here so the tier and gate above are
+	// applied once, to every operation, and cannot be forgotten by whoever adds the next one.
+	var err error
 	switch change.Operation {
 	case OperationScaleNodePool, OperationChangeNodeInstanceType:
-		pool, found := cluster.pool(change.NodePool)
-		if !found {
-			return DesiredItem{}, fmt.Errorf(
-				"fleet change: cluster %q has no node pool %q", cluster.Cluster, change.NodePool)
-		}
-		item.Kind, item.Name = "node-pool", cluster.Cluster+"/"+pool.Name
-		item.Slot = Slot{Cluster: cluster.Cluster, Name: pool.Name}
-		item.Limits = poolLimits
-		item.State = map[string]string{
-			"nodePoolSize":     strconv.Itoa(pool.Size),
-			"instanceType":     pool.InstanceType,
-			"nodePoolMaxNodes": strconv.Itoa(poolLimits.MaxNodes),
-		}
-		if change.Operation == OperationScaleNodePool {
-			size, err := strconv.Atoi(change.To)
-			if err != nil {
-				return DesiredItem{}, fmt.Errorf(
-					"fleet change: scale %q wants %q nodes, which is not a number",
-					pool.Name, change.To)
-			}
-			if size > poolLimits.MaxNodes || size < poolLimits.MinNodes {
-				return DesiredItem{}, fmt.Errorf(
-					"fleet change: scale %q to %d is outside the %s floor of %d..%d — the floor "+
-						"is what makes a light gate on a reversible change safe",
-					pool.Name, size, cluster.Tier, poolLimits.MinNodes, poolLimits.MaxNodes)
-			}
-			item.State["nodePoolSize"] = strconv.Itoa(size)
-			break
-		}
-		if !poolLimits.allowsInstanceType(change.To) {
-			return DesiredItem{}, fmt.Errorf(
-				"fleet change: instance type %q is not allowed at tier %s (%s)",
-				change.To, cluster.Tier, strings.Join(poolLimits.AllowedInstanceTypes, ", "))
-		}
-		item.State["instanceType"] = change.To
-
+		err = change.applyToNodePool(&item, cluster, poolLimits)
 	case OperationUpgradeKubernetes:
-		if !kubernetesVersion.MatchString(change.To) {
-			return DesiredItem{}, fmt.Errorf(
-				"fleet change: %q is not a pinned kubernetes version", change.To)
-		}
-		if !floor.Fleet.allows(change.To) {
-			return DesiredItem{}, fmt.Errorf(
-				"fleet change: kubernetes %q is not supported by this deployment (%s) — an "+
-					"unlisted version is refused, not defaulted to the nearest supported one",
-				change.To, strings.Join(floor.Fleet.KubernetesVersions, ", "))
-		}
-		if minorRank(change.To) < minorRank(cluster.KubernetesVersion) {
-			return DesiredItem{}, fmt.Errorf(
-				"fleet change: cluster %q is on kubernetes %s and asks for %s — a downgrade is "+
-					"not a rollback: etcd migrations are one-way, so the only way back is a new "+
-					"cluster with every workload migrated onto it",
-				cluster.Cluster, cluster.KubernetesVersion, change.To)
-		}
-		item.Kind, item.Name = "control-plane", cluster.Cluster+"/control-plane"
-		item.Slot = Slot{Cluster: cluster.Cluster, Name: "control-plane"}
-		item.Limits = ControlPlaneLimits{AllowedKubernetesVersions: floor.Fleet.KubernetesVersions}
-		item.State = map[string]string{"kubernetesVersion": change.To}
-
+		err = change.applyToControlPlane(&item, cluster, floor)
 	case OperationChangeStorageClass, OperationSwapNetworkPlugin, OperationSwapIngressController:
-		if !name.MatchString(change.To) {
-			return DesiredItem{}, fmt.Errorf("fleet change: %q is not a valid name", change.To)
-		}
-		item.Kind, item.Name = "cluster", cluster.Cluster
-		item.Slot = Slot{Cluster: cluster.Cluster, Name: "cluster"}
-		item.State = map[string]string{
-			"storageClass":  cluster.StorageClass,
-			"networkPlugin": cluster.NetworkPlugin,
-		}
-		if cluster.IngressController != "" {
-			item.State["ingressController"] = cluster.IngressController
-		}
-		item.State[fieldFor(change.Operation)] = change.To
-
+		err = change.applyToClusterField(&item, cluster)
 	case OperationRegisterCluster, OperationRemoveCluster:
-		item.Kind, item.Name = "cluster", cluster.Cluster
-		item.Slot = Slot{Cluster: cluster.Cluster, Name: "cluster"}
-		// clusterLifecycle is carried for the adapter and the audit record, and is deliberately
-		// NEITHER governed nor watched: a cluster's existence is judged by the item being
-		// absent or unexpected in [Diff], and a field for it as well would report one fact
-		// twice and let the two answers disagree.
-		lifecycle := "registered"
-		if change.Operation == OperationRemoveCluster {
-			lifecycle = "removed"
-		}
-		item.State = map[string]string{"clusterLifecycle": lifecycle}
+		change.applyToClusterLifecycle(&item, cluster)
+	}
+	if err != nil {
+		return DesiredItem{}, err
+	}
+	return item, nil
+}
+
+// applyToNodePool resolves a scale or an instance-type change against the pool's floor.
+func (change FleetChange) applyToNodePool(item *DesiredItem, cluster FleetManifest,
+	poolLimits NodePoolLimits) error {
+
+	pool, found := cluster.pool(change.NodePool)
+	if !found {
+		return fmt.Errorf("fleet change: cluster %q has no node pool %q",
+			cluster.Cluster, change.NodePool)
+	}
+	item.Kind, item.Name = "node-pool", cluster.Cluster+"/"+pool.Name
+	item.Slot = Slot{Cluster: cluster.Cluster, Name: pool.Name}
+	item.Limits = poolLimits
+	item.State = map[string]string{
+		"nodePoolSize":     strconv.Itoa(pool.Size),
+		"instanceType":     pool.InstanceType,
+		"nodePoolMaxNodes": strconv.Itoa(poolLimits.MaxNodes),
 	}
 
-	return item, nil
+	if change.Operation == OperationScaleNodePool {
+		size, err := strconv.Atoi(change.To)
+		if err != nil {
+			return fmt.Errorf("fleet change: scale %q wants %q nodes, which is not a number",
+				pool.Name, change.To)
+		}
+		if size > poolLimits.MaxNodes || size < poolLimits.MinNodes {
+			return fmt.Errorf(
+				"fleet change: scale %q to %d is outside the %s floor of %d..%d — the floor "+
+					"is what makes a light gate on a reversible change safe",
+				pool.Name, size, cluster.Tier, poolLimits.MinNodes, poolLimits.MaxNodes)
+		}
+		item.State["nodePoolSize"] = strconv.Itoa(size)
+		return nil
+	}
+
+	if !poolLimits.allowsInstanceType(change.To) {
+		return fmt.Errorf("fleet change: instance type %q is not allowed at tier %s (%s)",
+			change.To, cluster.Tier, strings.Join(poolLimits.AllowedInstanceTypes, ", "))
+	}
+	item.State["instanceType"] = change.To
+	return nil
+}
+
+// applyToControlPlane resolves a Kubernetes upgrade, which is the one fleet change with no
+// way back: etcd migrations are one-way, so a downgrade is a new cluster, not a rollback.
+func (change FleetChange) applyToControlPlane(item *DesiredItem, cluster FleetManifest,
+	floor Floor) error {
+
+	if !kubernetesVersion.MatchString(change.To) {
+		return fmt.Errorf("fleet change: %q is not a pinned kubernetes version", change.To)
+	}
+	if !floor.Fleet.allows(change.To) {
+		return fmt.Errorf(
+			"fleet change: kubernetes %q is not supported by this deployment (%s) — an "+
+				"unlisted version is refused, not defaulted to the nearest supported one",
+			change.To, strings.Join(floor.Fleet.KubernetesVersions, ", "))
+	}
+	if minorRank(change.To) < minorRank(cluster.KubernetesVersion) {
+		return fmt.Errorf(
+			"fleet change: cluster %q is on kubernetes %s and asks for %s — a downgrade is "+
+				"not a rollback: etcd migrations are one-way, so the only way back is a new "+
+				"cluster with every workload migrated onto it",
+			cluster.Cluster, cluster.KubernetesVersion, change.To)
+	}
+	item.Kind, item.Name = kindControlPlane, cluster.Cluster+"/"+kindControlPlane
+	item.Slot = Slot{Cluster: cluster.Cluster, Name: kindControlPlane}
+	item.Limits = ControlPlaneLimits{AllowedKubernetesVersions: floor.Fleet.KubernetesVersions}
+	item.State = map[string]string{"kubernetesVersion": change.To}
+	return nil
+}
+
+// applyToClusterField resolves a swap of one cluster-wide component.
+//
+// The whole current state travels, not just the field being changed: a reader of the record
+// should see what the cluster WAS, and a diff that carried only the new value could not say
+// what it replaced.
+func (change FleetChange) applyToClusterField(item *DesiredItem, cluster FleetManifest) error {
+	if !name.MatchString(change.To) {
+		return fmt.Errorf("fleet change: %q is not a valid name", change.To)
+	}
+	item.Kind, item.Name = "cluster", cluster.Cluster
+	item.Slot = Slot{Cluster: cluster.Cluster, Name: "cluster"}
+	item.State = map[string]string{
+		"storageClass":  cluster.StorageClass,
+		"networkPlugin": cluster.NetworkPlugin,
+	}
+	if cluster.IngressController != "" {
+		item.State["ingressController"] = cluster.IngressController
+	}
+	item.State[fieldFor(change.Operation)] = change.To
+	return nil
+}
+
+// applyToClusterLifecycle records a cluster arriving or leaving.
+//
+// clusterLifecycle is carried for the adapter and the audit record, and is deliberately
+// NEITHER governed nor watched: a cluster's existence is judged by the item being absent or
+// unexpected in [Diff], and a field for it as well would report one fact twice and let the
+// two answers disagree.
+func (change FleetChange) applyToClusterLifecycle(item *DesiredItem, cluster FleetManifest) {
+	item.Kind, item.Name = "cluster", cluster.Cluster
+	item.Slot = Slot{Cluster: cluster.Cluster, Name: "cluster"}
+	lifecycle := "registered"
+	if change.Operation == OperationRemoveCluster {
+		lifecycle = "removed"
+	}
+	item.State = map[string]string{"clusterLifecycle": lifecycle}
 }
 
 func (f FleetManifest) pool(poolName string) (NodePool, bool) {

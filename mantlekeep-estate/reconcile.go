@@ -259,34 +259,55 @@ func differs(want DesiredItem, got ObservedItem, ownership Ownership) []Differen
 	// Every asset's floor, not just apps. A limit that is applied once and never checked again
 	// is a limit that quietly stops holding: somebody widens a retention or a connection limit
 	// by hand, and the only record says what was approved a year ago.
+	compareLimits(want, got, compare)
+
+	return differences
+}
+
+// compareLimits holds each asset's floor against what is really configured.
+//
+// One case per limits type, and each is a no-op when the observed side is a different type:
+// an adapter reporting the wrong shape is a bug in that adapter, and inventing a difference
+// from it would report drift against a value nobody set.
+func compareLimits(want DesiredItem, got ObservedItem, compare func(field, approved, observed string)) {
 	switch wantLimits := want.Limits.(type) {
 	case AppLimits:
-		if gotLimits, ok := got.Limits.(AppLimits); ok {
-			compare("replicas", fmt.Sprint(wantLimits.Replicas), fmt.Sprint(gotLimits.Replicas))
-			compare("cpuLimit", wantLimits.CPULimit, gotLimits.CPULimit)
-			compare("memoryMiB", fmt.Sprint(wantLimits.MemoryMiB), fmt.Sprint(gotLimits.MemoryMiB))
+		gotLimits, ok := got.Limits.(AppLimits)
+		if !ok {
+			return
 		}
+		compare("replicas", fmt.Sprint(wantLimits.Replicas), fmt.Sprint(gotLimits.Replicas))
+		compare("cpuLimit", wantLimits.CPULimit, gotLimits.CPULimit)
+		compare("memoryMiB", fmt.Sprint(wantLimits.MemoryMiB), fmt.Sprint(gotLimits.MemoryMiB))
+
 	case KafkaLimits:
-		if gotLimits, ok := got.Limits.(KafkaLimits); ok {
-			compare("retention", wantLimits.Retention.String(), gotLimits.Retention.String())
-			compare("producerBytesPerSec", fmt.Sprint(wantLimits.ProducerBytesPerSec),
-				fmt.Sprint(gotLimits.ProducerBytesPerSec))
-			compare("consumerBytesPerSec", fmt.Sprint(wantLimits.ConsumerBytesPerSec),
-				fmt.Sprint(gotLimits.ConsumerBytesPerSec))
+		gotLimits, ok := got.Limits.(KafkaLimits)
+		if !ok {
+			return
 		}
+		compare("retention", wantLimits.Retention.String(), gotLimits.Retention.String())
+		compare("producerBytesPerSec", fmt.Sprint(wantLimits.ProducerBytesPerSec),
+			fmt.Sprint(gotLimits.ProducerBytesPerSec))
+		compare("consumerBytesPerSec", fmt.Sprint(wantLimits.ConsumerBytesPerSec),
+			fmt.Sprint(gotLimits.ConsumerBytesPerSec))
+
 	case PostgresLimits:
-		if gotLimits, ok := got.Limits.(PostgresLimits); ok {
-			compare("connectionLimit", fmt.Sprint(wantLimits.ConnectionLimit),
-				fmt.Sprint(gotLimits.ConnectionLimit))
-			compare("statementTimeout", wantLimits.StatementTimeout.String(),
-				gotLimits.StatementTimeout.String())
+		gotLimits, ok := got.Limits.(PostgresLimits)
+		if !ok {
+			return
 		}
+		compare("connectionLimit", fmt.Sprint(wantLimits.ConnectionLimit),
+			fmt.Sprint(gotLimits.ConnectionLimit))
+		compare("statementTimeout", wantLimits.StatementTimeout.String(),
+			gotLimits.StatementTimeout.String())
+
 	case HarborLimits:
-		if gotLimits, ok := got.Limits.(HarborLimits); ok {
-			compare("robotExpiry", wantLimits.RobotExpiry.String(), gotLimits.RobotExpiry.String())
+		gotLimits, ok := got.Limits.(HarborLimits)
+		if !ok {
+			return
 		}
+		compare("robotExpiry", wantLimits.RobotExpiry.String(), gotLimits.RobotExpiry.String())
 	}
-	return differences
 }
 
 func summarise(differences []Difference) string {

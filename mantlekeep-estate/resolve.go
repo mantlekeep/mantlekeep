@@ -67,140 +67,130 @@ func ResolveWith(m Manifest, floor Floor, placer *Placer, placed map[string]stri
 	return resolve(m, floor, placer, placed)
 }
 
+// resolve walks each asset section in turn.
+//
+// One function per section, rather than one long one: the sections share no state beyond the
+// manifest and the floor, and reading "what does a Kafka declaration become" should not mean
+// scrolling past Postgres to find out. Each returns its own changes so the caller does the
+// appending and no helper can quietly append twice.
 func resolve(m Manifest, floor Floor, placer *Placer, placed map[string]string) (Desired, error) {
 	desired := Desired{Team: m.Team, Owns: m.Owns}
-	add := func(item DesiredItem) { desired.Changes = append(desired.Changes, item) }
 
-	if m.Kafka != nil {
-		limits, ok := floor.Kafka[m.Tier]
-		if !ok {
-			return Desired{}, fmt.Errorf("resolve: no kafka floor configured for tier %q", m.Tier)
+	for _, section := range []func(Manifest, Floor) ([]DesiredItem, error){
+		resolveKafka, resolvePostgres, resolveHarbor,
+	} {
+		changes, err := section(m, floor)
+		if err != nil {
+			return Desired{}, err
 		}
-		// The boundary itself. Its tier is the manifest's, because taking a namespace is a
-		// team-level act however trivial the first topic inside it is.
-		add(DesiredItem{
-			Asset: "kafka", Kind: "boundary", Name: m.Owns + ".", Tier: m.Tier,
-			Gate: floor.GateFor(m.Tier), Cluster: m.Kafka.Cluster, Limits: limits,
-		})
-		for _, topic := range m.Kafka.Topics {
-			tier := m.tierOf(topic)
-			topicLimits, ok := floor.Kafka[tier]
-			if !ok {
-				return Desired{}, fmt.Errorf("resolve: no kafka floor for tier %q", tier)
-			}
-			add(DesiredItem{
-				Asset: "kafka", Kind: "topic", Name: m.Owns + "." + topic.Name, Tier: tier,
-				Gate: floor.GateFor(tier), Cluster: m.Kafka.Cluster, Limits: topicLimits,
-			})
-		}
+		desired.Changes = append(desired.Changes, changes...)
 	}
 
-	for _, bind := range m.Postgres {
-		tier := m.Tier
-		if bind.Tier != "" {
-			tier = bind.Tier
+	apps, err := resolveApps(m, floor, placer, placed)
+	if err != nil {
+		return Desired{}, err
+	}
+	desired.Changes = append(desired.Changes, apps...)
+
+	return desired, nil
+}
+
+// resolveKafka turns a Kafka declaration into a boundary and its topics.
+func resolveKafka(m Manifest, floor Floor) ([]DesiredItem, error) {
+	if m.Kafka == nil {
+		return nil, nil
+	}
+	limits, ok := floor.Kafka[m.Tier]
+	if !ok {
+		return nil, fmt.Errorf("resolve: no kafka floor configured for tier %q", m.Tier)
+	}
+	// The boundary itself. Its tier is the manifest's, because taking a namespace is a
+	// team-level act however trivial the first topic inside it is.
+	changes := []DesiredItem{{
+		Asset: "kafka", Kind: "boundary", Name: m.Owns + ".", Tier: m.Tier,
+		Gate: floor.GateFor(m.Tier), Cluster: m.Kafka.Cluster, Limits: limits,
+	}}
+	for _, topic := range m.Kafka.Topics {
+		tier := m.tierOf(topic)
+		topicLimits, ok := floor.Kafka[tier]
+		if !ok {
+			return nil, fmt.Errorf("resolve: no kafka floor for tier %q", tier)
 		}
+		changes = append(changes, DesiredItem{
+			Asset: "kafka", Kind: "topic", Name: m.Owns + "." + topic.Name, Tier: tier,
+			Gate: floor.GateFor(tier), Cluster: m.Kafka.Cluster, Limits: topicLimits,
+		})
+	}
+	return changes, nil
+}
+
+// resolvePostgres turns each database binding into a governed schema.
+func resolvePostgres(m Manifest, floor Floor) ([]DesiredItem, error) {
+	var changes []DesiredItem
+	for _, bind := range m.Postgres {
+		tier := orTier(bind.Tier, m.Tier)
 		limits, ok := floor.Postgres[tier]
 		if !ok {
-			return Desired{}, fmt.Errorf("resolve: no postgres floor for tier %q", tier)
+			return nil, fmt.Errorf("resolve: no postgres floor for tier %q", tier)
 		}
-		schema := bind.Schema
-		if schema == "" {
-			schema = m.Owns
-		}
-		add(DesiredItem{
+		schema := orName(bind.Schema, m.Owns)
+		changes = append(changes, DesiredItem{
 			Asset: "postgres", Kind: "schema",
 			Name: bind.Database + "." + schema, Tier: tier, Gate: floor.GateFor(tier),
 			Cluster: bind.Cluster, Limits: limits, Readers: bind.Readers,
 		})
 	}
+	return changes, nil
+}
 
-	if m.Harbor != nil {
-		tier := m.Tier
-		if m.Harbor.Tier != "" {
-			tier = m.Harbor.Tier
-		}
-		limits, ok := floor.Harbor[tier]
-		if !ok {
-			return Desired{}, fmt.Errorf("resolve: no harbor floor for tier %q", tier)
-		}
-		project := m.Harbor.Project
-		if project == "" {
-			project = m.Owns
-		}
-		add(DesiredItem{
-			Asset: "harbor", Kind: "project", Name: project, Tier: tier,
-			Gate: floor.GateFor(tier), Limits: limits,
-		})
-		for _, robot := range m.Harbor.Robots {
-			robotTier := m.tierOf(robot)
-			robotLimits, ok := floor.Harbor[robotTier]
-			if !ok {
-				return Desired{}, fmt.Errorf("resolve: no harbor floor for tier %q", robotTier)
-			}
-			add(DesiredItem{
-				Asset: "harbor", Kind: "robot", Name: project + "/" + robot.Name,
-				Tier: robotTier, Gate: floor.GateFor(robotTier), Limits: robotLimits,
-			})
-		}
+// resolveHarbor turns a registry declaration into a project and its robots.
+func resolveHarbor(m Manifest, floor Floor) ([]DesiredItem, error) {
+	if m.Harbor == nil {
+		return nil, nil
 	}
+	tier := orTier(m.Harbor.Tier, m.Tier)
+	limits, ok := floor.Harbor[tier]
+	if !ok {
+		return nil, fmt.Errorf("resolve: no harbor floor for tier %q", tier)
+	}
+	project := orName(m.Harbor.Project, m.Owns)
+	changes := []DesiredItem{{
+		Asset: "harbor", Kind: "project", Name: project, Tier: tier,
+		Gate: floor.GateFor(tier), Limits: limits,
+	}}
+	for _, robot := range m.Harbor.Robots {
+		robotTier := m.tierOf(robot)
+		robotLimits, ok := floor.Harbor[robotTier]
+		if !ok {
+			return nil, fmt.Errorf("resolve: no harbor floor for tier %q", robotTier)
+		}
+		changes = append(changes, DesiredItem{
+			Asset: "harbor", Kind: "robot", Name: project + "/" + robot.Name,
+			Tier: robotTier, Gate: floor.GateFor(robotTier), Limits: robotLimits,
+		})
+	}
+	return changes, nil
+}
 
+// resolveApps turns each app into a placed deployment.
+//
+// It takes the placer because an app is the only section whose target the PLATFORM chooses
+// rather than the team.
+func resolveApps(m Manifest, floor Floor, placer *Placer,
+	placed map[string]string) ([]DesiredItem, error) {
+
+	var changes []DesiredItem
 	for _, app := range m.Apps {
-		tier := m.Tier
-		if app.Tier != "" {
-			tier = app.Tier
-		}
-		byTier, ok := floor.App[app.Runtime]
-		if !ok {
-			return Desired{}, fmt.Errorf(
-				"resolve: runtime %q is not configured — the floor enumerates the runtimes this "+
-					"deployment serves, so an unknown one is refused rather than defaulted",
-				app.Runtime)
-		}
-		// The ENVIRONMENT raises the tier before anything is looked up under it.
-		//
-		// Tier is declared by the team and chooses both the gate and the limits, so without this
-		// a manifest saying tier "dev" with placement.env "prod" got GateNone and dev-sized
-		// limits inside a production cluster — config reaching the guarantee, which is the one
-		// thing the floor exists to prevent. An unruled environment is refused rather than
-		// guessed: an env nobody configured is a gap in the floor, not a licence.
-		minimum, ruled := floor.MinTierFor(app.Placement.Env)
-		if !ruled {
-			return Desired{}, fmt.Errorf(
-				"resolve: app %q targets env %q, which the floor has not ruled on — an "+
-					"environment with no minimum consequence would be governed at whatever "+
-					"tier the request asked for", app.Name, app.Placement.Env)
-		}
-		tier = AtLeast(tier, minimum)
-
-		limits, ok := byTier[tier]
-		if !ok {
-			return Desired{}, fmt.Errorf("resolve: no %q app floor for tier %q", app.Runtime, tier)
-		}
-		// A slot, even for a manifest-declared app. Without one these compare by name and
-		// collide the moment the same app runs in two namespaces — the side-by-side
-		// changeover case. The namespace defaults to the team's own, which is where a
-		// manifest-declared app lives until a promotion puts a second version beside it.
-		if placer == nil {
-			return Desired{}, fmt.Errorf(
-				"resolve: app %q needs a cluster and no fleet was supplied — use ResolveWith; "+
-					"inventing a placement would put data somewhere nobody ruled on", app.Name)
-		}
-		decision, err := placer.Place(app.Placement, placed[app.Name])
+		tier, limits, err := appFloor(m, floor, app)
 		if err != nil {
-			return Desired{}, fmt.Errorf("resolve: app %q: %w", app.Name, err)
+			return nil, err
 		}
-		// The tier was raised against the DECLARED env; placement must have honoured it, or the
-		// item would be governed for one environment and land in another.
-		if decision.Env != "" && decision.Env != app.Placement.Env {
-			return Desired{}, fmt.Errorf(
-				"resolve: app %q was governed for env %q but placed on %q (cluster %q) — the "+
-					"tier floor was applied to the wrong environment",
-				app.Name, app.Placement.Env, decision.Env, decision.Cluster)
+		decision, err := placeApp(app, placer, placed[app.Name])
+		if err != nil {
+			return nil, err
 		}
-
 		deployment := m.Owns + "-" + app.Name
-		add(DesiredItem{
+		changes = append(changes, DesiredItem{
 			Asset: "app", Kind: "deployment", Name: deployment, Tier: tier,
 			Gate: floor.GateFor(tier), Cluster: decision.Cluster, Limits: limits, Image: app.Image,
 			Runtime: string(app.Runtime),
@@ -210,8 +200,80 @@ func resolve(m Manifest, floor Floor, placer *Placer, placed map[string]string) 
 			Placement: &decision,
 		})
 	}
+	return changes, nil
+}
 
-	return desired, nil
+// appFloor resolves the tier an app is governed at, and the limits that tier carries.
+//
+// The ENVIRONMENT raises the tier before anything is looked up under it. Tier is declared by
+// the team and chooses both the gate and the limits, so without this a manifest saying tier
+// "dev" with placement.env "prod" got GateNone and dev-sized limits inside a production
+// cluster — config reaching the guarantee, which is the one thing the floor exists to prevent.
+func appFloor(m Manifest, floor Floor, app App) (Tier, any, error) {
+	byTier, ok := floor.App[app.Runtime]
+	if !ok {
+		return "", nil, fmt.Errorf(
+			"resolve: runtime %q is not configured — the floor enumerates the runtimes this "+
+				"deployment serves, so an unknown one is refused rather than defaulted",
+			app.Runtime)
+	}
+	// An unruled environment is refused rather than guessed: an env nobody configured is a gap
+	// in the floor, not a licence.
+	minimum, ruled := floor.MinTierFor(app.Placement.Env)
+	if !ruled {
+		return "", nil, fmt.Errorf(
+			"resolve: app %q targets env %q, which the floor has not ruled on — an "+
+				"environment with no minimum consequence would be governed at whatever "+
+				"tier the request asked for", app.Name, app.Placement.Env)
+	}
+	tier := AtLeast(orTier(app.Tier, m.Tier), minimum)
+
+	limits, ok := byTier[tier]
+	if !ok {
+		return "", nil, fmt.Errorf("resolve: no %q app floor for tier %q", app.Runtime, tier)
+	}
+	return tier, limits, nil
+}
+
+// placeApp asks the fleet where this app belongs, and checks the answer honoured the
+// environment the tier was raised against.
+func placeApp(app App, placer *Placer, sticky string) (PlacementDecision, error) {
+	// A slot, even for a manifest-declared app. Without one these compare by name and collide
+	// the moment the same app runs in two namespaces — the side-by-side changeover case.
+	if placer == nil {
+		return PlacementDecision{}, fmt.Errorf(
+			"resolve: app %q needs a cluster and no fleet was supplied — use ResolveWith; "+
+				"inventing a placement would put data somewhere nobody ruled on", app.Name)
+	}
+	decision, err := placer.Place(app.Placement, sticky)
+	if err != nil {
+		return PlacementDecision{}, fmt.Errorf("resolve: app %q: %w", app.Name, err)
+	}
+	// The tier was raised against the DECLARED env; placement must have honoured it, or the
+	// item would be governed for one environment and land in another.
+	if decision.Env != "" && decision.Env != app.Placement.Env {
+		return PlacementDecision{}, fmt.Errorf(
+			"resolve: app %q was governed for env %q but placed on %q (cluster %q) — the "+
+				"tier floor was applied to the wrong environment",
+			app.Name, app.Placement.Env, decision.Env, decision.Cluster)
+	}
+	return decision, nil
+}
+
+// orTier returns the declared tier when a section sets one, else the manifest's.
+func orTier(declared, fallback Tier) Tier {
+	if declared != "" {
+		return declared
+	}
+	return fallback
+}
+
+// orName returns the declared name when a section sets one, else the team's own.
+func orName(declared, fallback string) string {
+	if declared != "" {
+		return declared
+	}
+	return fallback
 }
 
 // NeedsGate reports whether anything in this desired state costs human attention. A change set

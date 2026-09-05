@@ -102,45 +102,86 @@ type PlacementDecision struct {
 // pass would migrate live apps whenever capacity shifted — silently, unapproved, and
 // catastrophically for anything holding state. Moving a placed app is a NEW governed decision,
 // never a reconcile outcome.
+// Place chooses a cluster for a claim, in three steps that must stay in this order:
+// legality, then stickiness, then capacity.
+//
+// The order IS the guarantee. Residency filters first and alone, so no amount of capacity
+// pressure elsewhere can push data into the wrong jurisdiction; stickiness comes next, so a
+// running app is never moved by a number; capacity only breaks the remaining tie.
 func (p *Placer) Place(claim Placement, current string) (PlacementDecision, error) {
 	if claim.Env == "" {
 		return PlacementDecision{}, fmt.Errorf("placement: a claim must name an environment")
 	}
 
-	// RESIDENCY FIRST, and alone. Capacity is not consulted until this has filtered, so no
-	// amount of pressure elsewhere can push data into the wrong jurisdiction.
+	legal := p.legalClusters(claim)
+	if len(legal) == 0 {
+		return PlacementDecision{}, fmt.Errorf(
+			"placement: no cluster satisfies env=%q purpose=%q residency=%q — refusing rather "+
+				"than placing somewhere that does not", claim.Env, claim.Purpose, claim.Residency)
+	}
+	considered := namesOf(legal)
+
+	// Sticky: if the app already runs somewhere still legal, it stays. Capacity does not move
+	// a running app; only a human does.
+	if stayed, ok := staysPut(legal, current, considered); ok {
+		return stayed, nil
+	}
+
+	best, found := p.emptiest(legal)
+	if !found {
+		return PlacementDecision{}, fmt.Errorf(
+			"placement: every cluster satisfying env=%q residency=%q is below %.0f%% free — "+
+				"placing there would create pods that never schedule",
+			claim.Env, claim.Residency, p.minFree*100)
+	}
+	return PlacementDecision{Cluster: best.Name, Env: best.Env,
+		Reason: p.reasonFor(best, current), Considered: considered}, nil
+}
+
+// legalClusters filters on the claim alone. Nothing about capacity is consulted here, which
+// is what makes residency unreachable from load.
+func (p *Placer) legalClusters(claim Placement) []Cluster {
 	var legal []Cluster
 	for _, cluster := range p.clusters {
 		if p.legalFor(claim, cluster) {
 			legal = append(legal, cluster)
 		}
 	}
-	if len(legal) == 0 {
-		return PlacementDecision{}, fmt.Errorf(
-			"placement: no cluster satisfies env=%q purpose=%q residency=%q — refusing rather "+
-				"than placing somewhere that does not", claim.Env, claim.Purpose, claim.Residency)
-	}
+	return legal
+}
 
-	considered := make([]string, 0, len(legal))
+// namesOf lists what was considered, sorted, so the recorded reason is the same on every run.
+func namesOf(clusters []Cluster) []string {
+	names := make([]string, 0, len(clusters))
+	for _, cluster := range clusters {
+		names = append(names, cluster.Name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// staysPut returns the current placement when it is still legal.
+func staysPut(legal []Cluster, current string, considered []string) (PlacementDecision, bool) {
+	if current == "" {
+		return PlacementDecision{}, false
+	}
 	for _, cluster := range legal {
-		considered = append(considered, cluster.Name)
-	}
-	sort.Strings(considered)
-
-	// Sticky: if the app already runs somewhere still legal, it stays. Capacity does not move
-	// a running app; only a human does.
-	if current != "" {
-		for _, cluster := range legal {
-			if cluster.Name == current {
-				return PlacementDecision{Cluster: current, Env: cluster.Env,
-					Considered: considered, Sticky: true,
-					Reason: "already placed here and still permitted"}, nil
-			}
+		if cluster.Name == current {
+			return PlacementDecision{Cluster: current, Env: cluster.Env,
+				Considered: considered, Sticky: true,
+				Reason: "already placed here and still permitted"}, true
 		}
 	}
+	return PlacementDecision{}, false
+}
 
-	// Among legal candidates, prefer the one with the most reported room. A cluster below
-	// minFree is skipped: pods that can never schedule look deployed and are not.
+// emptiest picks the legal cluster with the most reported room.
+//
+// A cluster below minFree is skipped: pods that can never schedule look deployed and are not.
+// A cluster with no reported capacity is still a candidate but ranks last — silence about a
+// cluster is not evidence that it is full, and refusing to place on an unmonitored cluster
+// would make observability a prerequisite for deployment.
+func (p *Placer) emptiest(legal []Cluster) (Cluster, bool) {
 	best, bestFree, found := Cluster{}, -1.0, false
 	for _, cluster := range legal {
 		free, known := p.capacity[cluster.Name]
@@ -148,19 +189,18 @@ func (p *Placer) Place(claim Placement, current string) (PlacementDecision, erro
 			continue
 		}
 		if !known {
-			free = 0 // unknown capacity ranks last, but is still a candidate
+			free = 0
 		}
 		if free > bestFree {
 			best, bestFree, found = cluster, free, true
 		}
 	}
-	if !found {
-		return PlacementDecision{}, fmt.Errorf(
-			"placement: every cluster satisfying env=%q residency=%q is below %.0f%% free — "+
-				"placing there would create pods that never schedule",
-			claim.Env, claim.Residency, p.minFree*100)
-	}
+	return best, found
+}
 
+// reasonFor says WHY this cluster, in words that reach the chain. Nobody can answer "why is
+// my app there?" from a decision that recorded only the answer.
+func (p *Placer) reasonFor(best Cluster, current string) string {
 	reason := "the emptiest permitted cluster"
 	if _, known := p.capacity[best.Name]; !known {
 		reason = "permitted; no capacity reported, so chosen by name"
@@ -168,8 +208,7 @@ func (p *Placer) Place(claim Placement, current string) (PlacementDecision, erro
 	if current != "" {
 		reason = "moved: " + reason + " (the previous cluster is no longer permitted)"
 	}
-	return PlacementDecision{Cluster: best.Name, Env: best.Env, Reason: reason,
-		Considered: considered}, nil
+	return reason
 }
 
 // legalFor reports whether a cluster satisfies the claim. Residency is the hard one.

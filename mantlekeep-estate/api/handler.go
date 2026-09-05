@@ -32,12 +32,12 @@ type Handler struct {
 	// service answers reads. It never calls the door — see the package comment.
 	service *estate.Service
 	// callers says who is on the other end of the call, resolved from the transport.
-	callers Callers
+	callers CallerResolver
 }
 
 // New wires the controller to its collaborators. One constructor, everything explicit, so a
 // test hands in exactly the manager, service and identity source it means to exercise.
-func New(manager *estate.Manager, service *estate.Service, callers Callers) *Handler {
+func New(manager *estate.Manager, service *estate.Service, callers CallerResolver) *Handler {
 	return &Handler{manager: manager, service: service, callers: callers}
 }
 

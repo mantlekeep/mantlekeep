@@ -19,45 +19,19 @@ var tiers = []estate.Tier{estate.TierDev, estate.TierShared, estate.TierProd}
 // a quota. That is config reaching the guarantee, so every limit must be POSITIVE — the one
 // exception is a node pool's minimum, where zero is a real choice (a playground may scale to
 // nothing) and the ceiling is the limit that matters.
+// validateFloor checks every tier has a complete, positive floor.
+//
+// One function per asset section rather than one loop doing all of them: the sections share
+// only the tier they are checked at, and a reader asking "what must a Kafka floor declare"
+// should not have to read past Postgres to find out.
 func validateFloor(floor estate.Floor) error {
 	for _, tier := range tiers {
-		limits, ok := floor.Kafka[tier]
-		if !ok {
-			return missing("kafka", tier)
-		}
-		if err := positive("kafka", tier, "producerBytesPerSec", limits.ProducerBytesPerSec); err != nil {
-			return err
-		}
-		if err := positive("kafka", tier, "consumerBytesPerSec", limits.ConsumerBytesPerSec); err != nil {
-			return err
-		}
-		if err := positive("kafka", tier, "retention", int64(limits.Retention)); err != nil {
-			return err
-		}
-
-		postgres, ok := floor.Postgres[tier]
-		if !ok {
-			return missing("postgres", tier)
-		}
-		if err := positive("postgres", tier, "connectionLimit", int64(postgres.ConnectionLimit)); err != nil {
-			return err
-		}
-		if err := positive("postgres", tier, "statementTimeout", int64(postgres.StatementTimeout)); err != nil {
-			return err
-		}
-		if err := positive("postgres", tier, "idleInTransactionTimeout",
-			int64(postgres.IdleInTransactionTimeout)); err != nil {
-			return err
-		}
-
-		harbor, ok := floor.Harbor[tier]
-		if !ok {
-			return missing("harbor", tier)
-		}
-		// A robot account is a long-lived credential with registry write access. An expiry of
-		// zero is a credential that never expires.
-		if err := positive("harbor", tier, "robotExpiry", int64(harbor.RobotExpiry)); err != nil {
-			return err
+		for _, check := range []func(estate.Floor, estate.Tier) error{
+			validateKafkaFloor, validatePostgresFloor, validateHarborFloor,
+		} {
+			if err := check(floor, tier); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -123,6 +97,51 @@ func missing(asset string, tier estate.Tier) error {
 	return fmt.Errorf(
 		"config: the floor has no %s limits for tier %q — every tier must be floored, because a "+
 			"tier with no entry is a tier with no limits", asset, tier)
+}
+
+// validateKafkaFloor checks the throughput and retention a tier is entitled to.
+func validateKafkaFloor(floor estate.Floor, tier estate.Tier) error {
+	limits, ok := floor.Kafka[tier]
+	if !ok {
+		return missing("kafka", tier)
+	}
+	if err := positive("kafka", tier, "producerBytesPerSec", limits.ProducerBytesPerSec); err != nil {
+		return err
+	}
+	if err := positive("kafka", tier, "consumerBytesPerSec", limits.ConsumerBytesPerSec); err != nil {
+		return err
+	}
+	return positive("kafka", tier, "retention", int64(limits.Retention))
+}
+
+// validatePostgresFloor checks the connection and timeout ceilings a tier is entitled to.
+func validatePostgresFloor(floor estate.Floor, tier estate.Tier) error {
+	postgres, ok := floor.Postgres[tier]
+	if !ok {
+		return missing("postgres", tier)
+	}
+	if err := positive("postgres", tier, "connectionLimit",
+		int64(postgres.ConnectionLimit)); err != nil {
+		return err
+	}
+	if err := positive("postgres", tier, "statementTimeout",
+		int64(postgres.StatementTimeout)); err != nil {
+		return err
+	}
+	return positive("postgres", tier, "idleInTransactionTimeout",
+		int64(postgres.IdleInTransactionTimeout))
+}
+
+// validateHarborFloor checks the one thing a registry floor must never leave at zero.
+//
+// A robot account is a long-lived credential with registry write access. An expiry of zero
+// is a credential that never expires.
+func validateHarborFloor(floor estate.Floor, tier estate.Tier) error {
+	harbor, ok := floor.Harbor[tier]
+	if !ok {
+		return missing("harbor", tier)
+	}
+	return positive("harbor", tier, "robotExpiry", int64(harbor.RobotExpiry))
 }
 
 func positive(asset string, tier estate.Tier, field string, value int64) error {

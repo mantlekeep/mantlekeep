@@ -76,24 +76,29 @@ func TestEveryAssetsFloorIsCheckedForDrift(t *testing.T) {
 				Limits: probe.observed,
 			}}}
 
-			drifts := DiffOwned(desired, observed, DefaultOwnership())
-			if len(drifts) != 1 {
-				t.Fatalf("a widened %s must be detected; got %+v", probe.field, drifts)
-			}
-			if !drifts[0].Ungoverned() {
-				t.Fatalf("%s is the floor's own number — widening it is a violation", probe.field)
-			}
-			var named bool
-			for _, difference := range drifts[0].Differences {
-				if difference.Field == probe.field {
-					named = true
-				}
-			}
-			if !named {
-				t.Fatalf("the drift must name %q; got %+v", probe.field, drifts[0].Differences)
-			}
+			assertWideningIsDrift(t, DiffOwned(desired, observed, DefaultOwnership()), probe.field)
 		})
 	}
+}
+
+// assertWideningIsDrift holds the three things a widened floor must produce: exactly one
+// drift, ungoverned rather than correctable, and naming the field that moved. Named so the
+// per-asset cases above read as the list of assets they are, rather than as a loop with
+// assertions buried in it.
+func assertWideningIsDrift(t *testing.T, drifts []Drift, field string) {
+	t.Helper()
+	if len(drifts) != 1 {
+		t.Fatalf("a widened %s must be detected; got %+v", field, drifts)
+	}
+	if !drifts[0].Ungoverned() {
+		t.Fatalf("%s is the floor's own number — widening it is a violation", field)
+	}
+	for _, difference := range drifts[0].Differences {
+		if difference.Field == field {
+			return
+		}
+	}
+	t.Fatalf("the drift must name %q; got %+v", field, drifts[0].Differences)
 }
 
 // GAP 6 — separation of duties was delegated to the door and never demonstrated here. This does
