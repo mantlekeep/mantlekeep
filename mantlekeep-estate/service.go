@@ -119,8 +119,13 @@ type Footprint struct {
 	ObservedAt time.Time `json:"observedAt"`
 	Manifest   Manifest  `json:"manifest"`
 	Desired    Desired   `json:"desired"`
-	Observed   Observed  `json:"observed"`
-	Drifts     []Drift   `json:"drifts"`
+	// Declared reports whether a manifest was found. False means nothing here was ever
+	// approved, so every observed item is unexpected by definition — a materially different
+	// statement from "approved, and this is what drifted", and a caller must be able to say
+	// which one it is looking at.
+	Declared bool     `json:"declared"`
+	Observed Observed `json:"observed"`
+	Drifts   []Drift  `json:"drifts"`
 }
 
 // Manifest returns what a team declared, or [ErrUnknownTeam].
@@ -141,14 +146,34 @@ func (s *Service) Manifest(ctx context.Context, team string) (Manifest, error) {
 // Estate reads a team's declared footprint, resolves it under the floor, observes reality, and
 // reports where they disagree.
 func (s *Service) Footprint(ctx context.Context, team string) (Footprint, error) {
+	// An UNDECLARED team is answered, not refused.
+	//
+	// The first day of any real deployment is an estate that already exists and a manifest
+	// that does not: the question "what is out there that nobody approved?" is the first one
+	// worth asking, and refusing it until something is declared makes the tool useless
+	// precisely when it is most needed. An undeclared team resolves to an empty desired
+	// state, so everything observed surfaces as unexpected — which is the honest answer.
+	//
+	// The distinction ErrUnknownTeam existed to preserve is kept: Declared says whether a
+	// manifest was found, so a caller can still tell "this team has nothing approved" from
+	// "this team approved an empty estate". Both are legitimate; conflating them is what
+	// would make a typo in a URL read as a clean bill of health.
 	manifest, err := s.Manifest(ctx, team)
-	if err != nil {
+	declared := true
+	switch {
+	case errors.Is(err, ErrUnknownTeam):
+		declared = false
+		manifest = Manifest{Team: team, Owns: team}
+	case err != nil:
 		return Footprint{}, err
 	}
 
-	desired, err := ResolveWith(manifest, s.floorOf(), s.placerOf(), s.placedFor(manifest.Team))
-	if err != nil {
-		return Footprint{}, err
+	var desired Desired
+	if declared {
+		desired, err = ResolveWith(manifest, s.floorOf(), s.placerOf(), s.placedFor(manifest.Team))
+		if err != nil {
+			return Footprint{}, err
+		}
 	}
 	observed, err := observeAll(ctx, s.ports, team)
 	if err != nil {
@@ -156,7 +181,7 @@ func (s *Service) Footprint(ctx context.Context, team string) (Footprint, error)
 	}
 
 	footprint := Footprint{
-		Team: team, ObservedAt: s.now().UTC(), Manifest: manifest,
+		Team: team, ObservedAt: s.now().UTC(), Manifest: manifest, Declared: declared,
 		Desired: desired, Observed: observed,
 		Drifts: DiffOwned(desired, observed, s.ownership),
 	}
