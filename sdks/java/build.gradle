@@ -9,26 +9,13 @@ plugins {
     id 'java-library'
     // SpotBugs static analysis + FindSecBugs security detectors. BUILD-only: drags nothing
     // into the published jars. Applied to every java-library module in allprojects below.
-    id 'com.github.spotbugs' version '6.5.11' apply false
+    id 'com.github.spotbugs' version '6.5.10' apply false
 }
 
 // MantleKeep's Java SDK uses ONLY the JDK (java.net.http) — no external dependencies,
 // so it drags nothing into a host's app. Compiled for JDK 17+ bytecode with whatever
 // newer JDK runs the build (release, not toolchain — no JDK auto-download needed).
 compileJava.options.release = 17
-
-tasks.register('resolveAndLockAll') {
-    description = 'Resolves every lockable configuration so --write-locks can record it.'
-    doFirst {
-        if (!gradle.startParameter.writeDependencyLocks) {
-            throw new GradleException('run this with --write-locks, or it records nothing')
-        }
-    }
-    doLast {
-        configurations.findAll { it.canBeResolved }*.resolve()
-    }
-}
-
 
 // Run the example against a live core:  ./gradlew run   (needs `mantlekeep serve` on :8080)
 tasks.register('run', JavaExec) {
@@ -44,16 +31,6 @@ tasks.register('run', JavaExec) {
 // artifact proxy mirrors GitHub Packages exactly as it would Central. Consume with:
 //   implementation "dev.mantlekeep:mantlekeep-spring-boot-starter:0.1.0"
 allprojects {
-    // Dependency locking. The published jars carry no external dependencies at all, so this
-    // locks the BUILD: the test and static-analysis classpaths. Without a lock file those
-    // resolve fresh on every run, which means the analysis that gates a release is not the
-    // same analysis twice — the same argument that pins the Go toolchain in tools/go.mod.
-    //
-    // Regenerate after changing a dependency:  ./gradlew resolveAndLockAll --write-locks
-    dependencyLocking {
-        lockAllConfigurations()
-    }
-
     group = 'dev.mantlekeep'
     version = '0.1.1'
 
