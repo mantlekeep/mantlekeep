@@ -99,7 +99,7 @@ func TestEveryAssetsFloorIsCheckedForDrift(t *testing.T) {
 // GAP 6 — separation of duties was delegated to the door and never demonstrated here. This does
 // not re-implement it: it proves the manager PASSES what the door needs to enforce it, and that
 // a door refusing on those grounds stops the change.
-type sodDoor struct{ approver string }
+type sodDoor struct{}
 
 func (d sodDoor) Submit(_ context.Context, intent mantlekeep.Intent) (mantlekeep.ExecutionToken, error) {
 	// The real door enforces this; here we assert the manager gave it what it needs to.

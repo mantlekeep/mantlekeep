@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/internal/safepath"
 	"os"
 
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
@@ -40,7 +41,11 @@ func Load(path string) ([]estate.Cluster, error) {
 			"fleet: no registry path — a control plane with no fleet can place nothing, and " +
 				"defaulting to an empty one would refuse every app with a confusing message")
 	}
-	content, err := os.ReadFile(path)
+	clean, err := safepath.Clean(path)
+	if err != nil {
+		return nil, fmt.Errorf("fleet: %w", err)
+	}
+	content, err := os.ReadFile(clean) // #nosec G304 -- operator-supplied path, guarded above
 	if err != nil {
 		return nil, fmt.Errorf("fleet: %w", err)
 	}

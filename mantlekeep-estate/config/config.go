@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/internal/safepath"
 	"os"
 
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
@@ -56,7 +57,11 @@ func Load(path string) (Config, error) {
 				"this deployment; set MANTLEKEEP_ESTATE_CONFIG (estate.DefaultFloor is a starting point " +
 				"for authoring that file, not a fallback to govern under)")
 	}
-	content, err := os.ReadFile(path)
+	clean, err := safepath.Clean(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("config: %w", err)
+	}
+	content, err := os.ReadFile(clean) // #nosec G304 -- operator-supplied path, guarded above
 	if err != nil {
 		return Config{}, fmt.Errorf("config: %w", err)
 	}
