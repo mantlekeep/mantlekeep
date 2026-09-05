@@ -76,7 +76,10 @@ func main() {
 		Spec:    mantlekeep.IntentSpec{Goal: "prove the branded binary uses the real door"},
 	})
 	must(err)
-	fmt.Printf("  ALLOW  job.run            → execution token %s…\n", token.Value[:8])
+	// The intent id, not the token: a credential fragment on stdout is a credential
+	// fragment in whatever collects stdout.
+	fmt.Printf("  ALLOW  job.run            → execution token issued for intent %s\n",
+		token.IntentID)
 
 	// A denied action: no goal declared. The floor is in the ENGINE, so a brand
 	// cannot configure its way past it — that is the point of a sealed floor.
