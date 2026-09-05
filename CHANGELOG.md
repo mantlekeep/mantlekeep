@@ -82,6 +82,23 @@ against a pattern; it does not serve the request. `Handle` invited the reader to
 `Handle` method to `Route`; nothing else changes shape. `internal/policy`'s `Source`/`SourceFunc`
 became `Loader`/`LoaderFunc` in the same pass but are internal, so no consumer sees them.
 
+### Security
+
+- **`doorserver.New` refuses a credential-bearing header as the caller-identity header.**
+  `TrustedUserHeader` / `DelegatedSubjectHeader` set to `Authorization`, `Proxy-Authorization`,
+  `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key` or `X-Auth-Token` is now rejected at
+  construction (case-insensitive, whitespace-trimmed) rather than accepted.
+
+  The door records the caller's id as the SUBJECT of every decision — in the console decision
+  log and in the **hash-chained audit record**. Pointing the identity header at a credential
+  header made the door write a live bearer token there as a user id, into an append-only,
+  tamper-evident log where it cannot be redacted afterwards without breaking the chain that
+  proves the record was not edited. A one-character configuration slip with a permanent
+  consequence, so it is now a machine-enforced refusal instead of a documented caution.
+
+  **To adopt:** only a deployment that was already recording credentials as user ids is
+  affected, and it fails fast at startup with a message naming what to set instead.
+
 ### Removed
 
 - **`internal/policy.liveSnapshot`** — it declared `RequiredRole(string) (Role, bool)`, which is
