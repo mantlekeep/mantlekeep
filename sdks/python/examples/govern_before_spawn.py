@@ -16,7 +16,11 @@ from mantlekeep.door.errors import DecisionError, DoorUnavailableError
 # INSIDE the zone — the zone governs its own launches, offline.
 _door = ServiceDoorClient(
     DoorConfig(
-        base_url="http://door.acme.svc:8080",
+        # https, even for a cluster-internal name: the door carries the caller's identity
+        # in a header, and a header on a plaintext hop is readable by anything on the path.
+        # A deployment that terminates TLS at a mesh sidecar can point this at http, but
+        # that is a decision to make deliberately rather than a default to inherit.
+        base_url="https://door.acme.svc:8443",
         # Rename this header for a branded deployment; the door must trust the same name.
         caller_header="X-Acme-User",
     )
