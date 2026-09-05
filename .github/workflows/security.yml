@@ -62,21 +62,58 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
+      - name: build pinned analysis tools
+        env:
+          # The tools module is intentionally OUTSIDE go.work: it exists to build
+          # binaries and must never join the workspace the published modules share.
+          GOWORK: "off"
+        run: |
+          go -C "$GITHUB_WORKSPACE/tools" build -o "$GITHUB_WORKSPACE/bin/" \
+            honnef.co/go/tools/cmd/staticcheck \
+            golang.org/x/vuln/cmd/govulncheck \
+            github.com/securego/gosec/v2/cmd/gosec
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
       # gosec — security-focused static analysis; exits non-zero on any finding.
       - name: gosec
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
-          "$(go env GOPATH)/bin/gosec" ./...
+        run: gosec ./...
       # staticcheck — correctness/lint that also catches unsafe patterns.
       - name: staticcheck
-        run: |
-          go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
-          "$(go env GOPATH)/bin/staticcheck" ./...
+        run: staticcheck ./...
       # govulncheck — fails on any KNOWN CVE reachable from the code.
       - name: govulncheck
+        run: govulncheck ./...
+
+  go-kafka-security:
+    name: go (kafka adapter) — gosec · staticcheck · govulncheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mantlekeep-kafka
+    # The adapter modules are scanned SEPARATELY from the core, which is the whole point of
+    # splitting them: the Kafka client tree is scanned here, and a CVE in it reds this job
+    # without touching the engine's gate or its build.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build pinned analysis tools
+        env:
+          # The tools module is intentionally OUTSIDE go.work: it exists to build
+          # binaries and must never join the workspace the published modules share.
+          GOWORK: "off"
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
-          "$(go env GOPATH)/bin/govulncheck" ./...
+          go -C "$GITHUB_WORKSPACE/tools" build -o "$GITHUB_WORKSPACE/bin/" \
+            honnef.co/go/tools/cmd/staticcheck \
+            golang.org/x/vuln/cmd/govulncheck \
+            github.com/securego/gosec/v2/cmd/gosec
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+      - name: gosec
+        run: gosec ./...
+      - name: staticcheck
+        run: staticcheck ./...
+      - name: govulncheck
+        run: govulncheck ./...
 
   rust-security:
     name: rust — clippy · cargo-audit

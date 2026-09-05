@@ -5,6 +5,40 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+### Added
+- **`mantlekeep-kafka` — the governed-grant adapter for Apache Kafka.** A new Go module, sibling to
+  `mantlekeep-control`, that applies an **already approved** grant to a Kafka cluster through the
+  Admin API. It decides nothing; the door decided before it was called.
+
+  Two operations, and the **asymmetry is the design**:
+  - **`OnboardTeam(boundary)`** — rare, gated. Gives a team a namespace it owns: **PREFIXED** ACLs
+    over its prefix (TOPIC: `READ`/`WRITE`/`DESCRIBE`, GROUP: `READ`) plus a producer/consumer
+    byte-rate **quota** for its principal. **`CREATE` is deliberately not granted** — the team may
+    read and write everything under its prefix and still cannot bring a topic into existence, so
+    topic creation stays a governed act. PREFIXED rather than LITERAL because a literal ACL per
+    topic recreates ACL sprawl and turns every playground topic into a governance event; a golden
+    path slower than the bypass stops being used.
+  - **`Provision(grant)`** — frequent, instant. Creates one topic inside a namespace the team
+    already owns. It grants nothing new (the prefix ACL already covers it), refuses a name outside
+    the granted prefix, and is idempotent: an existing topic is success, not failure.
+
+  Every artifact is **read back** from the cluster (`DescribeACLs` / `DescribeClientQuotas` /
+  `DescribeTopicConfigs`), never echoed from the request — a result reported from its own input is
+  testimony, not evidence. Limits (quota, retention, partitions, replication factor) are **inputs**;
+  the adapter invents none of them.
+
+- **The workspace now holds one module per dependency tree**, with the rule written into `go.work`:
+  the core links only bbolt, and each adapter carries its own heavy client. `mantlekeep-kafka`
+  depends on the core; the core depends on no adapter. A CVE or a registry quarantine in the Kafka
+  tree therefore cannot block the engine's build — proven, not asserted: the dependency guard runs
+  per module in CI and the core's budget stays at **1**.
+
+- **CI and security gates extended to the new module** — `go vet` · staticcheck · govulncheck · test
+  in `ci.yml`, and gosec · staticcheck · govulncheck in `security.yml`, each scanning the adapter's
+  dependency tree separately from the engine's. **No broker is required to run the tests**: the
+  cluster sits behind an `Admin` interface, so prefix refusal, ACL shape, quota shape and
+  already-exists idempotency are all decided — and asserted — without one.
+
 ## [0.1.2] — 2026-08-14
 
 Patch — a **security-hygiene** release: clears a consumer's **SonarQube Quality Gate** and a batch of

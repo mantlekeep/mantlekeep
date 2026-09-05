@@ -1,6 +1,14 @@
 // Go workspace — lets every go command run from the repo root (build, test, vet)
-// without cd-ing into the module. mantlekeep-control is also a standalone module:
+// without cd-ing into the module. Each module here is ALSO a standalone Go module:
 // building from inside it works exactly the same.
+//
+// One module per dependency tree, on purpose. The core (mantlekeep-control) links only
+// bbolt; every adapter module carries its own heavy client dependency, so a CVE — or a
+// registry quarantine — in that tree can never block the core's build. An adapter
+// depends on the core; the core depends on no adapter, and never will.
 go 1.26.6
 
-use ./mantlekeep-control
+use (
+	./mantlekeep-control // the core — generic engine, bbolt only
+	./mantlekeep-kafka   // governed-grant adapter for Apache Kafka (franz-go)
+)
