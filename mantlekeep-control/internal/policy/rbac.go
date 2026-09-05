@@ -97,13 +97,6 @@ type RBAC struct {
 	ladder RoleLadder
 }
 
-// liveSnapshot is the read side of a LiveResolver: the action authorizer read from an atomic
-// snapshot that a watcher can swap. RBAC depends only on this small interface, so the hot-reload
-// machinery stays in dynamic.go.
-type liveSnapshot interface {
-	RequiredRole(action string) (mantlekeep.Role, bool)
-}
-
 // NewRBAC returns the default policy engine, seeded with the built-in role ladder.
 func NewRBAC() *RBAC { return &RBAC{ladder: DefaultRoleLadder()} }
 
@@ -187,7 +180,11 @@ func (r *RBAC) WithResolved(res *Resolved) *RBAC {
 // config change and the very next decision uses the new policy — hot-reload, no restart. The
 // sealed floor is already baked into each swapped snapshot by Resolve(), so live config can
 // never loosen it. Returns the receiver to chain.
-func (r *RBAC) WithLive(l liveSnapshot) *RBAC {
+//
+// It takes an ActionAuthorizer because that is exactly what a LiveResolver is — the read side
+// of the snapshot is the same RequiredRole question WithDynamic asks, answered from a swappable
+// snapshot instead of a fixed one.
+func (r *RBAC) WithLive(l ActionAuthorizer) *RBAC {
 	r.dyn = l
 	return r
 }

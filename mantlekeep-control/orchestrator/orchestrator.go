@@ -9,7 +9,7 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
-// Engine implements mantlekeep.WorkflowEngine over an embedded transport. It refuses
+// Engine implements mantlekeep.WorkflowRunner over an embedded transport. It refuses
 // to run without a valid ExecutionToken (no token, nothing executes), runs steps
 // in dependency order with independent steps concurrent, and on the first failure
 // compensates completed steps in reverse completion order (saga). Every
@@ -20,6 +20,11 @@ type Engine struct {
 	now    func() time.Time
 }
 
+// The doc comment above claims Engine implements the core's WorkflowRunner; this makes
+// the claim enforceable, so a signature drift is a compile error rather than a stale
+// comment. (Same guard the registry uses for its Fetcher adapters.)
+var _ mantlekeep.WorkflowRunner = (*Engine)(nil)
+
 // NewEngine wires a step runner and an event store into the spine.
 func NewEngine(runner StepRunner, events EventStore) *Engine {
 	return &Engine{
@@ -29,7 +34,7 @@ func NewEngine(runner StepRunner, events EventStore) *Engine {
 	}
 }
 
-// Run implements mantlekeep.WorkflowEngine.
+// Run implements mantlekeep.WorkflowRunner.
 func (e *Engine) Run(ctx context.Context, token mantlekeep.ExecutionToken, dag mantlekeep.DAG) (mantlekeep.RunResult, error) {
 	res := mantlekeep.RunResult{DAGName: dag.Name, StartedAt: e.now()}
 

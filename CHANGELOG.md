@@ -39,6 +39,45 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
   cluster sits behind an `Admin` interface, so prefix refusal, ACL shape, quota shape and
   already-exists idempotency are all decided — and asserted — without one.
 
+### Changed — BREAKING (Go API)
+
+Three exported single-method interfaces (and one internal) are renamed for the method they
+declare, the Go convention
+(`Reader`/`Writer`/`CloseNotifier`); a name that shares nothing with its method makes a reader
+open the type to find out what implementing it costs. Renames only — **no behaviour changes**,
+and no signature changes beyond the names themselves.
+
+| Was | Now | Why |
+| --- | --- | --- |
+| `mantlekeep.WorkflowEngine` | `mantlekeep.WorkflowRunner` | its method is `Run` |
+| `extension.RouteRegistrar` | `extension.Router` | see below — the method is renamed too |
+| `registry.Source` | `registry.Fetcher` | its method is `Fetch` |
+| `registry.GitFetcher` | `registry.GitCloner` | frees the `Fetcher` name for the interface above; this is the narrower git-clone port injected into `GitSource`, not the registry's ingestion port |
+| `registry.GitSource{Fetcher: …}` | `registry.GitSource{Clone: …}` | the field holds a `GitCloner` |
+
+`extension.Router`'s method is renamed `Handle` → `Route`. The value REGISTERS a handler
+against a pattern; it does not serve the request. `Handle` invited the reader to expect an
+`http.Handler`, which is the one thing it is not.
+
+**To adopt:** rename at the call sites. An implementor of `extension.RouteRegistrar` renames its
+`Handle` method to `Route`; nothing else changes shape. `internal/policy`'s `Source`/`SourceFunc`
+became `Loader`/`LoaderFunc` in the same pass but are internal, so no consumer sees them.
+
+### Removed
+
+- **`internal/policy.liveSnapshot`** — it declared `RequiredRole(string) (Role, bool)`, which is
+  exactly `ActionAuthorizer`, in the same file. Two names for one contract let the two drift.
+  `WithLive` now takes `ActionAuthorizer` directly; internal, so no consumer sees it.
+
+### Added
+
+- **`internal/audit` is tested.** The bbolt hash-chained audit log — the framework's evidence
+  spine — had no tests. Now covered: the chain link between records, an intact walk, a record
+  edited behind the logger's back, an unreadable record, `Count` on an empty vs populated chain,
+  and `Records`' newest-first order and limit.
+- **`var _ mantlekeep.WorkflowRunner = (*orchestrator.Engine)(nil)`** — the doc comment claimed the
+  Engine implements the core contract; now the compiler checks it.
+
 ## [0.1.2] — 2026-08-14
 
 Patch — a **security-hygiene** release: clears a consumer's **SonarQube Quality Gate** and a batch of

@@ -14,10 +14,10 @@ func TestPromote_ArtifactUp_SourceEvidenceRidesAlong(t *testing.T) {
 	sit := New(newFakeStore(), "sit", LooseDev)
 	uat := New(newFakeStore(), "uat", SealedProd)
 
-	fetcher := func(_ context.Context, _, ref string) ([]byte, string, []byte, error) {
+	cloner := func(_ context.Context, _, ref string) ([]byte, string, []byte, error) {
 		return []byte("built@" + ref), "deadbeef", nil, nil
 	}
-	if _, err := sit.Ingest(ctx, GitSource{Fetcher: fetcher},
+	if _, err := sit.Ingest(ctx, GitSource{Clone: cloner},
 		SourceRequest{Repo: "forgejo/app", Ref: "v1.0"},
 		"app", "tool", "App", "alice", "v1.0", nil); err != nil {
 		t.Fatalf("sit ingest: %v", err)

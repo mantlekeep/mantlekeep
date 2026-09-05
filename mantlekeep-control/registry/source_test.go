@@ -24,13 +24,13 @@ func TestUploadSource_ContentAddresses(t *testing.T) {
 	}
 }
 
-func TestGitSource_InjectedFetcher(t *testing.T) {
+func TestGitSource_InjectedCloner(t *testing.T) {
 	// the git shared-lib model: repo@ref, ref is the version, commit is provenance,
 	// and a descriptor in the repo generates the template.
-	fetcher := func(_ context.Context, repo, ref string) ([]byte, string, []byte, error) {
+	cloner := func(_ context.Context, repo, ref string) ([]byte, string, []byte, error) {
 		return []byte("tree@" + ref), "abc1234", []byte(`{"summary":"from repo"}`), nil
 	}
-	src := GitSource{Fetcher: fetcher}
+	src := GitSource{Clone: cloner}
 	art, err := src.Fetch(context.Background(), SourceRequest{Repo: "forgejo/my-lib", Ref: "v1.2"})
 	if err != nil {
 		t.Fatalf("git fetch: %v", err)
@@ -47,11 +47,11 @@ func TestGitSource_InjectedFetcher(t *testing.T) {
 func TestIngest_Git_GeneratesTemplateFromRepo(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "sit", LooseDev)
-	fetcher := func(_ context.Context, _, ref string) ([]byte, string, []byte, error) {
+	cloner := func(_ context.Context, _, ref string) ([]byte, string, []byte, error) {
 		return []byte("lib@" + ref), "c0ffee", []byte(`{"summary":"scanner lib"}`), nil
 	}
 	// caller supplies NO manifest → the repo descriptor is used
-	v, err := r.Ingest(ctx, GitSource{Fetcher: fetcher}, SourceRequest{Repo: "forgejo/scan", Ref: "v2.0"},
+	v, err := r.Ingest(ctx, GitSource{Clone: cloner}, SourceRequest{Repo: "forgejo/scan", Ref: "v2.0"},
 		"scan-lib", "tool", "Scan Lib", "alice", "v2.0", nil)
 	if err != nil {
 		t.Fatalf("ingest git: %v", err)
@@ -65,9 +65,9 @@ func TestIngest_Git_GeneratesTemplateFromRepo(t *testing.T) {
 	}
 }
 
-func TestGitSource_NoFetcher(t *testing.T) {
+func TestGitSource_NoCloner(t *testing.T) {
 	if _, err := (GitSource{}).Fetch(context.Background(), SourceRequest{Repo: "x"}); err == nil {
-		t.Fatal("git source with no injected fetcher should error")
+		t.Fatal("git source with no injected cloner should error")
 	}
 }
 
