@@ -173,6 +173,26 @@ func (e *DecisionError) Error() string {
 	return string(e.Decision.Action) + ": " + e.Decision.Reason
 }
 
+// Refused is a typed refusal: what the door decided, why, and who can unblock it.
+//
+// An error string alone loses the distinction that matters most. "deny" is final; a
+// require_approval is a change WAITING for a person, and a caller that cannot tell them
+// apart reports a pending approval as a failure — which is how a governed change looks
+// broken to the person who submitted it.
+type Refused struct {
+	Action DecisionAction
+	Reason string
+	// RequiredApprovers names who may sign off, when the decision was require_approval. A
+	// refusal that cannot say who unblocks it is a dead end wearing the shape of a process.
+	RequiredApprovers []Role
+	PolicyID          string
+}
+
+func (r *Refused) Error() string { return string(r.Action) + ": " + r.Reason }
+
+// Pending reports a refusal that a person can resolve, as opposed to a final denial.
+func (r *Refused) Pending() bool { return r.Action == ActionRequireApproval }
+
 // PolicySubject is WHO is acting, as the policy sees it — resolved server-side.
 // Attrs carries verified ABAC attributes (department, clearance, region…) for
 // engines that need more than roles. A caller never sets Roles as input to the

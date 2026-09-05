@@ -77,6 +77,10 @@ func evalFloorRule(ladder RoleLadder, rule grants.FloorRule, params map[string]a
 				return rule.Message + " (" + res + "=" + want + " exceeds cap " + cap + ")"
 			}
 		}
+	case "require_approval_when":
+		// Never a deny, and stated here rather than left to the default so a reader is not
+		// left wondering whether it was forgotten. It is evaluated by approvalGate, AFTER
+		// every deny rule — including this loop — has finished.
 	case "required_role_when":
 		// When a param equals a trigger value, the caller must hold a role at least as senior as
 		// the required one (uses the core's generic authority ranking).
@@ -206,4 +210,51 @@ func floorHasPrefix(v string, prefixes []string) bool {
 		}
 	}
 	return false
+}
+
+// approvalGate reports whether an otherwise-allowed action needs a second person.
+//
+// It is the ONE floor rule that does not deny. Everything else in this file can turn an
+// allow into a refusal; this turns an allow into "a person must sign this", which is a
+// different thing and the only one a requester can act on.
+//
+// The condition is DATA. The engine still knows no action, environment or role name of its
+// own — a deployment declares when approval is required by writing a rule, and the rule is
+// matched against the intent's params exactly like every other floor rule.
+//
+// The loop terminates because the gate is satisfied by a SECOND PARTY: an intent naming a
+// requester other than the acting subject passes straight through, so the approver's
+// re-submission completes where the original was told to wait. Without that, an approval
+// would hit the same rule and open another approval forever.
+//
+// Role is OPTIONAL. An owning-team gate wants any second colleague, not a more senior one.
+// When the data names a role it travels as who to ask — advisory, because authority is the
+// door's to resolve from the directory when the approver actually submits.
+func approvalGate(action string, requester, subjectID string,
+	params map[string]any) (required bool, reason string, approvers []mantlekeep.Role) {
+
+	for _, rule := range floors().Floors[action] {
+		if rule.Kind != "require_approval_when" {
+			continue
+		}
+		if !floorWhenMatches(params, rule.WhenParam, rule.WhenValue) {
+			continue
+		}
+		// A second party is present. (requester == subjectID never reaches here: that is the
+		// separation-of-duties deny, upstream.)
+		if requester != "" && requester != subjectID {
+			continue
+		}
+		message := rule.Message
+		if message == "" {
+			// Never silent. A refusal with no words sends the requester to find whoever they
+			// can, and the next thing they try is the path that does not ask.
+			message = "this change requires approval by a second person"
+		}
+		if rule.Role != "" {
+			approvers = []mantlekeep.Role{mantlekeep.Role(rule.Role)}
+		}
+		return true, message, approvers
+	}
+	return false, "", nil
 }
