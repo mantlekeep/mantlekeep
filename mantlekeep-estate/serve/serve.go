@@ -37,6 +37,15 @@ type Options struct {
 	Ports []estate.Port
 	// Name identifies the binary in logs, so an operator can tell which build is running.
 	Name string
+
+	// Callers resolves WHO is calling, and is passed IN like every adapter.
+	//
+	// Nil means the trusted-header tier, which is fenced to loopback unless a deployment
+	// names the decision — see [resolveCallers]. A binary that verifies tokens supplies a
+	// resolver here from a module that carries the crypto, which is why this module contains
+	// none: an organisation scanning what it downloads should not find an RSA finding in an
+	// estate it took for governance.
+	Callers api.CallerResolver
 }
 
 func Run(options Options) error {
@@ -159,8 +168,13 @@ func Run(options Options) error {
 		}
 	}()
 
+	callers, err := resolveCallers(*addr, options.Callers)
+	if err != nil {
+		return err
+	}
+
 	mux := http.NewServeMux()
-	api.New(manager, service, api.HeaderCallers{}).Routes(mux)
+	api.New(manager, service, callers).Routes(mux)
 
 	server := &http.Server{
 		Addr:              *addr,
