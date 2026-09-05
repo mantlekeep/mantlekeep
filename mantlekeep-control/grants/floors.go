@@ -34,6 +34,13 @@ const FloorsEnvOverride = "MANTLEKEEP_POLICY_FLOORS"
 //   - required_pattern_when_in — when params[WhenParam] ∈ WhenIn, params[Param] must contain Pattern
 //   - capped_map               — every entry of the params[Param] map must have a Caps entry and be ≤ it
 //   - required_role_when       — when params[WhenParam] == WhenValue, the caller must hold ≥ Role
+//   - require_approval_when    — when params[WhenParam] == WhenValue, a SECOND PARTY must sign
+//                                off. Role, when set, names who to ask and is advisory: authority
+//                                is resolved at the door when the approver submits.
+//
+// require_approval_when is the ONLY kind that does not deny. It turns an allow into "a person
+// must sign this" and is evaluated AFTER every deny rule, so a document can tighten an allow
+// into a wait but can never re-open a decision another rule already closed.
 type FloorRule struct {
 	Kind      string            `json:"kind"`
 	Param     string            `json:"param,omitempty"`

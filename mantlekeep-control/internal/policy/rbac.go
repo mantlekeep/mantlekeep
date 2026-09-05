@@ -240,6 +240,24 @@ func (r *RBAC) Evaluate(_ context.Context, input mantlekeep.PolicyInput) (mantle
 	if denied, reason := admitFloor(r.rankLadder(), action, input.Intent.Params, input.Subject.Roles); denied {
 		return deny(mantlekeep.DenialFloor, reason), nil
 	}
+	// The APPROVAL gate, asked LAST — the request is otherwise allowed, and the only
+	// remaining question is whether it may proceed on one person's say-so.
+	//
+	// Asking it last is what makes "config may TIGHTEN, never LOOSEN" structural rather than
+	// a convention. Every deny above — the missing grant, the AI guardrail, the provider
+	// floor, the attribute floor and the separation-of-duties FLOOR — has already returned by
+	// the time this runs, so no policy document can reach past one of them and re-open a
+	// closed decision as merely awaiting a signature.
+	if required, reason, approvers := approvalGate(action, requester, subjectID,
+		input.Intent.Params); required {
+		return mantlekeep.Decision{
+			Action:            mantlekeep.ActionRequireApproval,
+			Reason:            reason,
+			RequiredApprovers: approvers,
+			PolicyID:          policyID("rbac"),
+		}, nil
+	}
+
 	return mantlekeep.Decision{Action: mantlekeep.ActionAllow, PolicyID: policyID("rbac")}, nil
 }
 
