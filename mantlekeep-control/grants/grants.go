@@ -11,6 +11,8 @@
 package grants
 
 import (
+	// Blank import: the //go:embed directive below needs the embed package linked in, but
+	// this file references no embed identifier of its own.
 	_ "embed"
 	"encoding/json"
 	"fmt"
