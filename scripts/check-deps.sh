@@ -26,7 +26,7 @@ for path in direct:
 
 echo "direct non-stdlib dependencies in $MODULE_DIR: $count (baseline $BASELINE)"
 
-if [ "$count" -gt "$BASELINE" ]; then
+if [[ "$count" -gt "$BASELINE" ]]; then
   echo "FAIL: direct dependency count $count exceeds the baseline $BASELINE." >&2
   echo "      A new direct dependency erodes the near-zero-dependency guarantee." >&2
   echo "      If it is justified, raise MANTLEKEEP_DEP_BASELINE in a commit that explains why." >&2
