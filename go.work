@@ -11,6 +11,5 @@ go 1.25.0
 use (
 	./mantlekeep-control // the core — generic engine, bbolt only
 	./mantlekeep-estate  // governs what runs where — floor, placement, drift; no third-party deps
-	./mantlekeep-oidc    // OIDC token verification — kept apart so the estate carries no RSA
 	./mantlekeep-kafka   // governed-grant adapter for Apache Kafka (franz-go)
 )
