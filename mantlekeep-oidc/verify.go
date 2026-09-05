@@ -1,4 +1,24 @@
-package api
+// Package oidc verifies an OIDC bearer token and resolves it to a caller.
+//
+// # Why this is its own module
+//
+// RS256 — the algorithm essentially every identity provider issues by default — is
+// RSASSA-PKCS1-v1_5, and a static analyser cannot tell that apart from PKCS#1 v1.5
+// ENCRYPTION, which is genuinely broken. The signature scheme has no practical break and is
+// NIST-approved; the encryption scheme is Bleichenbacher's. They share a name and nothing
+// else.
+//
+// That distinction is correct and unpersuasive to a scanner. An organisation running its own
+// analysis on what it downloads would see a CRITICAL finding on a module it did not choose to
+// take, and a dismissal in somebody else's dashboard does not travel.
+//
+// So this lives apart. mantlekeep-estate carries no RSA verification at all and scans clean;
+// a deployment that wants tokens verified takes this module deliberately, and takes the
+// finding with it — with the reason above written where the finding appears.
+//
+// Same rule as the Kubernetes adapter carrying client-go: the module that needs the weight
+// carries it, and nobody else pays.
+package oidc
 
 import (
 	"context"
@@ -15,6 +35,7 @@ import (
 	"time"
 
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/api"
 )
 
 // VerifiedCallers resolves the caller by VERIFYING a bearer token, rather than trusting a
@@ -73,7 +94,8 @@ type KeyFinder interface {
 	KeyFor(ctx context.Context, keyID string) (crypto.PublicKey, error)
 }
 
-var _ CallerResolver = (*VerifiedCallers)(nil)
+// Compile-time proof this satisfies the estate's resolver seam from outside the module.
+var _ api.CallerResolver = (*VerifiedCallers)(nil)
 
 // Caller verifies the bearer token and returns the subject it names.
 func (v *VerifiedCallers) Caller(request *http.Request) (mantlekeep.Subject, error) {

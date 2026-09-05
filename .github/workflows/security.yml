@@ -145,6 +145,37 @@ jobs:
         run: staticcheck ./...
       - name: govulncheck
         run: govulncheck ./...
+  go-oidc-security:
+    name: go (oidc) — gosec · staticcheck · govulncheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mantlekeep-oidc
+    # Scanned SEPARATELY from the core, which is the point of splitting the modules: a finding
+    # here reds this job without touching the core's gate or its build. The estate carries no
+    # third-party dependencies at all, so anything this reports is the module's own code.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build pinned analysis tools
+        env:
+          # The tools module is intentionally OUTSIDE go.work: it exists to build
+          # binaries and must never join the workspace the published modules share.
+          GOWORK: "off"
+        run: |
+          go -C "$GITHUB_WORKSPACE/tools" build -o "$GITHUB_WORKSPACE/bin/" \
+            honnef.co/go/tools/cmd/staticcheck \
+            golang.org/x/vuln/cmd/govulncheck \
+            github.com/securego/gosec/v2/cmd/gosec
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+      - name: gosec
+        run: gosec ./...
+      - name: staticcheck
+        run: staticcheck ./...
+      - name: govulncheck
+        run: govulncheck ./...
 
   rust-security:
     name: rust — clippy · cargo-audit

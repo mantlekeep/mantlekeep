@@ -12,16 +12,6 @@ import (
 
 // Environment that chooses how a caller is identified.
 const (
-	// IssuerVar, AudienceVar and JWKSVar configure token VERIFICATION. Set them and the
-	// estate stops trusting the transport and checks for itself.
-	IssuerVar   = "MANTLEKEEP_OIDC_ISSUER"
-	AudienceVar = "MANTLEKEEP_OIDC_AUDIENCE"
-	JWKSVar     = "MANTLEKEEP_OIDC_JWKS_FILE"
-
-	// SubjectClaimVar names the claim carrying the caller. Defaults to "sub"; deployments
-	// keyed on email or preferred_username set it here.
-	SubjectClaimVar = "MANTLEKEEP_OIDC_SUBJECT_CLAIM"
-
 	// TrustHeaderVar allows the trusted-header resolver on an address other people can
 	// reach. It exists because refusing outright would be wrong for a deployment whose
 	// gateway genuinely is the only path — but it must be a decision somebody made and can
@@ -44,22 +34,19 @@ const (
 // The estate already warns when it is read-only and when cluster reachability is assumed.
 // Identity deserves it more than either: it is the field every record on the chain is keyed
 // on, and a chain of decisions attributed to whoever typed a header is evidence of nothing.
-func resolveCallers(addr string) (api.CallerResolver, error) {
-	issuer := strings.TrimSpace(os.Getenv(IssuerVar))
-	audience := strings.TrimSpace(os.Getenv(AudienceVar))
-	jwksPath := strings.TrimSpace(os.Getenv(JWKSVar))
-
-	if issuer != "" || audience != "" || jwksPath != "" {
-		return verifyingCallers(issuer, audience, jwksPath)
+func resolveCallers(addr string, supplied api.CallerResolver) (api.CallerResolver, error) {
+	if supplied != nil {
+		slog.Info("identity is VERIFIED by the resolver this binary supplied")
+		return supplied, nil
 	}
 
-	// No verification configured — the trusted-header tier.
+	// Nothing supplied — the trusted-header tier.
 	if loopbackOnly(addr) {
 		slog.Warn("identity is TAKEN FROM A HEADER, not verified — every decision on the "+
 			"chain will be attributed to whoever set it. This is the development tier and is "+
 			"allowed here only because the listen address is loopback",
 			"header", api.UserHeader, "addr", addr,
-			"to verify instead", IssuerVar+" + "+AudienceVar+" + "+JWKSVar)
+			"to verify instead", "supply Options.Callers from mantlekeep-oidc")
 		return api.HeaderCallers{}, nil
 	}
 
@@ -69,10 +56,10 @@ func resolveCallers(addr string) (api.CallerResolver, error) {
 		// identity produces a perfectly ordinary-looking record.
 		return nil, fmt.Errorf(
 			"identity: refusing to trust the %s header on %s — anything that can reach this "+
-				"port could then be anyone, and the chain would record it as fact. Configure "+
-				"verification (%s, %s, %s), or set %s=true if a gateway is genuinely the only "+
-				"path to this address",
-			api.UserHeader, addr, IssuerVar, AudienceVar, JWKSVar, TrustHeaderVar)
+				"port could then be anyone, and the chain would record it as fact. Supply "+
+				"a verifying resolver in Options.Callers, or set %s=true if a gateway is genuinely "+
+				"the only path to this address",
+			api.UserHeader, addr, TrustHeaderVar)
 	}
 
 	slog.Warn("identity is TAKEN FROM A HEADER on a non-loopback address, because "+
@@ -80,38 +67,6 @@ func resolveCallers(addr string) (api.CallerResolver, error) {
 		"the gateway in front is now the only thing preventing impersonation",
 		"header", api.UserHeader, "addr", addr)
 	return api.HeaderCallers{}, nil
-}
-
-// verifyingCallers builds the token verifier, refusing a half-configured one.
-func verifyingCallers(issuer, audience, jwksPath string) (api.CallerResolver, error) {
-	// All three or none. A verifier missing its audience accepts tokens minted for any other
-	// service by the same issuer, which is a subtler hole than no verification at all —
-	// nobody reviews a deployment that appears to be verifying.
-	for name, value := range map[string]string{
-		IssuerVar: issuer, AudienceVar: audience, JWKSVar: jwksPath,
-	} {
-		if value == "" {
-			return nil, fmt.Errorf(
-				"identity: %s is not set, and a partly-configured verifier is worse than none "+
-					"— it looks like verification while accepting tokens it should refuse", name)
-		}
-	}
-
-	document, err := os.ReadFile(jwksPath) // #nosec G304,G703 -- an operator-supplied path
-	if err != nil {
-		return nil, fmt.Errorf("identity: reading the issuer's keys from %s: %w", jwksPath, err)
-	}
-	keys, err := api.NewStaticKeys(document)
-	if err != nil {
-		return nil, err
-	}
-
-	slog.Info("identity is VERIFIED from a bearer token",
-		"issuer", issuer, "audience", audience, "keys", jwksPath)
-	return &api.VerifiedCallers{
-		Issuer: issuer, Audience: audience, Keys: keys,
-		SubjectClaim: os.Getenv(SubjectClaimVar),
-	}, nil
 }
 
 // loopbackOnly reports whether this address is reachable only from this machine.
