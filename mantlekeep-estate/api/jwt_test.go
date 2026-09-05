@@ -232,3 +232,55 @@ func TestAnUnknownKeyIdIsRefused(t *testing.T) {
 		t.Fatal("a token naming an unknown key was accepted")
 	}
 }
+
+// mintPSS signs with RSASSA-PSS, the construction PS256 names.
+func (i *issuer) mintPSS(t *testing.T, header, claims map[string]any) string {
+	t.Helper()
+	body := segment(t, header) + "." + segment(t, claims)
+	digest := sha256.Sum256([]byte(body))
+	signature, err := rsa.SignPSS(rand.Reader, i.key, crypto.SHA256, digest[:],
+		&rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash, Hash: crypto.SHA256})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body + "." + base64.RawURLEncoding.EncodeToString(signature)
+}
+
+// PS256 is the better construction — RSASSA-PSS has a security proof PKCS1-v1_5 lacks — and
+// a deployment whose IdP issues it must not have to fall back to the weaker one.
+func TestAPS256TokenIsAccepted(t *testing.T) {
+	idp := newIssuer(t)
+	header := goodHeader(idp)
+	header["alg"] = "PS256"
+
+	subject, err := verifier(idp).Caller(requestWith(idp.mintPSS(t, header, goodClaims())))
+	if err != nil {
+		t.Fatalf("a valid PS256 token was refused: %v", err)
+	}
+	if subject.ID != "dev-alice" {
+		t.Errorf("subject = %q, want dev-alice", subject.ID)
+	}
+}
+
+// The scheme comes from the ALLOW-LIST, never from the token. A PS256 header over a
+// PKCS1-v1_5 signature must fail: honouring the token's claim about how it was signed is the
+// same defeat as honouring its claim about which algorithm to use.
+func TestTheAlgorithmHeaderCannotSelectTheWrongScheme(t *testing.T) {
+	idp := newIssuer(t)
+	header := goodHeader(idp)
+	header["alg"] = "PS256"                    // claims PSS
+	token := idp.mint(t, header, goodClaims()) // but signed PKCS1-v1_5
+
+	if _, err := verifier(idp).Caller(requestWith(token)); err == nil {
+		t.Fatal("a token whose header disagreed with its signature was accepted")
+	}
+}
+
+// RS256 keeps working: it is what essentially every OIDC provider issues by default, and
+// refusing it would mean refusing real tokens from real identity providers.
+func TestRS256RemainsAccepted(t *testing.T) {
+	idp := newIssuer(t)
+	if _, err := verifier(idp).Caller(requestWith(idp.mint(t, goodHeader(idp), goodClaims()))); err != nil {
+		t.Fatalf("a valid RS256 token was refused: %v", err)
+	}
+}

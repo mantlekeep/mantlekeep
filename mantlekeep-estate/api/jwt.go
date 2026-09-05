@@ -49,7 +49,7 @@ type VerifiedCallers struct {
 	// becomes every service.
 	Audience string
 	// Keys supplies the issuer's public keys.
-	Keys KeySet
+	Keys KeyFinder
 	// Now is the clock, replaceable in a test.
 	Now func() time.Time
 	// SubjectClaim names the claim carrying the caller's identity. Defaults to "sub";
@@ -57,13 +57,15 @@ type VerifiedCallers struct {
 	SubjectClaim string
 }
 
-// KeySet supplies an issuer's public keys by key id.
+// KeyFinder supplies an issuer's public keys by key id.
+//
+// Named for its method, per Go's convention for single-method interfaces.
 //
 // A port because where keys come from is a deployment decision: fetched from a JWKS endpoint
 // in a connected estate, mirrored to a file in an air-gapped one. Verification needs only
 // public keys, so a mirrored copy is not a secret to protect — which is what makes offline
 // verification possible at all.
-type KeySet interface {
+type KeyFinder interface {
 	// KeyFor returns the public key with this id, or an error.
 	//
 	// An unknown key id is an error, never a fallback to "try them all": accepting a token
@@ -140,14 +142,23 @@ func (v *VerifiedCallers) verify(ctx context.Context, raw string) (map[string]an
 		return nil, fmt.Errorf("identity: unreadable token header: %w", err)
 	}
 
-	// RS256 only, and checked against an allow-list rather than used to select an algorithm.
-	// Reading the algorithm FROM the token and honouring it is the classic JWT defeat: "none"
-	// verifies everything, and HS256 lets a public key be used as an HMAC secret.
-	if header.Algorithm != "RS256" {
+	// An ALLOW-LIST, never used to select an algorithm. Reading the algorithm FROM the token
+	// and honouring it is the classic JWT defeat: "none" verifies everything, and HS256 lets a
+	// public key be used as an HMAC secret.
+	//
+	// Both RSA signature schemes the JOSE specification defines for RSA are accepted. PS256 is
+	// the better construction — RSASSA-PSS has a security proof that RSASSA-PKCS1-v1_5 lacks —
+	// but RS256 is what essentially every OIDC provider issues by default, and refusing it
+	// would mean refusing real tokens from real identity providers.
+	//
+	// Note this is SIGNATURE verification, not encryption. PKCS#1 v1.5 ENCRYPTION is broken
+	// (Bleichenbacher); PKCS#1 v1.5 SIGNATURES have no practical break and remain a NIST-
+	// approved scheme. Conflating the two is a common misreading of the same padding name.
+	if !acceptedAlgorithms[header.Algorithm] {
 		return nil, fmt.Errorf(
-			"identity: token algorithm %q is not accepted — this verifier accepts RS256 only, "+
-				"because honouring the algorithm a token names is how a token verifies itself",
-			header.Algorithm)
+			"identity: token algorithm %q is not accepted — this verifier accepts PS256 and "+
+				"RS256, because honouring the algorithm a token names is how a token verifies "+
+				"itself", header.Algorithm)
 	}
 	if header.KeyID == "" {
 		return nil, fmt.Errorf("identity: the token names no key id")
@@ -167,7 +178,7 @@ func (v *VerifiedCallers) verify(ctx context.Context, raw string) (map[string]an
 		return nil, fmt.Errorf("identity: unreadable token signature: %w", err)
 	}
 	signed := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-	if err := rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, signed[:], signature); err != nil {
+	if err := verifySignature(header.Algorithm, publicKey, signed[:], signature); err != nil {
 		return nil, fmt.Errorf("identity: the token signature does not verify")
 	}
 
@@ -230,7 +241,7 @@ func decodeSegment(segment string, into any) error {
 	return json.Unmarshal(decoded, into)
 }
 
-// StaticKeys is a KeySet over keys already in hand.
+// StaticKeys is a KeyFinder over keys already in hand.
 //
 // The air-gapped case, and the testable one: a zone with no egress mirrors its issuer's JWKS
 // to a file and loads it here. Public keys, so the mirror is not a secret — which is what
@@ -280,7 +291,7 @@ func NewStaticKeys(jwks []byte) (*StaticKeys, error) {
 	return set, nil
 }
 
-// KeyFor implements [KeySet].
+// KeyFor implements [KeyFinder].
 func (s *StaticKeys) KeyFor(_ context.Context, keyID string) (crypto.PublicKey, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -289,4 +300,24 @@ func (s *StaticKeys) KeyFor(_ context.Context, keyID string) (crypto.PublicKey, 
 		return nil, fmt.Errorf("the issuer's key set has no key %q", keyID)
 	}
 	return key, nil
+}
+
+// acceptedAlgorithms is the allow-list. A map rather than a comparison so adding one is a
+// data change, and so nothing can accidentally accept an algorithm by falling through.
+var acceptedAlgorithms = map[string]bool{"PS256": true, "RS256": true}
+
+// verifySignature checks the signature under the named scheme.
+//
+// The scheme is chosen from the ALLOW-LIST above, not from the token — the token's claim has
+// already been checked against it. This function exists so the two schemes are visibly
+// different code paths rather than a flag on one call, because they are different
+// constructions and a reader should see that.
+func verifySignature(algorithm string, key *rsa.PublicKey, digest, signature []byte) error {
+	if algorithm == "PS256" {
+		// RSASSA-PSS. Salt length equal to the hash is what the JOSE specification requires.
+		return rsa.VerifyPSS(key, crypto.SHA256, digest, signature,
+			&rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash, Hash: crypto.SHA256})
+	}
+	// RSASSA-PKCS1-v1_5 — the RS256 of RFC 7518, and what OIDC providers issue by default.
+	return rsa.VerifyPKCS1v15(key, crypto.SHA256, digest, signature)
 }
