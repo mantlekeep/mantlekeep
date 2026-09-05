@@ -19,7 +19,7 @@ func TestPromote_ArtifactUp_SourceEvidenceRidesAlong(t *testing.T) {
 	}
 	if _, err := sit.Ingest(ctx, GitSource{Clone: cloner},
 		SourceRequest{Repo: "forgejo/app", Ref: "v1.0"},
-		"app", "tool", "App", "alice", "v1.0", nil); err != nil {
+		Registration{Name: "app", Kind: "tool", Title: "App", Owner: "alice", Version: "v1.0"}); err != nil {
 		t.Fatalf("sit ingest: %v", err)
 	}
 	sitEntry, _, _ := sit.Get(ctx, "app")

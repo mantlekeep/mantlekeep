@@ -40,7 +40,7 @@ func fakeKernel(stdout, stderr string, exit int) *kernel.Kernel {
 func TestRun_PassUnlocksPromote(t *testing.T) {
 	ctx := context.Background()
 	reg := registry.New(newFakeStore(), "sit", registry.SealedProd) // requires test-before-promote
-	reg.Register(ctx, "scan-tool", "tool", "Scanner", "alice", "1.0.0", "sha256:abc", nil)
+	reg.Register(ctx, registry.Registration{Name: "scan-tool", Kind: "tool", Title: "Scanner", Owner: "alice", Version: "1.0.0", Ref: "sha256:abc"})
 
 	// gate closed before any test
 	if _, err := reg.ProposePromote(ctx, "scan-tool", "1.0.0", "alice"); err == nil {
@@ -70,7 +70,7 @@ func TestRun_PassUnlocksPromote(t *testing.T) {
 func TestRun_KernelErrorKeepsGateClosed(t *testing.T) {
 	ctx := context.Background()
 	reg := registry.New(newFakeStore(), "sit", registry.SealedProd)
-	reg.Register(ctx, "scan-tool", "tool", "Scanner", "alice", "1.0.0", "sha256:abc", nil)
+	reg.Register(ctx, registry.Registration{Name: "scan-tool", Kind: "tool", Title: "Scanner", Owner: "alice", Version: "1.0.0", Ref: "sha256:abc"})
 
 	// the tool escaped the sandbox / errored → test fails, gate stays closed
 	k := fakeKernel("", "SOVEREIGN_SCAN_ERROR: memory escape\n", 2)

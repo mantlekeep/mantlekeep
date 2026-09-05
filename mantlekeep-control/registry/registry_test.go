@@ -30,7 +30,7 @@ func TestRegister_DraftAndImmutableVersion(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "dev", LooseDev)
 
-	if _, err := r.Register(ctx, "scan-tool", "tool", "Scanner", "alice", "1.0.0", "sha256:aaa", nil); err != nil {
+	if _, err := r.Register(ctx, Registration{Name: "scan-tool", Kind: "tool", Title: "Scanner", Owner: "alice", Version: "1.0.0", Ref: "sha256:aaa"}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	e, ok, err := r.Get(ctx, "scan-tool")
@@ -41,11 +41,11 @@ func TestRegister_DraftAndImmutableVersion(t *testing.T) {
 		t.Fatalf("unexpected entry: %+v", e)
 	}
 	// same version again → rejected (immutable)
-	if _, err := r.Register(ctx, "scan-tool", "tool", "", "", "1.0.0", "", nil); err == nil {
+	if _, err := r.Register(ctx, Registration{Name: "scan-tool", Kind: "tool", Version: "1.0.0"}); err == nil {
 		t.Fatal("expected duplicate-version rejection")
 	}
 	// a new version → appended
-	if _, err := r.Register(ctx, "scan-tool", "tool", "", "bob", "1.1.0", "", nil); err != nil {
+	if _, err := r.Register(ctx, Registration{Name: "scan-tool", Kind: "tool", Owner: "bob", Version: "1.1.0"}); err != nil {
 		t.Fatalf("second version: %v", err)
 	}
 	e, _, _ = r.Get(ctx, "scan-tool")
@@ -57,7 +57,7 @@ func TestRegister_DraftAndImmutableVersion(t *testing.T) {
 func TestLoosePolicy_PublishesOnPropose(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "dev", LooseDev)
-	r.Register(ctx, "t", "tool", "", "alice", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "alice", Version: "1.0.0"})
 
 	v, err := r.ProposePromote(ctx, "t", "1.0.0", "alice")
 	if err != nil {
@@ -71,7 +71,7 @@ func TestLoosePolicy_PublishesOnPropose(t *testing.T) {
 func TestSealedPolicy_ReviewThenApprove_WithSoD(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "prod", SealedProd)
-	r.Register(ctx, "t", "tool", "", "alice", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "alice", Version: "1.0.0"})
 	r.RecordTest(ctx, "t", "1.0.0", true, "run-1") // sealed env: must pass a test first
 
 	v, err := r.ProposePromote(ctx, "t", "1.0.0", "alice")
@@ -97,7 +97,7 @@ func TestSealedPolicy_ReviewThenApprove_WithSoD(t *testing.T) {
 func TestTestBeforePromoteGate(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "sit", SealedProd) // sealed env requires a passing test
-	r.Register(ctx, "t", "tool", "", "alice", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "alice", Version: "1.0.0"})
 
 	// promote blocked: untested draft
 	if _, err := r.ProposePromote(ctx, "t", "1.0.0", "alice"); err == nil {
@@ -122,7 +122,7 @@ func TestTestBeforePromoteGate(t *testing.T) {
 func TestLooseEnv_IgnoresTestGate(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "dev", LooseDev) // dev iterates freely, no gate
-	r.Register(ctx, "t", "tool", "", "alice", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "alice", Version: "1.0.0"})
 	v, err := r.ProposePromote(ctx, "t", "1.0.0", "alice")
 	if err != nil {
 		t.Fatalf("loose env should not gate on test: %v", err)
@@ -135,7 +135,7 @@ func TestLooseEnv_IgnoresTestGate(t *testing.T) {
 func TestReject_BackToDraft(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "prod", SealedProd)
-	r.Register(ctx, "t", "tool", "", "alice", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "alice", Version: "1.0.0"})
 	r.RecordTest(ctx, "t", "1.0.0", true, "run-1")
 	r.ProposePromote(ctx, "t", "1.0.0", "alice")
 
@@ -151,7 +151,7 @@ func TestReject_BackToDraft(t *testing.T) {
 func TestDeprecateThenDemise_BlockedByDependents(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "prod", SealedProd)
-	r.Register(ctx, "t", "tool", "", "alice", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "alice", Version: "1.0.0"})
 	r.RecordTest(ctx, "t", "1.0.0", true, "run-1")
 	r.ProposePromote(ctx, "t", "1.0.0", "alice")
 	r.Approve(ctx, "t", "1.0.0", "bob")
@@ -178,7 +178,7 @@ func TestDeprecateThenDemise_BlockedByDependents(t *testing.T) {
 func TestDependents_ListsPins(t *testing.T) {
 	ctx := context.Background()
 	r := New(newFakeStore(), "prod", SealedProd)
-	r.Register(ctx, "t", "tool", "", "a", "1.0.0", "", nil)
+	r.Register(ctx, Registration{Name: "t", Kind: "tool", Owner: "a", Version: "1.0.0"})
 	r.Pin(ctx, "t", "1.0.0", "pipe-a")
 	r.Pin(ctx, "t", "1.0.0", "pipe-b")
 

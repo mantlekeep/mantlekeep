@@ -98,20 +98,25 @@ var _ Fetcher = GitSource{}
 // content digest (Ref) and provenance. This is how an upload OR a git fetch becomes a
 // governed draft — identical downstream lifecycle regardless of where the bytes came
 // from.
-func (r *Registry) Ingest(ctx context.Context, src Fetcher, req SourceRequest, name string, kind Kind, title, owner, version string, manifest json.RawMessage) (Version, error) {
+//
+// Two fields of reg are supplied by the FETCH, not the caller: Ref is always the digest
+// of the bytes that arrived (anything set here is replaced — the registry content-
+// addresses what it actually stored, never what it was told), and an empty Manifest
+// falls back to the descriptor discovered in the source.
+func (r *Registry) Ingest(ctx context.Context, src Fetcher, req SourceRequest, reg Registration) (Version, error) {
 	art, err := src.Fetch(ctx, req)
 	if err != nil {
 		return Version{}, err
 	}
+	reg.Ref = art.Digest
 	// Generate the template from the source's descriptor when the caller supplies none.
-	tmpl := manifest
-	if len(tmpl) == 0 {
-		tmpl = art.Manifest
+	if len(reg.Manifest) == 0 {
+		reg.Manifest = art.Manifest
 	}
-	if _, err := r.Register(ctx, name, kind, title, owner, version, art.Digest, tmpl); err != nil {
+	if _, err := r.Register(ctx, reg); err != nil {
 		return Version{}, err
 	}
-	return r.transition(ctx, name, version, func(v *Version) error {
+	return r.transition(ctx, reg.Name, reg.Version, func(v *Version) error {
 		v.Provenance = art.Provenance
 		return nil
 	})

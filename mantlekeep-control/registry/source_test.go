@@ -52,7 +52,7 @@ func TestIngest_Git_GeneratesTemplateFromRepo(t *testing.T) {
 	}
 	// caller supplies NO manifest → the repo descriptor is used
 	v, err := r.Ingest(ctx, GitSource{Clone: cloner}, SourceRequest{Repo: "forgejo/scan", Ref: "v2.0"},
-		"scan-lib", "tool", "Scan Lib", "alice", "v2.0", nil)
+		Registration{Name: "scan-lib", Kind: "tool", Title: "Scan Lib", Owner: "alice", Version: "v2.0"})
 	if err != nil {
 		t.Fatalf("ingest git: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestIngest_UploadBecomesDraftWithProvenance(t *testing.T) {
 	r := New(newFakeStore(), "dev", LooseDev)
 
 	v, err := r.Ingest(ctx, UploadSource{}, SourceRequest{Data: []byte("blob"), Opts: map[string]string{"by": "alice"}},
-		"scan-tool", "tool", "Scanner", "alice", "1.0.0", nil)
+		Registration{Name: "scan-tool", Kind: "tool", Title: "Scanner", Owner: "alice", Version: "1.0.0"})
 	if err != nil {
 		t.Fatalf("ingest: %v", err)
 	}

@@ -55,6 +55,25 @@ and no signature changes beyond the names themselves.
 | `registry.GitFetcher` | `registry.GitCloner` | frees the `Fetcher` name for the interface above; this is the narrower git-clone port injected into `GitSource`, not the registry's ingestion port |
 | `registry.GitSource{Fetcher: …}` | `registry.GitSource{Clone: …}` | the field holds a `GitCloner` |
 
+`registry.Register` and `registry.Ingest` now take a `registry.Registration` value instead of a
+positional parameter list:
+
+```go
+// was
+r.Register(ctx, "scan-tool", "tool", "Scanner", "alice", "1.0.0", "sha256:aaa", nil)
+// now
+r.Register(ctx, registry.Registration{
+    Name: "scan-tool", Kind: "tool", Title: "Scanner",
+    Owner: "alice", Version: "1.0.0", Ref: "sha256:aaa",
+})
+```
+
+`Register` took six consecutive strings — title, owner, version and ref among them — so
+transposing any two of them compiled cleanly and stored the wrong thing under the right name.
+`Ingest` took nine parameters in total. `Ingest` still supplies `Ref` itself (the digest of the
+bytes that actually arrived) and still falls back to the source's descriptor for an empty
+`Manifest`.
+
 `extension.Router`'s method is renamed `Handle` → `Route`. The value REGISTERS a handler
 against a pattern; it does not serve the request. `Handle` invited the reader to expect an
 `http.Handler`, which is the one thing it is not.

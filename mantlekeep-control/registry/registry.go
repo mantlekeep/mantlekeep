@@ -91,25 +91,41 @@ func New(store mantlekeep.Store, env string, policy PromotionPolicy) *Registry {
 // Env returns the environment this instance serves (dev/sit/uat/prod).
 func (r *Registry) Env() string { return r.env }
 
+// Registration describes the artifact version being recorded.
+//
+// It is one value rather than a parameter list because Register otherwise took six
+// consecutive strings — title, owner, version and ref among them — and transposing any
+// two of them compiles cleanly and stores the wrong thing under the right name. Named
+// fields make that mistake visible at the call site.
+type Registration struct {
+	Name     string          // artifact name; an unknown one creates the entry
+	Kind     Kind            // tool, flow, … — entry-level, set when the entry is created
+	Title    string          // human label — entry-level
+	Owner    string          // owning team — entry-level
+	Version  string          // the version being added; immutable once it exists
+	Ref      string          // content address of the bytes ("sha256:…")
+	Manifest json.RawMessage // the version's template descriptor
+}
+
 // Register records a new DRAFT version. An unknown name creates the entry. A
 // duplicate (name, version) is rejected — a version is immutable once it exists.
-func (r *Registry) Register(ctx context.Context, name string, kind Kind, title, owner, version, ref string, manifest json.RawMessage) (Entry, error) {
-	if strings.TrimSpace(name) == "" || strings.TrimSpace(version) == "" {
+func (r *Registry) Register(ctx context.Context, reg Registration) (Entry, error) {
+	if strings.TrimSpace(reg.Name) == "" || strings.TrimSpace(reg.Version) == "" {
 		return Entry{}, fmt.Errorf("registry: name and version are required")
 	}
-	e, ok, err := r.get(ctx, name)
+	e, ok, err := r.get(ctx, reg.Name)
 	if err != nil {
 		return Entry{}, err
 	}
 	if !ok {
-		e = Entry{Name: name, Kind: kind, Title: title, Owner: owner}
+		e = Entry{Name: reg.Name, Kind: reg.Kind, Title: reg.Title, Owner: reg.Owner}
 	}
-	if indexOf(e, version) >= 0 {
-		return Entry{}, fmt.Errorf("registry: %s@%s already exists (versions are immutable)", name, version)
+	if indexOf(e, reg.Version) >= 0 {
+		return Entry{}, fmt.Errorf("registry: %s@%s already exists (versions are immutable)", reg.Name, reg.Version)
 	}
 	e.Versions = append(e.Versions, Version{
-		Version: version, Env: r.env, Status: StatusDraft,
-		Ref: ref, Manifest: manifest, UpdatedAt: r.now(),
+		Version: reg.Version, Env: r.env, Status: StatusDraft,
+		Ref: reg.Ref, Manifest: reg.Manifest, UpdatedAt: r.now(),
 	})
 	if err := r.save(ctx, e); err != nil {
 		return Entry{}, err
