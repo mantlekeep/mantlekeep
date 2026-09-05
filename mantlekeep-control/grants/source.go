@@ -8,14 +8,18 @@ import (
 	"fmt"
 )
 
-// Source is WHERE the policy documents come from.
+// Loader is WHERE the policy documents come from.
+//
+// Named for its method, per Go's convention for single-method interfaces, and so it pairs
+// with [Writer]. The sibling seams in internal/policy and registry are called Source; they
+// predate this and are the same idea under an older name.
 //
 // The core defines the question and never learns the answer's technology. A file today, a
 // database table for a deployment that edits policy through a UI, a signed bundle server for
 // one that treats policy as a release artefact — each is an adapter, and each carries its own
 // dependency rather than putting a driver in this module.
 //
-// It is the same seam as the layered-config Source in internal/policy and as the estate's
+// It is the same seam as the layered-config Loader in internal/policy and as the estate's
 // Port: the thing above states what it needs, the thing below decides how.
 //
 // # Why a Revision travels with the documents
@@ -28,7 +32,7 @@ import (
 // It is also what makes a single source of truth verifiable rather than merely intended: two
 // replicas reporting different revisions are demonstrably serving different policy, which is
 // a fact an operator can act on instead of a divergence nobody notices.
-type Source interface {
+type Loader interface {
 	// Load returns the documents in force and the revision that identifies them.
 	//
 	// An error is an error, never an empty policy. Empty grants deny everything, so a source
@@ -65,7 +69,7 @@ func RevisionOf(documents ...[]byte) Revision {
 // rather than beside it.
 type EnvSource struct{}
 
-// Load implements [Source] over the environment-configured documents.
+// Load implements [Loader] over the environment-configured documents.
 func (EnvSource) Load(context.Context) (*Grants, *Floors, Revision, error) {
 	grants, err := Load()
 	if err != nil {

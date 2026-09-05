@@ -69,10 +69,10 @@ func (c Change) Describe() string {
 
 // Writer applies an approved policy change to whatever holds the policy.
 //
-// Separate from [Source] because reading and writing have different deployments: a file
+// Separate from [Loader] because reading and writing have different deployments: a file
 // source is read by every replica and written by none, while a database source is both. A
 // source that could not be written is a legitimate deployment — the commonest one — and
-// making Write part of Source would force every reader to implement it.
+// making Write part of Loader would force every reader to implement it.
 type Writer interface {
 	// Write applies the change and returns the revision now in force.
 	//
@@ -101,7 +101,7 @@ type Writer interface {
 // policy changed but which policy became which. Without it an auditor can see that somebody
 // changed something and never learn what was in force on either side.
 func Govern(ctx context.Context, door mantlekeep.Submitter, actor mantlekeep.Subject,
-	source Source, writer Writer, change Change) (Revision, error) {
+	source Loader, writer Writer, change Change) (Revision, error) {
 
 	if err := change.Validate(); err != nil {
 		return "", err
