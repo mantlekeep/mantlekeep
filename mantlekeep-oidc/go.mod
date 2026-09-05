@@ -9,6 +9,6 @@ require (
 	github.com/mantlekeep/mantlekeep/mantlekeep-estate v0.1.0
 )
 
-replace github.com/mantlekeep/mantlekeep/mantlekeep-control => ../mantlekeep-control
-
-replace github.com/mantlekeep/mantlekeep/mantlekeep-estate => ../mantlekeep-estate
+// No replace: both dependencies are published, so this module resolves the same way for a
+// consumer as it does here. A replace applies only to the main module — one that needs it
+// builds here and nowhere else.
