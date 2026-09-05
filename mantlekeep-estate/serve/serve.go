@@ -159,8 +159,13 @@ func Run(options Options) error {
 		}
 	}()
 
+	callers, err := resolveCallers(*addr)
+	if err != nil {
+		return err
+	}
+
 	mux := http.NewServeMux()
-	api.New(manager, service, api.HeaderCallers{}).Routes(mux)
+	api.New(manager, service, callers).Routes(mux)
 
 	server := &http.Server{
 		Addr:              *addr,
