@@ -8,7 +8,7 @@ import (
 //
 // The engine understands exactly one thing about roles — their RELATIVE authority (a rank).
 // The NAMES are data. Historically the five built-in tier names were a hardcoded package var,
-// which pinned every deployment to those exact strings: a bank that named its own tier
+// which pinned every deployment to those exact strings: a deployment that named its own tier
 // ("L1-Super-Admin") got no rank, so its role could never satisfy a seniority check. The
 // RoleLadder makes that vocabulary a REPLACEABLE table — the engine ships a default, and a
 // config layer (or a code-side product) can supply its own, so the core holds no hardcoded

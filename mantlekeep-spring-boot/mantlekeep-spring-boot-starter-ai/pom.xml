@@ -18,7 +18,7 @@
 
   <!-- Spring Boot platform imported for BUILD-time versions only (dependencyManagement is not
        transitive) → Spring deps below stay version-less in the published pom, so the consumer's Spring
-       Boot BOM floats them (CVE-patched releases). Only MANTLE's own artifact is pinned (${revision}). -->
+       Boot BOM floats them (CVE-patched releases). Only MantleKeep's own artifact is pinned (${revision}). -->
   <dependencyManagement>
     <dependencies>
       <dependency>

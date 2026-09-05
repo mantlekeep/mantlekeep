@@ -6,7 +6,7 @@
 // bbolt; every adapter module carries its own heavy client dependency, so a CVE — or a
 // registry quarantine — in that tree can never block the core's build. An adapter
 // depends on the core; the core depends on no adapter, and never will.
-go 1.26.6
+go 1.25.0
 
 use (
 	./mantlekeep-control // the core — generic engine, bbolt only

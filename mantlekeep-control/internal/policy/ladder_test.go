@@ -45,22 +45,22 @@ func TestDefaultLadderPreservesTiers(t *testing.T) {
 	}
 }
 
-// bankLadder is a deployment that renamed the built-in tiers — the exact case the old hardcoded
+// renamedLadder is a deployment that renamed the built-in tiers — the exact case the old hardcoded
 // map could not serve. Note "L1-Super-Admin" and "L2-Engineer" are NOT default tier names, so any
 // check that still passes for them proves the CONFIGURED ladder (not the default) is in force.
-func bankLadder() RoleLadder {
+func renamedLadder() RoleLadder {
 	return RoleLadder{
 		"L0-SuperAdmin": 0, "L1-Super-Admin": 1, "L2-Engineer": 2, "L3-Consumer": 3, "AI-Agent": 4,
 	}
 }
 
-// TestBankRenamedRoles_GovernEndToEnd is the demo: a bank names its OWN role ("L1-Super-Admin"),
+// TestRenamedRoleLadderGovernsEndToEnd is the demo: a deployment names its OWN role ("L1-Super-Admin"),
 // binds an action to it in a config layer, and the door governs on that vocabulary end-to-end.
 // It drives the real RBAC.Evaluate — a full door decision, not a bare holdsAtLeast call.
-func TestBankRenamedRoles_GovernEndToEnd(t *testing.T) {
-	ladder := bankLadder()
-	// A team layer binds the bank's action to the bank's renamed role. Resolve threads the
-	// configured ladder so the binding is ranked in the bank's vocabulary.
+func TestRenamedRoleLadderGovernsEndToEnd(t *testing.T) {
+	ladder := renamedLadder()
+	// A team layer binds the deployment's action to the deployment's renamed role. Resolve threads the
+	// configured ladder so the binding is ranked in the deployment's vocabulary.
 	teamLayer := Layer{
 		Name:        "team:payments",
 		ActionRoles: map[string]mantlekeep.Role{"session.deploy": "L1-Super-Admin"},
@@ -82,28 +82,28 @@ func TestBankRenamedRoles_GovernEndToEnd(t *testing.T) {
 		return dec
 	}
 
-	// ALLOW for the senior bank role — proves a renamed tier governs an action the core never
+	// ALLOW for the senior configured role — proves a renamed tier governs an action the core never
 	// heard of, entirely from config.
 	if dec := evaluate("L1-Super-Admin"); dec.Action != mantlekeep.ActionAllow {
 		t.Errorf("L1-Super-Admin must be ALLOWED session.deploy, got %s (%s)", dec.Action, dec.Reason)
 	}
-	// DENY for a junior bank role — L3-Consumer is not senior enough for an L1 floor.
+	// DENY for a junior configured role — L3-Consumer is not senior enough for an L1 floor.
 	if dec := evaluate("L3-Consumer"); dec.Action != mantlekeep.ActionDeny {
 		t.Errorf("L3-Consumer must be DENIED session.deploy, got %s", dec.Action)
 	}
-	// DENY for a role absent from the bank ladder — an unknown role can never satisfy the floor.
+	// DENY for a role absent from the configured ladder — an unknown role can never satisfy the floor.
 	if dec := evaluate("L9-Ghost"); dec.Action != mantlekeep.ActionDeny {
 		t.Errorf("unknown role must be DENIED session.deploy, got %s", dec.Action)
 	}
 }
 
 // TestSealTighteningUsesConfiguredLadder proves the sealed-floor seniority check ranks against the
-// CONFIGURED ladder, not the default. A platform layer seals session.deploy at a bank role; a team
-// layer may TIGHTEN it to a more-senior bank role but may NOT loosen it. Because the bank role
-// names are unknown to the default ladder, a tighten that SUCCEEDS could only have used the bank
+// CONFIGURED ladder, not the default. A platform layer seals session.deploy at a deployment role; a team
+// layer may TIGHTEN it to a more-senior configured role but may NOT loosen it. Because the configured role
+// names are unknown to the default ladder, a tighten that SUCCEEDS could only have used the deployment
 // ladder.
 func TestSealTighteningUsesConfiguredLadder(t *testing.T) {
-	ladder := bankLadder()
+	ladder := renamedLadder()
 	platform := Layer{
 		Name:        "platform",
 		ActionRoles: map[string]mantlekeep.Role{"session.deploy": "L2-Engineer"},
@@ -114,7 +114,7 @@ func TestSealTighteningUsesConfiguredLadder(t *testing.T) {
 	tighten := Layer{Name: "team", ActionRoles: map[string]mantlekeep.Role{"session.deploy": "L1-Super-Admin"}}
 	got, ok := Resolve(ladder, DefaultLayer(), platform, tighten).RequiredRole("session.deploy")
 	if !ok || got != "L1-Super-Admin" {
-		t.Errorf("tightening a sealed floor to a more-senior bank role must win: got %q ok=%v, want L1-Super-Admin", got, ok)
+		t.Errorf("tightening a sealed floor to a more-senior configured role must win: got %q ok=%v, want L1-Super-Admin", got, ok)
 	}
 
 	// LOOSEN: a team drops the floor to the junior L3-Consumer — rejected, sealed value kept.

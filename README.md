@@ -216,7 +216,7 @@ SpringApplication.run(Application.class, args);
 acme:
   door:
     mode: service
-    url: https://door.internal
+    url: https://door.example.com
 ```
 
 Aliases are added at the lowest precedence, so an explicit `mantlekeep.*` value always

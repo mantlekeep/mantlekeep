@@ -27,7 +27,7 @@ Requires Python 3.9+.
 ```python
 from mantlekeep import DoorConfig, Intent, ServiceDoorClient
 
-door = ServiceDoorClient(DoorConfig(base_url="http://door.internal:8080"))
+door = ServiceDoorClient(DoorConfig(base_url="https://door.example.com"))
 
 decision = door.submit(Intent(
     action="launch.start",

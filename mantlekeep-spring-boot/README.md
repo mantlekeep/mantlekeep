@@ -32,7 +32,7 @@ dependencies {
 ## Configure
 
 ```yaml
-mantle:
+mantlekeep:
   door:
     base-url: http://localhost:8080     # the core's door
     govern-path: /api/govern

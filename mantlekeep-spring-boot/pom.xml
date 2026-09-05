@@ -81,7 +81,7 @@
           their Spring Boot version. Instead each module imports the EXTERNAL spring-boot-dependencies at
           BUILD time only (dependencyManagement is not transitive), leaving Spring deps version-less in the
           published pom so a consumer's own Spring Boot BOM floats them to any CVE-patched release.
-       MANTLE pins only its OWN artifacts (${revision}); it never pins Spring for consumers. -->
+       MantleKeep pins only its OWN artifacts (${revision}); it never pins Spring for consumers. -->
 
 
   <build>
@@ -117,7 +117,7 @@
       </plugin>
       <!-- CI-friendly versions REQUIRE flatten: a deployed pom must never contain a raw ${revision}
            (consumers can't resolve it). resolveCiFriendliesOnly substitutes ONLY revision/sha1/changelist
-           and leaves everything else exactly as authored — so MANTLE's own ${revision} deps become
+           and leaves everything else exactly as authored — so MantleKeep's own ${revision} deps become
            concrete while the version-less Spring deps STAY version-less (the CVE-float guarantee).
            updatePomFile=true applies it to the pom-packaging parent + BOM too, so they also ship
            resolved. -->
@@ -162,7 +162,7 @@
   </distributionManagement>
 
   <!-- The `release` profile re-routes deploy from GitHub Packages to the Sonatype Central
-       Portal, MIRRORING sdks/java so the spring-boot starters (which products + the Frame
+       the web UI, MIRRORING sdks/java so the spring-boot starters (which products + the Frame
        facade depend on) publish to Central too — not just the SDK tree. Same javadoc + gpg +
        central-publishing plumbing; sources are already attached by the base build above. -->
   <profiles>
