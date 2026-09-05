@@ -27,7 +27,7 @@ import (
 //	}
 //
 // roles, when present, declares the deployment's role vocabulary (name→authority rank, lower =
-// more senior). It is the ONE place a bank renames the built-in tiers; the FIRST layer that sets
+// more senior). It is the ONE place a deployment renames the built-in tiers; the FIRST layer that sets
 // it wins (see policy.LadderFrom). Omit it and the built-in five tiers apply unchanged.
 type layerFile struct {
 	Roles       map[string]int    `json:"roles"`

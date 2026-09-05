@@ -33,7 +33,7 @@
 
   <dependencies>
     <!-- The pure-JDK door spine — the ONE definition of Intent · Decision · DoorClient · DoorConfig.
-         MANTLE's OWN artifact, pinned lockstep to the family version (flatten resolves ${revision}). -->
+         MantleKeep's OWN artifact, pinned lockstep to the family version (flatten resolves ${revision}). -->
     <dependency>
       <groupId>dev.mantlekeep</groupId>
       <artifactId>mantlekeep-door-client</artifactId>

@@ -10,14 +10,14 @@ import (
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
 )
 
-// TestLayerFileCarriesRenamedRoleVocabulary proves the config seam a bank uses to rename its
+// TestLayerFileCarriesRenamedRoleVocabulary proves the config seam a deployment uses to rename its
 // tiers: a layer file's "roles" map loads onto the layer, and LadderFrom turns it into the
 // deployment ladder. This is the on-disk half of the flexible-role-ladder change — the door then
 // governs on THIS vocabulary (see the policy-package end-to-end test).
 func TestLayerFileCarriesRenamedRoleVocabulary(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "platform.json")
-	// A bank platform layer: it names its OWN tiers and binds an action to one of them.
+	// A platform layer: it names its OWN tiers and binds an action to one of them.
 	const layerJSON = `{
 	  "roles":       { "L0-SuperAdmin": 0, "L1-Super-Admin": 1, "L2-Engineer": 2, "L3-Consumer": 3, "AI-Agent": 4 },
 	  "actionRoles": { "session.deploy": "L1-Super-Admin" },

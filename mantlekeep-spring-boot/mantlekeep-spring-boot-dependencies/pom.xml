@@ -21,7 +21,7 @@
   </properties>
 
   <!-- This BOM manages ONLY MantleKeep's own artifacts — deliberately NOT Spring Boot. A consumer who
-       imports this BOM gets MANTLE's versions and brings their OWN Spring Boot BOM, so they float Spring
+       imports this BOM gets MantleKeep's versions and brings their OWN Spring Boot BOM, so they float Spring
        to any CVE-patched release. Pinning Spring here would cap them (the very thing to avoid). Versions
        are ${revision} (the family version), resolved into the deployed pom by flatten. The two trees
        release in LOCKSTEP, so door-client (built in sdks/java) follows the same ${revision}. -->

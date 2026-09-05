@@ -288,7 +288,7 @@ existed to produce.
   approval, so a run approved as a unit does not re-ask the door per step (which would turn transition
   governance into phase governance). This was a real consumer's top blocker.
 - **`app.Brand` / `BrandPrefix`** — a product declares its own name and config prefix without naming any
-  framework variable; `frame.door.url` binds in `application.yml`, aliased at lowest precedence so an
+  framework variable; `acme.door.url` binds in `application.yml`, aliased at lowest precedence so an
   explicit `mantlekeep.*` value still wins.
 
 ### Corrected claims (the code no longer promises more than it delivers)

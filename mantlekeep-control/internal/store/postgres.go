@@ -4,7 +4,7 @@
 // keeps the heavy driver optional: in a normal build it does not exist, so its
 // dependency is never linked and can never affect the core. Enable it with:
 //
-//	go build -tags postgres ./cmd/mantle
+//	go build -tags postgres ./cmd/mantlekeep
 //
 // In a real deployment the body opens a live pool, e.g.:
 //

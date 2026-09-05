@@ -52,7 +52,7 @@ jobs:
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: mvn -B -P release -DskipTests deploy
-      # Spring-boot starters (products + the Frame facade depend on starter-webflux). The tree uses
+      # Spring-boot starters (downstream products depend on starter-webflux). The tree uses
       # ci-friendly ${revision}; pin it to the SDK's version so both trees publish the SAME GAV, and the
       # starters' door-client:${revision} resolves the SDK just deployed to ~/.m2.
       - name: deploy spring-boot starters to Central Portal

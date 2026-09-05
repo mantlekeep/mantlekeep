@@ -3,7 +3,7 @@ module github.com/mantlekeep/mantlekeep/mantlekeep-kafka
 // Kept in lockstep with mantlekeep-control/go.mod — the CI toolchain is pinned to the
 // patched release that clears the current stdlib advisories, and a module lagging behind
 // would be scanned against an older stdlib.
-go 1.26.6
+go 1.25.0
 
 require (
 	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.1.2

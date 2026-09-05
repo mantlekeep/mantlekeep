@@ -56,9 +56,9 @@ seal from the previous page:
    `app/door.go:31-34` (comment: "NOT wiped on boot"), so the chain is continuous. This
    is why demo beat #4 ("durable evidence, restart, chain intact") works.
 5. **Prove it by running the verifier.** The chain has a CLI check today: the bare
-   `mantle` command opens the audit DB and prints `audit hash-chain intact: true`
-   (`cmd/mantle/main.go:102-105`); the products demo prints the same for one shared chain
-   across all products (`cmd/mantle/products.go:72-75`). Run it, tamper with `audit.db`
+   `mantlekeep` command opens the audit DB and prints `audit hash-chain intact: true`
+   (`cmd/mantlekeep/main.go:102-105`); the products demo prints the same for one shared chain
+   across all products (`cmd/mantlekeep/products.go:72-75`). Run it, tamper with `audit.db`
    by hand, run again — it will print `false`. That's the guarantee, demonstrated without
    reading any Go. **Known gap:** there is no HTTP endpoint for verification yet — it is
    CLI-only.

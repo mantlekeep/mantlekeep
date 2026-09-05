@@ -20,7 +20,7 @@ class DoorConfig:
     """How to reach the door and how to name the caller on the wire.
 
     Attributes:
-        base_url: the door's base URL, e.g. ``"http://door.internal:8080"``.
+        base_url: the door's base URL, e.g. ``"https://door.example.com"``.
         caller_header: the header carrying the acting subject. Must match the header the
             door server trusts (its TrustedUserHeader).
         on_behalf_of_header: the header by which a service names the person it acts for.
