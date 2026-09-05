@@ -73,6 +73,15 @@ func (s *Server) resolveCaller(request *http.Request) (caller, error) {
 // authenticatedCaller returns the id of the caller that authenticated, by trusted
 // header or by dev session.
 func (s *Server) authenticatedCaller(request *http.Request) (string, bool) {
+	// A configured Authenticator is the ONLY path when present. Falling back to the header
+	// on a verification failure would make the weaker tier the one an attacker chooses.
+	if s.options.Authenticator != nil {
+		id, err := s.options.Authenticator.Authenticate(request)
+		if err != nil || strings.TrimSpace(id) == "" {
+			return "", false
+		}
+		return id, true
+	}
 	if header := s.options.TrustedUserHeader; header != "" {
 		if id := strings.TrimSpace(request.Header.Get(header)); id != "" {
 			return id, true
