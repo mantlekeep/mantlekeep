@@ -53,7 +53,11 @@ func (c ChainRecorder) Record(ctx context.Context, discovery Discovery) error {
 	}
 	subject := c.Subject
 	if subject == "" {
-		subject = "mantlekeep-reconciler"
+		// A ROLE, not a product name. This lands in an append-only record, so a record
+		// already written can never be corrected — a deployment that rebrands later would
+		// carry the old name permanently in the evidence it shows an auditor. "reconciler"
+		// stays true through any rebrand, and matches the PolicyID set below.
+		subject = "reconciler"
 	}
 	_, err := c.Audit.Log(ctx, mantlekeep.AuditRecord{
 		Timestamp: discovery.Observed.UTC(),
