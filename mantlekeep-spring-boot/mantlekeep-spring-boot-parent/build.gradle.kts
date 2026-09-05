@@ -10,8 +10,7 @@ repositories {
 }
 
 dependencies {
-    // Puts the SpotBugs Gradle plugin on the convention-plugin classpath so the precompiled
-    // `mantlekeep-spring-boot.java-conventions` script can apply `id("com.github.spotbugs")`.
-    // BUILD-only: it never reaches any module's runtime or published ABI.
-    implementation("com.github.spotbugs.snom:spotbugs-gradle-plugin:6.5.9")
+    // Versions come from gradle/libs.versions.toml, which also carries the note on why this
+    // is here and why it never reaches a module's runtime or published ABI.
+    implementation(libs.spotbugs.gradle.plugin)
 }

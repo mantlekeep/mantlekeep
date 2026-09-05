@@ -5,15 +5,19 @@ plugins {
     id("mantlekeep-spring-boot.java-conventions")
 }
 
+// Declarations are grouped by configuration — every api together, every implementation
+// together — so a reader can see the whole of what this module exposes, or consumes, or
+// only needs at build time, without scanning past the other kinds.
 dependencies {
     api(platform(project(":mantlekeep-spring-boot-dependencies")))
-    annotationProcessor(platform(project(":mantlekeep-spring-boot-dependencies"))) // BOM pins the processor version too
     api(project(":mantlekeep-spring-boot-core"))
-
     api("io.projectreactor:reactor-core") // Mono/Flux on the AgentPort adapter surface
+
     implementation("com.fasterxml.jackson.core:jackson-databind") // parse the CLI's stream-json deltas
     implementation("org.springframework.boot:spring-boot-autoconfigure")
     implementation("org.springframework.boot:spring-boot") // @ConfigurationProperties binding
+
+    annotationProcessor(platform(project(":mantlekeep-spring-boot-dependencies"))) // BOM pins the processor version too
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
