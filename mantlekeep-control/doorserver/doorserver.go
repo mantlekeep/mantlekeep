@@ -65,6 +65,19 @@ type Options struct {
 	// with NO credential check. Development and tests only — never enable it where a
 	// real identity source exists.
 	DevLogin bool
+
+	// Authenticator verifies a credential and returns the caller's id.
+	//
+	// When set it REPLACES the header and dev-login tiers rather than adding to them: two
+	// ways to be believed is one way too many, and the weaker would become the one attackers
+	// use. Everything below then rests on a proven name — including the Delegators list,
+	// which is the door's whole control on impersonation and today checks a name a header
+	// asserted.
+	//
+	// Nil keeps the existing behaviour, which is why this is additive to a published module
+	// — but a nil Authenticator on a non-loopback address is now refused unless the
+	// deployment names that decision. See [TrustHeaderVar].
+	Authenticator Authenticator
 }
 
 // Server serves the door's HTTP contract. Build it with New and mount it anywhere an
