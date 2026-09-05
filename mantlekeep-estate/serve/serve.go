@@ -42,15 +42,15 @@ type Options struct {
 func Run(options Options) error {
 	var (
 		addr       = flag.String("addr", envOr("MANTLEKEEP_ESTATE_ADDR", ":8092"), "listen address")
-		configPath = flag.String("config", os.Getenv("MANTLEKEEP_ESTATE_CONFIG"),
+		configPath = flag.String("config", envOr("MANTLEKEEP_ESTATE_CONFIG", ""),
 			"path to the floor and ownership document")
 		doorURL = flag.String("door", envOr("MANTLEKEEP_DOOR_URL", "http://localhost:8080"),
 			"base URL of the door")
 		account = flag.String("service-account", envOr("MANTLEKEEP_SERVICE_ACCOUNT", "mantlekeep-estate"),
 			"the identity this service authenticates to the door AS")
-		fleetPath = flag.String("fleet", os.Getenv("MANTLEKEEP_ESTATE_FLEET"),
+		fleetPath = flag.String("fleet", envOr("MANTLEKEEP_ESTATE_FLEET", ""),
 			"path to the cluster registry")
-		ksmSpec = flag.String("ksm", os.Getenv("MANTLEKEEP_ESTATE_KSM"),
+		ksmSpec = flag.String("ksm", envOr("MANTLEKEEP_ESTATE_KSM", ""),
 			"cluster=url,cluster=url — kube-state-metrics endpoints, one per cluster")
 	)
 	flag.Parse()
@@ -233,9 +233,39 @@ func parseKSM(spec string) map[string]string {
 	return endpoints
 }
 
+// BrandPrefixVar names the prefix this deployment reads its environment under.
+//
+// The variable names ARE a contract: they appear in a deployment's manifests, its Helm
+// values and its runbooks. Baking a product name into them makes rebranding a migration
+// rather than a setting, which is the same reason the wire headers carry no product name.
+//
+// Set MANTLEKEEP_BRAND=ACME and the estate reads ACME_ESTATE_CONFIG, falling back to
+// MANTLEKEEP_ESTATE_CONFIG so an existing deployment keeps working unchanged.
+const BrandPrefixVar = "MANTLEKEEP_BRAND"
+
+// defaultBrand is the prefix used when a deployment chooses none.
+const defaultBrand = "MANTLEKEEP"
+
+// brandPrefix reports the prefix in force, upper-cased so a lowercase brand still resolves.
+func brandPrefix() string {
+	if brand := strings.TrimSpace(os.Getenv(BrandPrefixVar)); brand != "" {
+		return strings.ToUpper(brand)
+	}
+	return defaultBrand
+}
+
+// envOr reads a variable under the deployment's brand, then under the default, then falls
+// back to the built-in value.
+//
+// Both are tried on purpose. A rebranded deployment sets its own names; one that has not
+// rebranded keeps working with no change at all; and a deployment mid-migration can move
+// one variable at a time rather than all of them in a single edit.
 func envOr(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
+	suffix := strings.TrimPrefix(name, defaultBrand+"_")
+	for _, prefix := range []string{brandPrefix(), defaultBrand} {
+		if value := strings.TrimSpace(os.Getenv(prefix + "_" + suffix)); value != "" {
+			return value
+		}
 	}
 	return fallback
 }
