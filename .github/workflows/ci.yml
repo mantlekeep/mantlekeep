@@ -83,6 +83,43 @@ jobs:
       - name: go test
         run: go test ./...
 
+  go-policy-postgres:
+    name: go (policy postgres) — vet · staticcheck · govulncheck · test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mantlekeep-policy-postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build pinned analysis tools
+        env:
+          # The tools module is intentionally OUTSIDE go.work: it exists to build
+          # binaries and must never join the workspace the published modules share.
+          GOWORK: "off"
+        run: |
+          go -C "$GITHUB_WORKSPACE/tools" build -o "$GITHUB_WORKSPACE/bin/" \
+            honnef.co/go/tools/cmd/staticcheck \
+            golang.org/x/vuln/cmd/govulncheck \
+            github.com/securego/gosec/v2/cmd/gosec
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: staticcheck ./...
+      - name: govulncheck
+        run: govulncheck ./...
+      # No database is started, and none is needed here: Postgres is behind the Store
+      # interface, so every RULE in the adapter is decided without one. The SQL that makes
+      # those rules true is proved separately, against a real server, by the tests that run
+      # when MANTLEKEEP_POSTGRES_TEST_DSN names a throwaway database — see the module README.
+      # They skip when it is unset, which is what keeps this job honest rather than merely
+      # green: it claims only what it actually checked.
+      - name: go test
+        run: go test ./...
+
   go-estate:
     name: go (estate) — vet · staticcheck · govulncheck · test
     runs-on: ubuntu-latest
@@ -132,6 +169,10 @@ jobs:
       # kerr via franz-go, kmsg). Raise it in a commit that says why.
       - name: dependency count guard — kafka adapter
         run: MANTLEKEEP_DEP_BASELINE=4 bash scripts/check-deps.sh mantlekeep-kafka
+      # The policy store's own budget: the core, plus the Postgres driver. Two, and it stays
+      # there — the whole point of the split is that this driver cannot reach the engine.
+      - name: dependency count guard — policy postgres adapter
+        run: MANTLEKEEP_DEP_BASELINE=2 bash scripts/check-deps.sh mantlekeep-policy-postgres
 
   java-gradle:
     name: java — gradle build (sdk + spring-boot)

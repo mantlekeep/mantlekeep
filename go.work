@@ -12,4 +12,9 @@ use (
 	./mantlekeep-control // the core — generic engine, bbolt only
 	./mantlekeep-estate  // governs what runs where — floor, placement, drift; no third-party deps
 	./mantlekeep-kafka   // governed-grant adapter for Apache Kafka (franz-go)
+
+	// Policy held in a database instead of a file, so a deployment can change who may do
+	// what through the door without a rollout. Carries the Postgres driver, which is
+	// exactly why it is a module of its own.
+	./mantlekeep-policy-postgres
 )
