@@ -7,10 +7,15 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
+// The namespace model writes ONE request per (resource type) rather than one per operation:
+// the four planned bindings collapse into a topic group carrying READ/WRITE/DESCRIBE and a
+// consumer-group group carrying READ.
 func TestGroupBindingsCollapsesOperationsPerResourceType(t *testing.T) {
+	const prefix = "payments."
+
 	boundary := kafkagrant.Boundary{
 		Principal: "User:svc-payments",
-		Prefix:    "payments.",
+		Prefix:    prefix,
 		Quota:     kafkagrant.Quota{ProducerByteRate: 1 << 20, ConsumerByteRate: 1 << 20},
 	}
 	bindings, err := kafkagrant.PlanBoundaryACLs(boundary)
@@ -23,24 +28,41 @@ func TestGroupBindingsCollapsesOperationsPerResourceType(t *testing.T) {
 		t.Fatalf("grouped 4 bindings into %d groups, want 2 (topic ops and group ops differ, everything else matches)", len(groups))
 	}
 	for _, group := range groups {
-		if len(group.names) != 1 || group.names[0] != "payments." {
-			t.Errorf("group names = %v, want the single prefix", group.names)
-		}
-		if group.key.pattern != kmsg.ACLResourcePatternTypePrefixed {
-			t.Errorf("group pattern = %s, want PREFIXED", group.key.pattern)
-		}
-		switch group.key.resource {
-		case kmsg.ACLResourceTypeTopic:
-			if len(group.operations) != 3 {
-				t.Errorf("topic group has %d operations %v, want 3", len(group.operations), group.operations)
-			}
-		case kmsg.ACLResourceTypeGroup:
-			if len(group.operations) != 1 {
-				t.Errorf("consumer-group group has %d operations %v, want 1", len(group.operations), group.operations)
-			}
-		default:
-			t.Errorf("unexpected resource type %s", group.key.resource)
-		}
+		assertGroupIsPrefixedOn(t, group, prefix)
+		assertGroupOperationCount(t, group)
+	}
+}
+
+// Every group must cover exactly the one prefix the boundary named, as a PREFIXED pattern —
+// a LITERAL pattern here would mean an ACL per topic, which is the sprawl the model avoids.
+func assertGroupIsPrefixedOn(t *testing.T, group *aclGroup, prefix string) {
+	t.Helper()
+	if len(group.names) != 1 || group.names[0] != prefix {
+		t.Errorf("group names = %v, want the single prefix %q", group.names, prefix)
+	}
+	if group.key.pattern != kmsg.ACLResourcePatternTypePrefixed {
+		t.Errorf("group pattern = %s, want PREFIXED", group.key.pattern)
+	}
+}
+
+// assertGroupOperationCount checks the collapse itself: how many operations ended up on the
+// one request for this resource type. A resource type the model does not write is a failure
+// in its own right — CREATE is deliberately never granted, so an unexpected type here would
+// mean the plan grew a permission nobody asked for.
+func assertGroupOperationCount(t *testing.T, group *aclGroup) {
+	t.Helper()
+	wantOperations := map[kmsg.ACLResourceType]int{
+		kmsg.ACLResourceTypeTopic: 3, // READ, WRITE, DESCRIBE
+		kmsg.ACLResourceTypeGroup: 1, // READ
+	}
+	want, expected := wantOperations[group.key.resource]
+	if !expected {
+		t.Errorf("unexpected resource type %s", group.key.resource)
+		return
+	}
+	if len(group.operations) != want {
+		t.Errorf("%s group has %d operations %v, want %d",
+			group.key.resource, len(group.operations), group.operations, want)
 	}
 }
 

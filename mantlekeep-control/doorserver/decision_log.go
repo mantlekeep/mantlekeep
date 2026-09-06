@@ -21,6 +21,15 @@ import (
 // param map or a token, so there is nothing secret to leak here. Every value is passed as a typed
 // slog attribute (key/value), never concatenated into a message, so a request-derived string such
 // as `action` cannot forge a second log line.
+//
+// CodeQL's go/clear-text-logging flags the `subject` and `via` attributes here, because it
+// treats any value read from an HTTP request header as sensitive — headers commonly carry
+// Authorization and Cookie. What reaches these fields is the caller IDENTITY resolved from
+// the trusted identity header (see identity.go), which is the one thing a decision log
+// exists to record; the execution token never comes near this file. The credential case
+// CodeQL is generalising from is prevented at construction instead: New refuses an identity
+// header that names a credential (checkIdentityHeader), so the value logged here cannot be
+// a bearer token even under a misconfiguration.
 
 // decisionLog is the SAFE-TO-LOG projection of a finalized door decision. The field set is the
 // whole security argument: there is no place to put a secret. category and reason are populated

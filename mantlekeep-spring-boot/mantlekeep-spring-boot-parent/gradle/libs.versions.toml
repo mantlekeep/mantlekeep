@@ -1,0 +1,15 @@
+# Version catalog for the "-parent" build (the convention plugins). Gradle picks this file
+# up automatically and exposes it to this build's scripts as `libs`.
+#
+# Versions live here rather than inline in build.gradle.kts so there is ONE place to read
+# and bump what the convention-plugin classpath pins — the same reason the module family
+# takes its versions from the -dependencies BOM instead of spelling them out per module.
+
+[versions]
+# The SpotBugs Gradle plugin, put on the convention-plugin classpath so the precompiled
+# `mantlekeep-spring-boot.java-conventions` script can apply `id("com.github.spotbugs")`.
+# BUILD-only: it never reaches any module's runtime or published ABI.
+spotbugs = "6.5.9"
+
+[libraries]
+spotbugs-gradle-plugin = { module = "com.github.spotbugs.snom:spotbugs-gradle-plugin", version.ref = "spotbugs" }

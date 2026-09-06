@@ -39,6 +39,81 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
   cluster sits behind an `Admin` interface, so prefix refusal, ACL shape, quota shape and
   already-exists idempotency are all decided — and asserted — without one.
 
+### Changed — BREAKING (Go API)
+
+Three exported single-method interfaces (and one internal) are renamed for the method they
+declare, the Go convention
+(`Reader`/`Writer`/`CloseNotifier`); a name that shares nothing with its method makes a reader
+open the type to find out what implementing it costs. Renames only — **no behaviour changes**,
+and no signature changes beyond the names themselves.
+
+| Was | Now | Why |
+| --- | --- | --- |
+| `mantlekeep.WorkflowEngine` | `mantlekeep.WorkflowRunner` | its method is `Run` |
+| `extension.RouteRegistrar` | `extension.Router` | see below — the method is renamed too |
+| `registry.Source` | `registry.Fetcher` | its method is `Fetch` |
+| `registry.GitFetcher` | `registry.GitCloner` | frees the `Fetcher` name for the interface above; this is the narrower git-clone port injected into `GitSource`, not the registry's ingestion port |
+| `registry.GitSource{Fetcher: …}` | `registry.GitSource{Clone: …}` | the field holds a `GitCloner` |
+
+`registry.Register` and `registry.Ingest` now take a `registry.Registration` value instead of a
+positional parameter list:
+
+```go
+// was
+r.Register(ctx, "scan-tool", "tool", "Scanner", "alice", "1.0.0", "sha256:aaa", nil)
+// now
+r.Register(ctx, registry.Registration{
+    Name: "scan-tool", Kind: "tool", Title: "Scanner",
+    Owner: "alice", Version: "1.0.0", Ref: "sha256:aaa",
+})
+```
+
+`Register` took six consecutive strings — title, owner, version and ref among them — so
+transposing any two of them compiled cleanly and stored the wrong thing under the right name.
+`Ingest` took nine parameters in total. `Ingest` still supplies `Ref` itself (the digest of the
+bytes that actually arrived) and still falls back to the source's descriptor for an empty
+`Manifest`.
+
+`extension.Router`'s method is renamed `Handle` → `Route`. The value REGISTERS a handler
+against a pattern; it does not serve the request. `Handle` invited the reader to expect an
+`http.Handler`, which is the one thing it is not.
+
+**To adopt:** rename at the call sites. An implementor of `extension.RouteRegistrar` renames its
+`Handle` method to `Route`; nothing else changes shape. `internal/policy`'s `Source`/`SourceFunc`
+became `Loader`/`LoaderFunc` in the same pass but are internal, so no consumer sees them.
+
+### Security
+
+- **`doorserver.New` refuses a credential-bearing header as the caller-identity header.**
+  `TrustedUserHeader` / `DelegatedSubjectHeader` set to `Authorization`, `Proxy-Authorization`,
+  `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key` or `X-Auth-Token` is now rejected at
+  construction (case-insensitive, whitespace-trimmed) rather than accepted.
+
+  The door records the caller's id as the SUBJECT of every decision — in the console decision
+  log and in the **hash-chained audit record**. Pointing the identity header at a credential
+  header made the door write a live bearer token there as a user id, into an append-only,
+  tamper-evident log where it cannot be redacted afterwards without breaking the chain that
+  proves the record was not edited. A one-character configuration slip with a permanent
+  consequence, so it is now a machine-enforced refusal instead of a documented caution.
+
+  **To adopt:** only a deployment that was already recording credentials as user ids is
+  affected, and it fails fast at startup with a message naming what to set instead.
+
+### Removed
+
+- **`internal/policy.liveSnapshot`** — it declared `RequiredRole(string) (Role, bool)`, which is
+  exactly `ActionAuthorizer`, in the same file. Two names for one contract let the two drift.
+  `WithLive` now takes `ActionAuthorizer` directly; internal, so no consumer sees it.
+
+### Added
+
+- **`internal/audit` is tested.** The bbolt hash-chained audit log — the framework's evidence
+  spine — had no tests. Now covered: the chain link between records, an intact walk, a record
+  edited behind the logger's back, an unreadable record, `Count` on an empty vs populated chain,
+  and `Records`' newest-first order and limit.
+- **`var _ mantlekeep.WorkflowRunner = (*orchestrator.Engine)(nil)`** — the doc comment claimed the
+  Engine implements the core contract; now the compiler checks it.
+
 ## [0.1.2] — 2026-08-14
 
 Patch — a **security-hygiene** release: clears a consumer's **SonarQube Quality Gate** and a batch of

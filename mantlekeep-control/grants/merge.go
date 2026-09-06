@@ -64,8 +64,28 @@ func productDocs() ([]productDoc, error) {
 	if v == "" {
 		return nil, nil
 	}
+	files, err := policyDocPaths(v)
+	if err != nil {
+		return nil, err
+	}
+	docs := make([]productDoc, 0, len(files))
+	for _, f := range files {
+		d, err := readPolicyDoc(f)
+		if err != nil {
+			return nil, err
+		}
+		docs = append(docs, d)
+	}
+	return docs, nil
+}
+
+// policyDocPaths expands the OS path list into the SORTED set of doc files. Each entry is
+// either a directory — contributing its *.json entries — or a single doc path. Sorting is
+// what makes the merge reproducible: the same set of files must always compose in the same
+// order, whatever order the filesystem hands them back.
+func policyDocPaths(pathList string) ([]string, error) {
 	var files []string
-	for _, p := range strings.Split(v, string(os.PathListSeparator)) {
+	for _, p := range strings.Split(pathList, string(os.PathListSeparator)) {
 		if p == "" {
 			continue
 		}
@@ -73,35 +93,50 @@ func productDocs() ([]productDoc, error) {
 		if err != nil {
 			return nil, fmt.Errorf("policy source %q: %w", p, err)
 		}
-		if info.IsDir() {
-			ents, err := os.ReadDir(p)
-			if err != nil {
-				return nil, err
-			}
-			for _, e := range ents {
-				if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
-					files = append(files, filepath.Join(p, e.Name()))
-				}
-			}
-		} else {
+		if !info.IsDir() {
 			files = append(files, p)
+			continue
 		}
-	}
-	sort.Strings(files)
-	docs := make([]productDoc, 0, len(files))
-	for _, f := range files {
-		b, err := safeio.ReadConfigFile(f)
+		inDir, err := jsonFilesIn(p)
 		if err != nil {
 			return nil, err
 		}
-		var d productDoc
-		if err := json.Unmarshal(b, &d); err != nil {
-			return nil, fmt.Errorf("policy doc %q: %w", f, err)
-		}
-		d.Source = f
-		docs = append(docs, d)
+		files = append(files, inDir...)
 	}
-	return docs, nil
+	sort.Strings(files)
+	return files, nil
+}
+
+// jsonFilesIn lists the *.json files directly inside dir. Subdirectories and any other
+// extension are skipped, so a README or a stray editor backup beside the policy does not
+// become policy.
+func jsonFilesIn(dir string) ([]string, error) {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, e := range ents {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+			files = append(files, filepath.Join(dir, e.Name()))
+		}
+	}
+	return files, nil
+}
+
+// readPolicyDoc reads and parses ONE policy doc, stamping its path as the Source so a
+// refusal can name the file that caused it.
+func readPolicyDoc(path string) (productDoc, error) {
+	b, err := safeio.ReadConfigFile(path)
+	if err != nil {
+		return productDoc{}, err
+	}
+	var d productDoc
+	if err := json.Unmarshal(b, &d); err != nil {
+		return productDoc{}, fmt.Errorf("policy doc %q: %w", path, err)
+	}
+	d.Source = path
+	return d, nil
 }
 
 // unionStrings returns a ∪ b, preserving a's order then b's new entries, deduped.

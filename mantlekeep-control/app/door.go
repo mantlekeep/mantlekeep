@@ -122,9 +122,9 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 	}
 	live := policy.NewLiveResolver(initial)
 
-	// The Source re-reads the env-configured files quietly on every poll; a Store-backed
-	// Source (bbolt/Postgres) drops in here unchanged for the HA story.
-	src := policy.SourceFunc(func(context.Context) ([]policy.Layer, error) {
+	// The Loader re-reads the env-configured files quietly on every poll; a Store-backed
+	// Loader (bbolt/Postgres) drops in here unchanged for the HA story.
+	src := policy.LoaderFunc(func(context.Context) ([]policy.Layer, error) {
 		// On a hot-reload poll an invalid edit returns an error; the watcher keeps the
 		// last-good snapshot (fail static, not open) rather than swapping to a broken law.
 		return currentLayers(false)
