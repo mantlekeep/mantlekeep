@@ -18,7 +18,7 @@ SELECT revision, updated_at, jsonb_pretty(grants_doc)
 -- when you need to put a name to a change.
 SELECT applied_at, change_role, change_action, change_grant, change_reason
   FROM mantlekeep_policy_history
- ORDER BY seq;
+ ORDER BY seq ASC;
 
 -- WHAT DID THE POLICY SAY AT A POINT IN TIME?
 -- The question an auditor asks. Replace the timestamp.
