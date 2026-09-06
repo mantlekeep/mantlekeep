@@ -48,7 +48,7 @@ func TestSealedFloorDenialIsNotMisclassified(t *testing.T) {
 			codeSeparationDuties, got)
 	}
 	// Prove the guess alone would have failed — this is what the stamp protects against.
-	if guessed := denialCode(sealed.Reason); guessed == codeSeparationDuties {
+	if denialCode(sealed.Reason) == codeSeparationDuties {
 		t.Skip("reason-guessing happens to match; the stamp is what guarantees it does not have to")
 	}
 }

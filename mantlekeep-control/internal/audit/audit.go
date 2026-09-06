@@ -58,7 +58,7 @@ func (b *Bolt) Log(_ context.Context, rec mantlekeep.AuditRecord) (mantlekeep.Au
 		rec.PrevHash = ""
 		if _, last := bkt.Cursor().Last(); last != nil {
 			var prev mantlekeep.AuditRecord
-			if e := json.Unmarshal(last, &prev); e == nil {
+			if json.Unmarshal(last, &prev) == nil {
 				rec.PrevHash = prev.Hash
 			}
 		}
@@ -119,7 +119,7 @@ func (b *Bolt) Verify(_ context.Context) (bool, error) {
 		prevHash := ""
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			var rec mantlekeep.AuditRecord
-			if e := json.Unmarshal(v, &rec); e != nil {
+			if json.Unmarshal(v, &rec) != nil {
 				intact = false
 				return nil
 			}

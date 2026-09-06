@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -21,6 +22,40 @@ var (
 )
 
 const sessionCookieName = "mantlekeep_session"
+
+// credentialHeaderNames are headers whose value is a SECRET, never an identity.
+//
+// Naming one of these as the identity header would make the door read a bearer token,
+// cookie or API key AS the caller's user id — and that id is then written to the console
+// decision log and, worse, into the hash-chained audit record, which is append-only and
+// tamper-evident by design. A credential written there cannot be redacted afterwards
+// without breaking the chain that proves the record was not edited.
+//
+// So this is refused at construction rather than documented as the operator's problem:
+// it is a one-character configuration slip with a permanent, unfixable consequence.
+// Compared lower-cased because HTTP header names are case-insensitive.
+var credentialHeaderNames = map[string]bool{
+	"authorization":       true,
+	"proxy-authorization": true,
+	"cookie":              true,
+	"set-cookie":          true,
+	"x-api-key":           true,
+	"api-key":             true,
+	"x-auth-token":        true,
+}
+
+// checkIdentityHeader refuses an identity header that names a credential. An empty name
+// means the tier is disabled and is always fine.
+func checkIdentityHeader(option, name string) error {
+	if credentialHeaderNames[strings.ToLower(strings.TrimSpace(name))] {
+		return fmt.Errorf(
+			"doorserver: %s is set to %q, which carries a CREDENTIAL, not an identity — "+
+				"the value would be recorded as the caller's id in the audit chain, where it "+
+				"cannot be redacted; name the header your gateway puts the authenticated "+
+				"user id in", option, name)
+	}
+	return nil
+}
 
 // caller is the outcome of identifying a request: the subject whose action this is,
 // and — when a service acted for someone else — which service carried the claim.

@@ -16,6 +16,28 @@ import (
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/orchestrator"
 )
 
+// The demo's fixed vocabulary. These are EXAMPLE values, not core concepts: the engine
+// names no action and no resource of its own, so every one of them is a string this
+// smoke test chose. Named once here so the cases below and the example provider that
+// grants them can never drift apart — a case naming an action the provider does not
+// grant would silently turn this demo's expected ALLOW into a DENY.
+const (
+	// The one resource every demo case acts on; its value is arbitrary, only its sameness matters.
+	demoResource = "project/demo"
+
+	// Granted to L3-Consumer by exampleGrants below.
+	actionJobRun = "job.run"
+	// Granted to AI-Agent below: an AI may PROPOSE a change.
+	actionChangePropose = "change.propose"
+	// Deliberately granted to NO ONE, so the demo shows a real deny: approval is the act
+	// an AI may never perform, and the core ships zero grants of its own.
+	actionChangeApprove = "change.approve"
+)
+
+// sectionDivider separates the demo's printed sections. Its width matches the banner
+// lines it sits under.
+const sectionDivider = "────────────────────────────────────────────────────────"
+
 func main() {
 	// Role dispatch — the lean CORE binary: engine + governance demos only. The PRODUCT
 	// surface (the Portal, the Canvas, the product catalog) is served by the MantleKeep
@@ -65,27 +87,27 @@ func main() {
 	door := sdk.New(identity.NewMock(), policy.NewRBAC().WithProviders(exampleGrants{}), aud)
 
 	fmt.Println("🔱 MantleKeep — the one door (Week-1 smoke test)")
-	fmt.Println("────────────────────────────────────────────────────────")
+	fmt.Println(sectionDivider)
 
 	cases := []mantlekeep.Intent{
 		// SuperAdmin (L0) — the engine-baked wildcard → ALLOWED (needs no grant)
-		{ID: "INT-001", Action: "job.run", Resource: "project/demo",
+		{ID: "INT-001", Action: actionJobRun, Resource: demoResource,
 			Subject: mantlekeep.Subject{ID: "root", Roles: []mantlekeep.Role{mantlekeep.RoleSuperAdmin}},
 			Spec:    mantlekeep.IntentSpec{Goal: "run anything — superadmin wildcard"}},
 		// Consumer runs a job → ALLOWED (granted to L3-Consumer by the example provider)
-		{ID: "INT-002", Action: "job.run", Resource: "project/demo",
+		{ID: "INT-002", Action: actionJobRun, Resource: demoResource,
 			Subject: mantlekeep.Subject{ID: "dev-alice", Roles: []mantlekeep.Role{mantlekeep.RoleConsumer}},
 			Spec:    mantlekeep.IntentSpec{Goal: "run the build"}},
 		// AI agent proposes a change → ALLOWED (AI may propose; granted to AI-Agent)
-		{ID: "INT-003", Action: "change.propose", Resource: "project/demo",
+		{ID: "INT-003", Action: actionChangePropose, Resource: demoResource,
 			Subject: mantlekeep.Subject{ID: "ci-agent", Roles: []mantlekeep.Role{mantlekeep.RoleAIAgent}, IsAI: true},
 			Spec:    mantlekeep.IntentSpec{Goal: "propose a dependency bump"}},
 		// Intent with NO goal → DENIED (declare-before-execute)
-		{ID: "INT-004", Action: "job.run", Resource: "project/demo",
+		{ID: "INT-004", Action: actionJobRun, Resource: demoResource,
 			Subject: mantlekeep.Subject{ID: "dev-alice", Roles: []mantlekeep.Role{mantlekeep.RoleConsumer}},
 			Spec:    mantlekeep.IntentSpec{Goal: ""}},
 		// AI agent tries to APPROVE → DENIED (never granted — the core ships zero grants; you supply them)
-		{ID: "INT-005", Action: "change.approve", Resource: "project/demo",
+		{ID: "INT-005", Action: actionChangeApprove, Resource: demoResource,
 			Subject: mantlekeep.Subject{ID: "ci-agent", Roles: []mantlekeep.Role{mantlekeep.RoleAIAgent}, IsAI: true},
 			Spec:    mantlekeep.IntentSpec{Goal: "approve the change"}},
 	}
@@ -106,7 +128,7 @@ func main() {
 
 	ok, err := aud.Verify(ctx)
 	must(err)
-	fmt.Println("────────────────────────────────────────────────────────")
+	fmt.Println(sectionDivider)
 	fmt.Printf("audit hash-chain intact: %v\n", ok)
 
 	// ── The spine — run a governed DAG under a token ─────────────────────────
@@ -117,7 +139,7 @@ func main() {
 	// demo needs zero external policy data (grants are DATA the core no longer embeds).
 	fmt.Println()
 	fmt.Println("🔱 MantleKeep — the spine (orchestrator engine + saga)")
-	fmt.Println("────────────────────────────────────────────────────────")
+	fmt.Println(sectionDivider)
 
 	token, err := door.Submit(ctx, mantlekeep.Intent{
 		ID: "INT-100", Action: "spine.run", Resource: "demo",
@@ -200,11 +222,11 @@ func runChain(ctx context.Context, label string, runner orchestrator.StepRunner,
 type exampleGrants struct{}
 
 func (exampleGrants) Name() string      { return "example" }
-func (exampleGrants) Actions() []string { return []string{"job.run", "change.propose"} }
+func (exampleGrants) Actions() []string { return []string{actionJobRun, actionChangePropose} }
 func (exampleGrants) RoleActions() map[mantlekeep.Role][]string {
 	return map[mantlekeep.Role][]string{
-		mantlekeep.RoleConsumer: {"job.run"},
-		mantlekeep.RoleAIAgent:  {"change.propose"},
+		mantlekeep.RoleConsumer: {actionJobRun},
+		mantlekeep.RoleAIAgent:  {actionChangePropose},
 	}
 }
 

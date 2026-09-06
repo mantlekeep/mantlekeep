@@ -38,7 +38,9 @@ type Options struct {
 	// door trusts what it asserts. Empty disables header identity.
 	//
 	// SECURITY: only set this when something in front of the door actually strips and
-	// re-sets the header. Trusting a client-settable header is impersonation.
+	// re-sets the header. Trusting a client-settable header is impersonation. It must name
+	// a header carrying an IDENTITY — New refuses Authorization, Cookie and the like,
+	// because the value becomes the caller id in the audit chain (see checkIdentityHeader).
 	TrustedUserHeader string
 
 	// DelegatedSubjectHeader names the header by which an authenticated SERVICE says
@@ -49,7 +51,8 @@ type Options struct {
 	// service as VIA (which application carried the claim). An audit that keeps only
 	// one of them cannot answer the question it exists to answer.
 	//
-	// Empty disables delegation entirely.
+	// Empty disables delegation entirely. Like TrustedUserHeader, it must name an identity
+	// header, not a credential one — New refuses the latter.
 	DelegatedSubjectHeader string
 
 	// Delegators lists the authenticated callers permitted to act for someone else.
@@ -96,6 +99,13 @@ func New(options Options) (*Server, error) {
 	}
 	if options.TrustedUserHeader == "" && !options.DevLogin {
 		return nil, errNoIdentitySource
+	}
+	// An identity header must name an identity, not a secret — see checkIdentityHeader.
+	if err := checkIdentityHeader("TrustedUserHeader", options.TrustedUserHeader); err != nil {
+		return nil, err
+	}
+	if err := checkIdentityHeader("DelegatedSubjectHeader", options.DelegatedSubjectHeader); err != nil {
+		return nil, err
 	}
 	return &Server{door: options.Door, sessions: newSessionStore(), options: options}, nil
 }

@@ -12,10 +12,14 @@ package extension
 
 import "net/http"
 
-// RouteRegistrar is the minimal mux the portal hands to a provider. method is an HTTP
+// Router is the minimal mux the portal hands to a provider. method is an HTTP
 // method ("GET"/"POST"/…); pattern is a Go 1.22 ServeMux pattern (may carry {vars}).
-type RouteRegistrar interface {
-	Handle(method, pattern string, h http.HandlerFunc)
+//
+// The method is Route, not Handle: this value REGISTERS a handler against a pattern,
+// it does not serve the request itself. Naming it Handle invited the reader to expect
+// an http.Handler, which is the one thing it is not.
+type Router interface {
+	Route(method, pattern string, h http.HandlerFunc)
 }
 
 // RouteProvider mounts a set of routes. Implement it in your product or module and pass
@@ -23,7 +27,7 @@ type RouteRegistrar interface {
 // A provider should namespace its patterns (e.g. /api/<yours>/…) to avoid colliding
 // with core routes.
 type RouteProvider interface {
-	MountRoutes(r RouteRegistrar)
+	MountRoutes(r Router)
 }
 
 // Routes is a convenience RouteProvider: a plain list of routes. Build one with Route
@@ -38,8 +42,8 @@ type Route struct {
 }
 
 // MountRoutes registers every route in the list.
-func (rs Routes) MountRoutes(r RouteRegistrar) {
+func (rs Routes) MountRoutes(r Router) {
 	for _, rt := range rs {
-		r.Handle(rt.Method, rt.Pattern, rt.Handler)
+		r.Route(rt.Method, rt.Pattern, rt.Handler)
 	}
 }

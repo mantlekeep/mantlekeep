@@ -295,9 +295,9 @@ type RunResult struct {
 	FinishedAt time.Time
 }
 
-// WorkflowEngine executes a DAG under a valid ExecutionToken. Impl: channel
+// WorkflowRunner executes a DAG under a valid ExecutionToken. Impl: channel
 // transport (embedded, MVP) → NATS coordinator/worker (distributed).
-type WorkflowEngine interface {
+type WorkflowRunner interface {
 	Run(ctx context.Context, token ExecutionToken, dag DAG) (RunResult, error)
 }
 

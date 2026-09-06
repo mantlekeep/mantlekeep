@@ -23,7 +23,11 @@ type LocalPromoter struct {
 // shows this was promoted, not re-fetched. The target env's own gate decides whether
 // it publishes there.
 func (p LocalPromoter) Promote(ctx context.Context, entry Entry, version Version) error {
-	if _, err := p.Target.Register(ctx, entry.Name, entry.Kind, entry.Title, entry.Owner, version.Version, version.Ref, version.Manifest); err != nil {
+	reg := Registration{
+		Name: entry.Name, Kind: entry.Kind, Title: entry.Title, Owner: entry.Owner,
+		Version: version.Version, Ref: version.Ref, Manifest: version.Manifest,
+	}
+	if _, err := p.Target.Register(ctx, reg); err != nil {
 		return err
 	}
 	prov := map[string]string{"promotedFrom": version.Env}

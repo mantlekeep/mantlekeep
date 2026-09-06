@@ -85,7 +85,10 @@ class ServiceDoorClient:
     def _decision_from(raw: bytes) -> Decision:
         try:
             payload = json.loads(raw.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError) as parse_error:
+        # Both failures are ValueErrors: bytes that are not UTF-8 raise UnicodeDecodeError
+        # (a UnicodeError, which is a ValueError) and text that is not JSON raises
+        # json.JSONDecodeError (also a ValueError). One clause catches the pair.
+        except ValueError as parse_error:
             raise DoorUnavailableError(
                 "door response was not JSON — cannot read it as a verdict"
             ) from parse_error

@@ -23,7 +23,7 @@ import (
 //
 //   1. LiveResolver holds the active *Resolved behind an atomic.Pointer. The engine
 //      reads it per-request (one atomic load, no lock on the hot path).
-//   2. A Watcher polls a Source (a file/dir or a Store table) for the current layers,
+//   2. A Watcher polls a Loader (a file/dir or a Store table) for the current layers,
 //      rebuilds a BRAND-NEW *Resolved via Resolve(...), and atomically SWAPS the
 //      pointer. In-flight requests finish against the old snapshot; the next request
 //      sees the new one — no request is ever evaluated against a half-applied config.
@@ -62,26 +62,26 @@ func (l *LiveResolver) RequiredRole(action string) (mantlekeep.Role, bool) {
 	return l.cur.Load().RequiredRole(action)
 }
 
-// Source abstracts WHERE the current layers come from: a file/dir today (kept for dev),
+// Loader abstracts WHERE the current layers come from: a file/dir today (kept for dev),
 // a Store table for HA (Postgres/bbolt) later. The resolver is unchanged — it still
 // just consumes []Layer. This is the same driver-swap pattern as the Store port.
-type Source interface {
+type Loader interface {
 	Load(ctx context.Context) ([]Layer, error)
 }
 
-// SourceFunc adapts a plain function to a Source.
-type SourceFunc func(ctx context.Context) ([]Layer, error)
+// LoaderFunc adapts a plain function to a Loader.
+type LoaderFunc func(ctx context.Context) ([]Layer, error)
 
-// Load implements Source.
-func (f SourceFunc) Load(ctx context.Context) ([]Layer, error) { return f(ctx) }
+// Load implements Loader.
+func (f LoaderFunc) Load(ctx context.Context) ([]Layer, error) { return f(ctx) }
 
-// Watcher polls a Source and, on a REAL change, rebuilds the cascade and atomically
+// Watcher polls a Loader and, on a REAL change, rebuilds the cascade and atomically
 // swaps it into a LiveResolver. Poll is the honest floor — it works everywhere with
 // zero infra; a change is live in <= interval, not instantly. (LISTEN/NOTIFY and NATS
 // pub/sub are sub-second alternatives behind the same shape, per the design spec, and
 // live in adapter modules so the core links no transport.)
 type Watcher struct {
-	src      Source
+	src      Loader
 	live     *LiveResolver
 	fallback ActionAuthorizer // the product registry, re-attached to every rebuilt *Resolved
 	ladder   RoleLadder       // the deployment's role vocabulary, passed to every rebuilt Resolve
@@ -95,7 +95,7 @@ type Watcher struct {
 // poll of an unchanged source is a no-op (no needless re-swap on boot). ladder is the
 // deployment's role vocabulary — every rebuilt cascade resolves against the SAME ladder as
 // the seeded one, so a renamed-role deployment's seal checks stay consistent across reloads.
-func NewWatcher(src Source, live *LiveResolver, fallback ActionAuthorizer, ladder RoleLadder, initial []Layer) *Watcher {
+func NewWatcher(src Loader, live *LiveResolver, fallback ActionAuthorizer, ladder RoleLadder, initial []Layer) *Watcher {
 	return &Watcher{
 		src:      src,
 		live:     live,

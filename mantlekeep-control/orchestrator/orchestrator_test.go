@@ -81,6 +81,19 @@ func TestLayersCycle(t *testing.T) {
 	}
 }
 
+// Two steps sharing a name make every dependency on that name ambiguous, so the DAG is
+// refused before anything runs rather than silently ordering one of them.
+func TestLayersDuplicateStepName(t *testing.T) {
+	dag := mantlekeep.DAG{Name: "dup", Steps: []mantlekeep.Step{
+		{Name: "a"},
+		{Name: "b", DependsOn: []string{"a"}},
+		{Name: "a"},
+	}}
+	if _, err := Layers(dag); err == nil {
+		t.Fatal("expected duplicate-step rejection")
+	}
+}
+
 func TestLayersUnknownDep(t *testing.T) {
 	dag := mantlekeep.DAG{Name: "u", Steps: []mantlekeep.Step{{Name: "a", DependsOn: []string{"ghost"}}}}
 	if _, err := Layers(dag); err == nil {
