@@ -23,8 +23,9 @@
 -- exactly one answer, and a boolean is_current column has as many answers as there are rows
 -- somebody forgot to clear. The history below is where versions live.
 --
--- Read it with:
---   SELECT revision, updated_at, jsonb_pretty(grants_doc) FROM mantlekeep_policy_head;
+-- To read it by hand, see queries.sql beside this file — the statements live there as real,
+-- runnable SQL rather than as text in a comment, so they cannot quietly rot when a column
+-- is renamed.
 CREATE TABLE IF NOT EXISTS mantlekeep_policy_head (
     -- The single-row guard. A boolean primary key that must be true admits exactly one row,
     -- enforced by the database rather than by every writer remembering to.
@@ -70,13 +71,8 @@ CREATE TABLE IF NOT EXISTS mantlekeep_policy_head (
 -- this" in an application table could disagree with the signed one, and an audit trail with
 -- two answers is worse than one with a join. Join on revision.
 --
--- Read it with:
---   SELECT applied_at, change_role, change_action, change_grant, change_reason
---     FROM mantlekeep_policy_history ORDER BY seq;
---
--- Ask what the policy said at a point in time with:
---   SELECT revision, jsonb_pretty(grants_doc) FROM mantlekeep_policy_history
---    WHERE applied_at <= TIMESTAMPTZ '2026-08-14 23:59:59+00' ORDER BY seq DESC LIMIT 1;
+-- To read the history, or to ask what the policy said at a point in time, see queries.sql
+-- beside this file.
 CREATE TABLE IF NOT EXISTS mantlekeep_policy_history (
     -- The order changes landed in. A revision cannot order the history: it is content-derived,
     -- so a grant and its later revoke return to a revision that was already used, on purpose.
