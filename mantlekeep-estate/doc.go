@@ -23,7 +23,7 @@
 //   - [Labels] carry the deployment's OWN grouping vocabulary through to every resolved
 //     [DesiredItem]. Descriptive only: nothing here reads one to decide, and a label may not
 //     take the name of a field that is read to decide.
-//   - [ChangeTransform] lets a change be rewritten BEFORE it is submitted to the door, so what
+//   - [ChangeTransformer] lets a change be rewritten BEFORE it is submitted to the door, so what
 //     a person approves is what will actually be applied. Optional — unset means no call at all.
 //
 // Both are additive and both are configured, never edited. A deployment that uses neither

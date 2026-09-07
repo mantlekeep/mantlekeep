@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// ChangeTransform rewrites a change before it is governed.
+// ChangeTransformer rewrites a change before it is governed.
 //
 // # What this is for
 //
@@ -52,16 +52,16 @@ import (
 //
 // An implementation must be deterministic for a given input and must not depend on the door:
 // it runs before any decision exists.
-type ChangeTransform interface {
+type ChangeTransformer interface {
 	Transform(ctx context.Context, team string, change DesiredItem) (DesiredItem, error)
 }
 
-// ChangeTransformFunc lets a plain function be a [ChangeTransform], for the many
+// ChangeTransformerFunc lets a plain function be a [ChangeTransformer], for the many
 // implementations that hold no state.
-type ChangeTransformFunc func(ctx context.Context, team string, change DesiredItem) (DesiredItem, error)
+type ChangeTransformerFunc func(ctx context.Context, team string, change DesiredItem) (DesiredItem, error)
 
 // Transform calls the function.
-func (f ChangeTransformFunc) Transform(ctx context.Context, team string,
+func (f ChangeTransformerFunc) Transform(ctx context.Context, team string,
 	change DesiredItem) (DesiredItem, error) {
 
 	return f(ctx, team, change)

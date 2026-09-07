@@ -103,7 +103,7 @@ func TestATransformRunsBeforeTheDoorAndItsOutputIsWhatIsGoverned(t *testing.T) {
 	port := &capturingPort{asset: "kafka", log: &log}
 
 	manager := NewManager(door, DefaultFloor(), port).TransformChangesWith(
-		ChangeTransformFunc(func(_ context.Context, team string, change DesiredItem) (DesiredItem, error) {
+		ChangeTransformerFunc(func(_ context.Context, team string, change DesiredItem) (DesiredItem, error) {
 			log = append(log, "transform "+change.Name)
 			if team != "team-a" {
 				t.Errorf("the transform was told team %q", team)
@@ -150,7 +150,7 @@ func TestAnAlreadyTransformedChangeIsNotTransformedTwice(t *testing.T) {
 	port := &capturingPort{asset: "kafka"}
 	store := NewMemoryApprovals()
 	manager := NewManager(door, DefaultFloor(), port).AwaitApprovalIn(store).
-		TransformChangesWith(ChangeTransformFunc(
+		TransformChangesWith(ChangeTransformerFunc(
 			func(_ context.Context, _ string, change DesiredItem) (DesiredItem, error) {
 				calls++
 				change.State = map[string]string{"preparedOnCall": strconv.Itoa(calls)}
@@ -213,7 +213,7 @@ func TestAFailingTransformStopsTheChangeBeforeTheDoor(t *testing.T) {
 	door := &loggingDoor{}
 	port := &capturingPort{asset: "kafka"}
 	manager := NewManager(door, DefaultFloor(), port).TransformChangesWith(
-		ChangeTransformFunc(func(_ context.Context, _ string, _ DesiredItem) (DesiredItem, error) {
+		ChangeTransformerFunc(func(_ context.Context, _ string, _ DesiredItem) (DesiredItem, error) {
 			return DesiredItem{}, errors.New("the change could not be prepared")
 		}))
 
@@ -259,7 +259,7 @@ func TestATransformMayNotChangeWhichChangeThisIs(t *testing.T) {
 	door := &loggingDoor{}
 	port := &capturingPort{asset: "kafka"}
 	manager := NewManager(door, DefaultFloor(), port).TransformChangesWith(
-		ChangeTransformFunc(func(_ context.Context, _ string, change DesiredItem) (DesiredItem, error) {
+		ChangeTransformerFunc(func(_ context.Context, _ string, change DesiredItem) (DesiredItem, error) {
 			change.Name = change.Name + "-elsewhere"
 			return change, nil
 		}))
@@ -287,7 +287,7 @@ func TestTheReconcilePathTransformsToo(t *testing.T) {
 	door := &loggingDoor{}
 	port := &capturingPort{asset: "kafka"}
 	manager := NewManager(door, DefaultFloor(), port).TransformChangesWith(
-		ChangeTransformFunc(func(_ context.Context, _ string, change DesiredItem) (DesiredItem, error) {
+		ChangeTransformerFunc(func(_ context.Context, _ string, change DesiredItem) (DesiredItem, error) {
 			calls++
 			change.State = map[string]string{"prepared": "yes"}
 			return change, nil

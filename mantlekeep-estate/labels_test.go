@@ -62,19 +62,30 @@ func TestALabelMayNotTakeTheNameOfAGovernedField(t *testing.T) {
 //
 // The second half is the part a list gets wrong. A name is confusing wherever it is governed,
 // and a list written from the top-level fields protects the outer layer only.
+// assertEveryDeclaredNameIsGoverned checks one shape's JSON names against the derived set.
+//
+// Extracted so the test above reads as the three properties it asserts — every declared name,
+// every nested name, and the mechanism itself — rather than as a loop with the claim buried
+// three levels in.
+func assertEveryDeclaredNameIsGoverned(t *testing.T, shape reflect.Type) {
+	t.Helper()
+	for index := range shape.NumField() {
+		field := shape.Field(index)
+		declared, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		if declared == "" || declared == "-" {
+			continue
+		}
+		if !governsFieldNamed(declared) {
+			t.Fatalf("%s.%s is parsed as %q and is not in the governed set — the "+
+				"derivation has fallen behind the shape it derives from",
+				shape.Name(), field.Name, declared)
+		}
+	}
+}
+
 func TestTheForbiddenSetIsDerivedFromTheEnginesOwnShapes(t *testing.T) {
 	for _, shape := range []reflect.Type{reflect.TypeOf(Manifest{}), reflect.TypeOf(DesiredItem{})} {
-		for index := range shape.NumField() {
-			declared, _, _ := strings.Cut(shape.Field(index).Tag.Get("json"), ",")
-			if declared == "" || declared == "-" {
-				continue
-			}
-			if !governsFieldNamed(declared) {
-				t.Fatalf("%s.%s is parsed as %q and is not in the governed set — the "+
-					"derivation has fallen behind the shape it derives from",
-					shape.Name(), shape.Field(index).Name, declared)
-			}
-		}
+		assertEveryDeclaredNameIsGoverned(t, shape)
 	}
 
 	// Reachable, not top-level: a field on a nested section is read by the engine exactly as an
