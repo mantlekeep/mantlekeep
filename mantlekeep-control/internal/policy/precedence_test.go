@@ -20,9 +20,7 @@ func (l layerOnly) RequiredRole(action string) (mantlekeep.Role, bool) {
 func withDocument(t *testing.T, document map[string]map[string]bool) {
 	t.Helper()
 	ensurePolicy()
-	restore := roleActionsCache
-	roleActionsCache = document
-	t.Cleanup(func() { roleActionsCache = restore })
+	t.Cleanup(swapRoleActions(document))
 }
 
 // PINS THE PRECEDENCE RULE: a layer that names an action DECIDES it.
@@ -192,8 +190,8 @@ func TestNothingBecameMorePermissive(t *testing.T) {
 	// Seeded directly rather than through withDocument: this loop swaps the document many
 	// times, and a stack of deferred restores is a slower way of saying "put it back once".
 	ensurePolicy()
-	original := roleActionsCache
-	defer func() { roleActionsCache = original }()
+	restore := swapRoleActions(nil)
+	defer restore()
 
 	engineCases := permissivenessCases(documents, layers, subjects, actions)
 	if want := len(documents) * len(layers) * len(subjects) * len(actions); len(engineCases) != want {
@@ -202,7 +200,7 @@ func TestNothingBecameMorePermissive(t *testing.T) {
 	}
 
 	for _, c := range engineCases {
-		roleActionsCache = c.document
+		swapRoleActions(c.document)
 		now := engine.actionAllowed(c.roles, c.action, c.layer)
 		before := allowedUnderTheOldRule(engine, c.roles, c.action, c.layer)
 		if now && !before {
@@ -273,4 +271,15 @@ func allowedUnderTheOldRule(r *RBAC, roles []string, action string, dyn ActionAu
 		}
 	}
 	return false
+}
+
+// swapRoleActions installs a grant document and returns the function that puts the previous one
+// back. It replaces the whole snapshot rather than editing the live one, which is the same
+// discipline the reload path follows: the law is exchanged, never edited underneath a reader.
+func swapRoleActions(document map[string]map[string]bool) (restore func()) {
+	previous := ensurePolicy()
+	replacement := *previous
+	replacement.roleActions = document
+	livePolicy.Store(&replacement)
+	return func() { livePolicy.Store(previous) }
 }

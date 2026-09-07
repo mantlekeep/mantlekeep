@@ -8,13 +8,17 @@ import (
 )
 
 // withFloors installs floor data for one test and restores whatever was there.
+//
+// It swaps a whole snapshot rather than writing into the live floor map, which is the law the
+// door decides against — the same discipline the reload path follows: the policy is exchanged,
+// never edited underneath a reader.
 func withFloors(t *testing.T, data *grants.Floors) {
 	t.Helper()
-	// Let the real load run first, so sync.Once is spent and cannot overwrite the swap.
-	ensurePolicy()
-	previous := floorsCache
-	floorsCache = data
-	t.Cleanup(func() { floorsCache = previous })
+	previous := ensurePolicy()
+	replacement := *previous
+	replacement.floors = data
+	livePolicy.Store(&replacement)
+	t.Cleanup(func() { livePolicy.Store(previous) })
 }
 
 // The gate turns an otherwise-allowed action into a wait for a second person, driven by
