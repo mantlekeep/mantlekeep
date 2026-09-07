@@ -6,7 +6,7 @@ module github.com/mantlekeep/mantlekeep/mantlekeep-estate
 go 1.25.0
 
 require (
-	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.1.3
+	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.2.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -16,3 +16,11 @@ require go.yaml.in/yaml/v2 v2.4.2 // indirect
 // consumer can reproduce: a replace applies to the main module alone, so a module that
 // needs one builds here and nowhere else. Verified by building this module with the
 // replace removed, against the tag, before it was cut.
+
+// The estate is built BOTH ways: as a published module a consumer imports, and as one module
+// inside a clone of this repository. Without this, the second case silently downloads a
+// DIFFERENT mantlekeep-control than the one sitting beside it — so a bank that clones the repo,
+// scans it, and then builds this module in its own pipeline would build against code the scan
+// never saw. `replace` applies only to the main module, so it governs our builds and is
+// invisible to anyone importing the estate.
+replace github.com/mantlekeep/mantlekeep/mantlekeep-control => ../mantlekeep-control

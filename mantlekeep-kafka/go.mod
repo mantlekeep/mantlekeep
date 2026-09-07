@@ -6,7 +6,7 @@ module github.com/mantlekeep/mantlekeep/mantlekeep-kafka
 go 1.25.0
 
 require (
-	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.1.2
+	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.2.0
 	github.com/twmb/franz-go v1.21.0
 	github.com/twmb/franz-go/pkg/kadm v1.18.0
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
