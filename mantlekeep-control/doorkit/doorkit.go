@@ -10,7 +10,10 @@
 package doorkit
 
 import (
+	"context"
+
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/grants"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/audit"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/identity"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
@@ -35,7 +38,7 @@ type Door struct {
 	Submitter mantlekeep.Submitter        // the door — POST intents here
 	Identity  mantlekeep.IdentityResolver // the (mock) identity resolver, for dev/test
 	Audit     mantlekeep.AuditLogger      // the durable, hash-chained audit log
-	Failsafe  Failsafe                // the read-only failsafe control
+	Failsafe  Failsafe                    // the read-only failsafe control
 }
 
 // NewInMemoryDoor builds a door with a MOCK identity, pure-Go RBAC policy, and a bbolt
@@ -67,6 +70,25 @@ func NewInMemoryDoor(auditPath string, dyn ...policy.ActionAuthorizer) (*Door, e
 // the policy env, so an assembled door has its grants before the first governed request — without
 // importing core's internal policy package.
 func EnsureLoaded() { policy.EnsureLoaded() }
+
+// ReloadPolicy re-reads the grant and floor documents through source and installs them if they
+// are valid, returning the revision now in force and whether it changed.
+//
+// The public seam for the same mechanism door.go starts automatically: a product that drives
+// policy from its own store — an onboarding register a platform team edits through a UI, a
+// bundle it pulls on a signal — calls this instead of polling files, and gets the identical
+// guarantee. A source that fails installs NOTHING and the last good documents keep deciding.
+//
+// A restart is never required to change who may do what. That is the point: governance that can
+// only change on a release cadence is governance that gets switched off during an incident.
+func ReloadPolicy(ctx context.Context, source grants.Loader) (inForce grants.Revision, changed bool, err error) {
+	return policy.ReloadGrants(ctx, source)
+}
+
+// PolicyRevisionInForce is the revision of the documents the engine accepted and is deciding
+// against — not the ones on disk. Pair it with ReloadPolicy to report what a refused reload left
+// running.
+func PolicyRevisionInForce() grants.Revision { return policy.RevisionInForce() }
 
 // OpenBoltStore opens a durable, bbolt-backed key/value Store at path — the store a loop
 // hub (or any component keyed on mantlekeep.Store) persists into. bbolt is file-durable, so a
