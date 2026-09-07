@@ -40,3 +40,53 @@ func PolicyInputFor(subject Subject, intent Intent) PolicyInput {
 		},
 	}
 }
+
+// EvaluationStep is ONE stage of the engine's decision, in the order it is asked.
+//
+// The order is the interesting part of a policy engine and the part a person cannot read off a
+// grant table. It is what makes "config may tighten, never loosen" structural rather than
+// conventional: every deny is asked BEFORE the approval gate, so no policy document can reach
+// past a closed decision and re-open it as merely awaiting a signature.
+//
+// It is described here, beside the ports, so a surface that explains a refusal describes the
+// engine's real order rather than a plausible one. The engine that implements it publishes the
+// list; a behavioural test drives each step and fails if the code stops matching the words.
+type EvaluationStep struct {
+	// Name identifies the stage.
+	Name string `json:"name"`
+	// Outcome is what this stage can produce: a deny, or the approval gate's require_approval.
+	Outcome DecisionAction `json:"outcome"`
+	// Source says whether a deployment can change this stage. "engine" is a floor — it is code,
+	// not data, and no configuration reaches it. "policy" is a document somebody can edit.
+	// A reader who cannot tell the two apart cannot tell a rule they may argue with from a rule
+	// they may not.
+	Source EvaluationSource `json:"source"`
+	// Detail is the one sentence a person needs to know what this stage asked.
+	Detail string `json:"detail"`
+}
+
+// EvaluationSource says whether a stage is code or configuration.
+type EvaluationSource string
+
+const (
+	// SourceEngine is a stage compiled into the engine. Configuration cannot reach it.
+	SourceEngine EvaluationSource = "engine"
+	// SourcePolicy is a stage driven by a policy document a deployment can change.
+	SourcePolicy EvaluationSource = "policy"
+)
+
+// The stage names the default engine publishes and stamps onto every decision it makes.
+//
+// Constants rather than literals because they are used in three places that must agree: the
+// published order, the [Decision.Step] each stage stamps, and any surface that locates a
+// refusal in the order. Two of those spelling it differently is a page pointing at the wrong
+// rule, which is the failure this whole mechanism exists to prevent.
+const (
+	StepGoalStated         = "goal is stated"
+	StepAINotApproving     = "an AI is not performing an approval"
+	StepRolePermits        = "a role permits the action"
+	StepSeparationOfDuties = "the approver is not the requester"
+	StepProductAdmits      = "the owning product admits the request"
+	StepAttributeFloor     = "the attribute floor admits the request"
+	StepApprovalGate       = "does a second person have to sign off"
+)
