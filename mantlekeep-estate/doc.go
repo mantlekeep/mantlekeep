@@ -15,6 +15,20 @@
 // This package DECIDES. It never talks to Kafka, Postgres or Harbor itself: backends live
 // behind [Port], one adapter per asset, so the decision logic never learns what a broker is.
 //
+// # Extending it without forking it
+//
+// Two seams exist for a deployment this module cannot see, and neither of them teaches it
+// anything about that deployment:
+//
+//   - [Labels] carry the deployment's OWN grouping vocabulary through to every resolved
+//     [DesiredItem]. Descriptive only: nothing here reads one to decide, and a label may not
+//     take the name of a field that is read to decide.
+//   - [ChangeTransformer] lets a change be rewritten BEFORE it is submitted to the door, so what
+//     a person approves is what will actually be applied. Optional — unset means no call at all.
+//
+// Both are additive and both are configured, never edited. A deployment that uses neither
+// behaves exactly as it did before they existed.
+//
 // # Why JSON rather than YAML
 //
 // Manifests are authored in YAML because humans read it, but this package parses JSON. The
