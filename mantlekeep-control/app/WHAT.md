@@ -42,6 +42,28 @@ This is the answer to *"how does default → platform → product → team actua
 | What a layer file looks like | `policyconfig.go` (`layerFile`) | Plain JSON: `actionRoles`, `sealed`. No new dependency, same env-config style as the rest of MantleKeep. (Env-gating of an action is a product's floor DATA, not a layer key.) |
 | A missing/broken layer is ignored, not fatal | `policyconfig.go:36-45` | Unset env → skip; bad JSON → warn on stderr and skip. Boot never dies on a bad optional layer. |
 
+### The boot diagnostic — `policyconfig.go` + `policyscopes.go`
+
+A layer that names an action a grant document also grants now DECIDES that action (see
+`internal/policy/WHAT.md`). That is a rule whose effect is invisible in every file involved:
+the layer looks the same, the document looks the same, and the only evidence would be a
+refusal at 3am in an environment nobody changed. So the door says it out loud, once, at boot.
+
+| Step | Where | What it means |
+|---|---|---|
+| Which file said so | `policyconfig.go` (`currentLayers`) | The env var's path travels alongside each loaded layer, purely so the notice can NAME the file. `Layer.Name` is a label, not a path a person can open. |
+| Reported after the cascade, not per file | `policyconfig.go` (`reportPrecedence`) | A layer's own value is what it ASKED for; only the resolved cascade knows whether a sealed floor above it let that value through. A layer set that is about to refuse startup is passed over in silence. |
+| The per-scope tier gets it too | `policyscopes.go` (`attachScopes`) | And needs it most: scope layers are not in the set `ValidateLayers` refuses startup over, so a role nobody can rank would otherwise reach the engine and silently refuse every subject. |
+| Boot only, never the poll | `policyconfig.go` (`printPrecedenceNotices`) | The hot-reload watcher re-reads the same files every couple of seconds and passes `verbose=false`. A notice there would bury the boot line under thousands of copies. |
+
+### The dev directory — `identity.go`
+
+| Step | Where | What it means |
+|---|---|---|
+| A deployment can name its own people | `identity.go` (`DevSubjectsEnv`) | `MANTLEKEEP_DEV_SUBJECTS="id=Role,Role;id2=Role"` replaces the six names compiled into this binary. Set-but-empty is a hard startup error: falling back to the demo set would leave a deployment answering about six people nobody configured, under a variable the operator believes they set. |
+| It is still ASSERTED, not looked up | `internal/identity/identity.go` (`DescribeDirectory`) | Configured or seeded, the dev directory always reports `Authoritative: false`. A screen that showed it as the staff list would be believed. |
+| A directory that cannot be listed says so | `identity.go` (`chainResolver.Subjects`) | Listing only the layers that CAN be listed produces a page that looks complete and is missing exactly the population the other layer holds. It returns the refusal instead. An empty user list on a permissions screen reads as "nobody has access". |
+
 ## How to review this WITHOUT reading Go
 
 1. **Read `Serve` (`app.go:49-104`) as a numbered checklist.** Each block is one wiring

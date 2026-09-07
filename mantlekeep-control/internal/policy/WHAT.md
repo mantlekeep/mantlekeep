@@ -39,6 +39,19 @@ write) rather than fail open.
 | "At least as senior" test | `resolve.go:109-116` | An **unknown** role never counts as senior enough, so a typo or bogus role can never sneak a floor looser. |
 | Default layer is unsealed | `resolve.go:98-104` | MantleKeep's own baseline seals nothing, so teams are free by default; the host adds the floor on top. |
 
+### Grant document vs. layer cascade — `precedence.go`, `notices.go`
+
+When a grant document AND a layer both name the same action, one of them has to win. It is
+the layer.
+
+| Decision | Where | What it means |
+|---|---|---|
+| Grant is NECESSARY, the cascade is SUFFICIENT-TO-REFUSE | `precedence.go` (`actionAllowed`) | The cascade is asked FIRST, because it is the only one of the two that can refuse. Where a layer names a required role, that role decides. Where no layer names the action — most actions — the grant documents decide alone, exactly as before. |
+| Provider grants are DOCUMENTS, not layers | `precedence.go` (`grantedByDocument`) | A product declaring what its own roles are for is the same KIND of statement as the shared grants file. A deployment that wants one of them tightened writes a layer, and the rule above lets that layer bind. |
+| It can only ever refuse MORE | `precedence_test.go` (`TestNothingBecameMorePermissive`) | The old rule was `D ∨ (L ∧ H)`; the new one is `(L ∧ H) ∨ (¬L ∧ D)`. The test walks the whole cross-product of documents, layers and subjects against a literal transcription of the old code, rather than trusting the algebra. |
+| The change is announced at boot | `notices.go` (`PrecedenceNotices`) | One line per action a loaded layer changes, naming the FILE and the ACTION and the roles that lose it — otherwise the only evidence is a refusal at 3am in an environment nobody changed. It reports the RESOLVED cascade, not the layer's own value: where a sealed floor above rejected what the file asked for, the notice says both. |
+| A role the ladder cannot rank refuses EVERYONE | `precedence.go`, `notices.go` | Including the wildcard holder. Guessing in the permissive direction is how a floor becomes a default. `ValidateLayers` refuses startup on this for the base cascade; for a per-scope layer, the boot notice is the only warning there is. |
+
 ### The failsafe wrapper — `failsafe.go`
 
 | Decision | Where | What it means |

@@ -5,6 +5,45 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+### Changed — BEHAVIOUR (policy precedence)
+
+- **A config layer can now TIGHTEN a grant document.** When both a grant document and the
+  resolved layer cascade name an action, the cascade decides. Grant is NECESSARY; the cascade is
+  SUFFICIENT-TO-REFUSE. Previously the document was asked first and returned on the spot, so a
+  scope file saying `{"actionRoles": {"service.deploy": "L1-Architect"}}` asserted nothing where a
+  document already granted `service.deploy` to a consumer — the file was read, the layer loaded,
+  the boot log named it, and every consumer still deployed. An operator got positive feedback for
+  a control that governed nothing.
+
+  **Nothing became more permissive.** The rule moved from `D ∨ (L ∧ H)` to `(L ∧ H) ∨ (¬L ∧ D)`;
+  only `D ∧ L ∧ ¬H` moves, and it moves from allow to DENY. `TestNothingBecameMorePermissive`
+  walks the whole cross-product of documents, layers and subjects against a literal transcription
+  of the old code rather than trusting that paragraph.
+
+  **What to check before upgrading:** any action that a layer names AND a grant document grants.
+  Subjects holding a role the layer does not reach will start being refused. The boot diagnostic
+  below prints exactly that list.
+
+### Added
+
+- **`policy.PrecedenceNotices`** — the boot diagnostic for the rule above. One line per action a
+  loaded layer changes, naming the FILE and the ACTION and the roles that lose it. Wired at boot
+  for the platform/team layers and for each per-scope layer; the hot-reload poll path stays
+  silent. It reports the **resolved** cascade, not the layer's own value: where a sealed floor
+  above rejected what the file asked for, the notice says both, because a diagnostic that quoted
+  the file would announce a requirement the engine does not have.
+- **`SubjectLister` and `DirectoryDescriber`** (with `DirectoryDescription`) — optional
+  capabilities of an `IdentityResolver`, discovered by type assertion. A resolver that cannot
+  enumerate its population says nothing, and a surface that finds nothing must SAY the directory
+  cannot be listed rather than render an empty one: an empty user list on a permissions screen
+  reads as "nobody has access". The gateway resolver deliberately does not implement
+  `SubjectLister` — it holds a group→role table, never people.
+- **`app.DevSubjectsEnv` (`MANTLEKEEP_DEV_SUBJECTS`)** — seeds the dev directory from
+  `"id=Role,Role;id2=Role"` so a deployment can look at itself with its own people in it rather
+  than the six names compiled into the binary. Set-but-empty is a hard startup error, not a quiet
+  fall back to the demo set. The result still describes itself as ASSERTED, not of record.
+- `ContractVersion` is `3.1.0` — additive ports, no signature changed.
+
 ## [mantlekeep-control/v0.2.0] — 2026-09-07
 
 Go module only. The Java and Python SDKs are unchanged since `0.1.1` and are **not** re-released:
