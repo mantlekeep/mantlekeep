@@ -321,26 +321,8 @@ func (r *RBAC) authorizerFor(in mantlekeep.PolicyInput) ActionAuthorizer {
 	return r.dyn
 }
 
-func (r *RBAC) actionAllowed(roles []string, action string, dyn ActionAuthorizer) bool {
-	for _, ro := range roles {
-		acts := roleActions()[ro]
-		if acts["*"] || acts[action] {
-			return true
-		}
-		// A registered product provider may grant this role the action — the core keeps no
-		// product action names of its own (see WithProviders/provider.go).
-		if r.providerRoleActions[ro][action] {
-			return true
-		}
-	}
-	// Fall back to the resolved/config-authored binding (team, project, or product RunAs).
-	if dyn != nil {
-		if need, ok := dyn.RequiredRole(action); ok {
-			return r.rankLadder().holdsAtLeast(roles, need)
-		}
-	}
-	return false
-}
+// actionAllowed — the grant-document / layer-cascade precedence rule — lives in precedence.go,
+// which is one file about one decision: which of the two wins when both name an action.
 
 // deny builds a denial Decision stamped with its generic category, so the wire (and any
 // other consumer) branches on a stable value rather than parsing the human reason.
