@@ -52,8 +52,9 @@ func ReloadGrants(ctx context.Context, source grants.Loader) (inForce grants.Rev
 // confidently. It is what the reload log names, so an operator reading "still enforcing X" can
 // match X against the source that produced it.
 //
-// It is NOT the revision [app.PolicyInForce] shows, which identifies a VIEW that also carries
-// the engine's built-in grants. See that method for why they differ.
+// A surface that also reports the ENGINE's built-in grants (the L0-SuperAdmin wildcard, which is
+// code and appears in no document) must not re-derive a revision from that view: the view is not
+// a document, and hashing it would report a revision no document-reading loader can reproduce.
 func RevisionInForce() grants.Revision { return ensurePolicy().revision }
 
 // GrantsWatcher polls a [grants.Loader] and installs each valid change.
