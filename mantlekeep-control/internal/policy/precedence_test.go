@@ -195,32 +195,62 @@ func TestNothingBecameMorePermissive(t *testing.T) {
 	original := roleActionsCache
 	defer func() { roleActionsCache = original }()
 
-	compared := 0
+	engineCases := permissivenessCases(documents, layers, subjects, actions)
+	if want := len(documents) * len(layers) * len(subjects) * len(actions); len(engineCases) != want {
+		t.Fatalf("built %d combinations, want %d — the table is not the table it claims to be",
+			len(engineCases), want)
+	}
+
+	for _, c := range engineCases {
+		roleActionsCache = c.document
+		now := engine.actionAllowed(c.roles, c.action, c.layer)
+		before := allowedUnderTheOldRule(engine, c.roles, c.action, c.layer)
+		if now && !before {
+			t.Fatalf("MORE PERMISSIVE: %q + %q + %q on %q is allowed now and was "+
+				"denied before. This change may only ever refuse more; a case that "+
+				"gains an ability is a governance regression, not a fix — stop and "+
+				"report it rather than adjusting this test",
+				c.documentName, c.layerName, c.subjectName, c.action)
+		}
+	}
+}
+
+// permissivenessCase is one cell of the table: a document, a layer, a subject and an action,
+// each carrying the name it is reported under so a failure names the case rather than an index.
+type permissivenessCase struct {
+	documentName, layerName, subjectName, action string
+	document                                     map[string]map[string]bool
+	layer                                        ActionAuthorizer
+	roles                                        []string
+}
+
+// permissivenessCases expands the four tables into one flat list.
+//
+// Flat rather than nested on purpose: the assertion that matters is that EVERY combination was
+// compared, and a length check on a list says that plainly. A counter incremented in the
+// innermost of four loops says the same thing far less legibly, and is the shape that made this
+// function hard to read in the first place.
+func permissivenessCases(
+	documents map[string]map[string]map[string]bool,
+	layers map[string]ActionAuthorizer,
+	subjects map[string][]string,
+	actions []string,
+) []permissivenessCase {
+	var cases []permissivenessCase
 	for documentName, document := range documents {
-		roleActionsCache = document
 		for layerName, layer := range layers {
 			for subjectName, roles := range subjects {
 				for _, action := range actions {
-					now := engine.actionAllowed(roles, action, layer)
-					before := allowedUnderTheOldRule(engine, roles, action, layer)
-					compared++
-					if now && !before {
-						t.Fatalf("MORE PERMISSIVE: %q + %q + %q on %q is allowed now and was "+
-							"denied before. This change may only ever refuse more; a case that "+
-							"gains an ability is a governance regression, not a fix — stop and "+
-							"report it rather than adjusting this test",
-							documentName, layerName, subjectName, action)
-					}
+					cases = append(cases, permissivenessCase{
+						documentName: documentName, layerName: layerName,
+						subjectName: subjectName, action: action,
+						document: document, layer: layer, roles: roles,
+					})
 				}
 			}
 		}
 	}
-	// A guard that compared nothing passes for the wrong reason, and this one is the whole
-	// evidence for "nothing became more permissive".
-	if want := len(documents) * len(layers) * len(subjects) * len(actions); compared != want {
-		t.Fatalf("compared %d combinations, want %d — the oracle did not cover the table it "+
-			"claims to", compared, want)
-	}
+	return cases
 }
 
 // allowedUnderTheOldRule is a LITERAL transcription of actionAllowed as it stood before the
