@@ -38,7 +38,7 @@ func TestTheDoorPicksUpAPolicyEditWhileItIsRunning(t *testing.T) {
 
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
-	if started := startGrantsWatcher(ctx); !started {
+	if !startGrantsWatcher(ctx) {
 		t.Fatal("no watcher started even though a policy directory is configured")
 	}
 	t.Cleanup(func() {
