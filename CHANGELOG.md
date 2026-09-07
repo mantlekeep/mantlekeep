@@ -5,6 +5,47 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+### Added — mantlekeep-estate: two seams for a deployment the framework cannot see
+
+Both are ADDITIVE and both are optional. No existing signature changed, no new dependency was
+taken, and a deployment that configures neither behaves exactly as it did before — asserted, not
+assumed: with no transform configured, what reaches the adapter is compared byte-for-byte against
+what `Resolve` produces.
+
+- **`Labels` — a deployment's own grouping vocabulary.** `labels` on a manifest and on an app,
+  carried through to every resolved `DesiredItem`, so a consumer can group a resolved estate
+  without rebuilding the resolver's naming rule. An app's effective labels are its team's plus
+  its own: it may ADD a key, never restate one its team declared, or the estate would report an
+  app under a heading its own team disclaims.
+
+  A label is descriptive and nothing reads one to make a decision. That is why a label may not
+  take the name of a field the engine governs: it would render beside the real value, look
+  authoritative and govern nothing — and the day somebody wired it up, relabelling would become a
+  way out of the thing that field protects. **The forbidden set is DERIVED** by reflection over
+  the engine's own shapes rather than written down, so a field added tomorrow is reserved
+  tomorrow; a hand-written list would be a second place to edit and would fall behind on the
+  first change. Keys take the same narrow shape as every other name here, and values are bounded
+  and carry no control characters — a label reaches a UI, a log line and an evidence record,
+  where one line must stay one line.
+
+- **`ChangeTransform` — a change may be transformed before it is governed.** An optional hook,
+  wired with `Manager.TransformChangesWith`, that rewrites a change BEFORE it is submitted to the
+  door, so what a person approves is what will actually be applied. Preparation done after the
+  approval means a person signed a description and something else was produced from it
+  afterwards.
+
+  The ORDERING is the guarantee: transform, then govern, then apply. A change that arrives
+  already transformed is not transformed twice — the approval path replays a stored change, and
+  re-running the rewrite there would apply what it produces NOW under an approval given for what
+  it produced THEN. That is held by structure (`Approve` calls the door directly) rather than by a
+  flag, because a flag can be wrong. A transform that fails refuses the change before the door:
+  nothing is submitted, nothing is recorded as pending, and no adapter is called. A transform may
+  rewrite what a change is; it may never rewrite which change it is.
+
+  The interface names no tool and never will. One deployment may render a template, another may
+  ask a separate system to prepare the work — the framework says only that a change may be
+  transformed, which is what makes it a port rather than an integration.
+
 ### Changed — BEHAVIOUR (policy precedence)
 
 - **A config layer can now TIGHTEN a grant document.** When both a grant document and the

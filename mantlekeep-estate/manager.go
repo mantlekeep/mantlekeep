@@ -44,6 +44,10 @@ type Manager struct {
 	// time-critical config change there is — placement keeps choosing it until something says
 	// otherwise — so the registry is reloadable for the same reason the floor is.
 	placerOf func() *Placer
+	// transform rewrites a change before it reaches the door. Optional: nil means no call at
+	// all, so a deployment that configures none behaves exactly as it did before the seam
+	// existed. See [ChangeTransformer] for why the ordering, not the hook, is the guarantee.
+	transform ChangeTransformer
 	// now is injectable so a test can pin intent ids and timestamps rather than assert on a
 	// clock it does not control.
 	now func() time.Time
@@ -107,6 +111,18 @@ func (m *Manager) FloorFrom(provider func() Floor) *Manager {
 // re-submit and hope the approver is watching.
 func (m *Manager) AwaitApprovalIn(approvals Approvals) *Manager {
 	m.approvals = approvals
+	return m
+}
+
+// TransformChangesWith makes every change pass through a deployment's own rewrite before it is
+// submitted to the door, so what a person approves is what will actually be applied.
+//
+// Without it nothing is called and the manager governs the resolved change exactly as it always
+// has. The transform never runs on the approval path: that change was transformed when it was
+// requested, and running it again would apply what the rewrite produces now under an approval
+// given for what it produced then. See [ChangeTransformer].
+func (m *Manager) TransformChangesWith(transform ChangeTransformer) *Manager {
+	m.transform = transform
 	return m
 }
 
@@ -205,7 +221,8 @@ func (m *Manager) Apply(ctx context.Context, actor mantlekeep.Subject, manifest 
 
 	var outcome ApplyOutcome
 	for _, change := range desired.Changes {
-		result := m.applyOne(ctx, acting{subject: actor}, manifest.Team, change, floor.Revision)
+		result := m.transformThenApply(ctx, acting{subject: actor}, manifest.Team, change,
+			floor.Revision)
 		switch {
 		case result.Refused != "":
 			outcome.Refused = append(outcome.Refused, result)
@@ -370,7 +387,7 @@ func (m *Manager) Reconcile(ctx context.Context, actor mantlekeep.Subject,
 			escalated = append(escalated, drift)
 			continue
 		}
-		result := m.applyOne(ctx, acting{subject: actor}, manifest.Team, *drift.Desired,
+		result := m.transformThenApply(ctx, acting{subject: actor}, manifest.Team, *drift.Desired,
 			floor.Revision)
 		switch {
 		case result.Refused != "":

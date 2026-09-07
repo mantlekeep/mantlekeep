@@ -60,6 +60,10 @@ type Manifest struct {
 	Kafka          *KafkaSection  `json:"kafka,omitempty"`
 	Postgres       []PostgresBind `json:"postgres,omitempty"`
 	Harbor         *HarborSection `json:"harbor,omitempty"`
+	// Labels are a deployment's OWN grouping vocabulary, which this module does not have and
+	// must not invent. They describe; nothing reads one to decide. See [Labels] for the rule
+	// that keeps that true.
+	Labels Labels `json:"labels,omitempty"`
 }
 
 // App is one deployable, and the reason this manifest exists: "deploy all apps from just some
@@ -89,6 +93,9 @@ type App struct {
 	// Tier may raise the consequence for this one app — a customer-facing app in an otherwise
 	// dev-tier team.
 	Tier Tier `json:"tier,omitempty"`
+	// Labels describe THIS app, on top of whatever its team declared. An app may add a key its
+	// team never used; it may not restate one its team did. See [Labels].
+	Labels Labels `json:"labels,omitempty"`
 }
 
 // Runtime is the app shape the platform serves — enterprise, analytics, and whatever a deployment
@@ -242,7 +249,7 @@ func (m Manifest) validate() error {
 			return err
 		}
 	}
-	return nil
+	return m.validateLabels()
 }
 
 // validateApp checks one app declaration.

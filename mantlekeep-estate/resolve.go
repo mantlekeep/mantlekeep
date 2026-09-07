@@ -43,6 +43,17 @@ type DesiredItem struct {
 	// per asset would put asset knowledge in the differ, which is the one place that must stay
 	// generic — so the shape is a map and the vocabulary is the ownership map's.
 	State map[string]string `json:"state,omitempty"`
+	// Labels are the declaring deployment's own grouping vocabulary, carried through so a
+	// consumer can group a resolved estate without rebuilding the resolver's naming rule.
+	// Rebuilding it is what makes a report drift from the thing it reports on: the name here
+	// is already prefixed and already placed, and a consumer that re-derived "which group is
+	// this" from the name would be parsing a convention nobody promised to keep.
+	//
+	// An app's labels are its team's plus its own; every other change carries its team's. They
+	// are descriptive only — see [Labels] — so they appear on [DesiredItem] and deliberately
+	// NOT on [ObservedItem]: there is nothing to reconcile in a field no decision reads, and
+	// a differ that compared labels would report drift a person could do nothing about.
+	Labels Labels `json:"labels,omitempty"`
 }
 
 // Resolve applies the floor to a manifest.
@@ -109,6 +120,7 @@ func resolveKafka(m Manifest, floor Floor) ([]DesiredItem, error) {
 	changes := []DesiredItem{{
 		Asset: "kafka", Kind: "boundary", Name: m.Owns + ".", Tier: m.Tier,
 		Gate: floor.GateFor(m.Tier), Cluster: m.Kafka.Cluster, Limits: limits,
+		Labels: m.Labels.clone(),
 	}}
 	for _, topic := range m.Kafka.Topics {
 		tier := m.tierOf(topic)
@@ -119,6 +131,7 @@ func resolveKafka(m Manifest, floor Floor) ([]DesiredItem, error) {
 		changes = append(changes, DesiredItem{
 			Asset: "kafka", Kind: "topic", Name: m.Owns + "." + topic.Name, Tier: tier,
 			Gate: floor.GateFor(tier), Cluster: m.Kafka.Cluster, Limits: topicLimits,
+			Labels: m.Labels.clone(),
 		})
 	}
 	return changes, nil
@@ -138,6 +151,7 @@ func resolvePostgres(m Manifest, floor Floor) ([]DesiredItem, error) {
 			Asset: "postgres", Kind: "schema",
 			Name: bind.Database + "." + schema, Tier: tier, Gate: floor.GateFor(tier),
 			Cluster: bind.Cluster, Limits: limits, Readers: bind.Readers,
+			Labels: m.Labels.clone(),
 		})
 	}
 	return changes, nil
@@ -156,7 +170,7 @@ func resolveHarbor(m Manifest, floor Floor) ([]DesiredItem, error) {
 	project := orName(m.Harbor.Project, m.Owns)
 	changes := []DesiredItem{{
 		Asset: "harbor", Kind: "project", Name: project, Tier: tier,
-		Gate: floor.GateFor(tier), Limits: limits,
+		Gate: floor.GateFor(tier), Limits: limits, Labels: m.Labels.clone(),
 	}}
 	for _, robot := range m.Harbor.Robots {
 		robotTier := m.tierOf(robot)
@@ -167,6 +181,7 @@ func resolveHarbor(m Manifest, floor Floor) ([]DesiredItem, error) {
 		changes = append(changes, DesiredItem{
 			Asset: "harbor", Kind: "robot", Name: project + "/" + robot.Name,
 			Tier: robotTier, Gate: floor.GateFor(robotTier), Limits: robotLimits,
+			Labels: m.Labels.clone(),
 		})
 	}
 	return changes, nil
@@ -198,6 +213,9 @@ func resolveApps(m Manifest, floor Floor, placer *Placer,
 			// Where an app runs is now a PLATFORM choice, so it travels with the change and
 			// reaches the chain. Without it nobody can answer "why is my app on that cluster?"
 			Placement: &decision,
+			// The team's vocabulary plus this app's own. Merged HERE rather than by a consumer,
+			// so every reader of a resolved estate groups it the same way.
+			Labels: m.labelsFor(app),
 		})
 	}
 	return changes, nil

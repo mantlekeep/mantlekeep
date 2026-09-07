@@ -88,6 +88,42 @@ is not a failure, and a pipeline that cannot tell them apart will treat an appro
 Adapters are passed IN; this module imports none of them. That is what keeps a backend's
 dependency tail out of the engine — a consumer who needs no Kubernetes links none of it.
 
+## Extending it without forking it
+
+Two seams exist for a deployment this module cannot see. Both are configured, never edited, and
+a deployment that uses neither behaves exactly as it did before they existed.
+
+**Its own vocabulary.** `labels` on a manifest, and on an app, reach every resolved change — so a
+consumer groups a resolved estate by its own words without rebuilding the resolver's naming rule.
+An app's labels are its team's plus its own; it may add a key, never restate one its team
+declared. Labels are descriptive: nothing reads one to decide, and a label may not take the name
+of a field that IS read to decide. That forbidden set is derived from this module's own shapes
+rather than listed, so it cannot fall behind them.
+
+```json
+{"team": "team-a", "owns": "team-a", "labels": {"stream": "alpha"},
+ "apps": [{"name": "svc-one", "runtime": "enterprise", "image": "registry/team-a/svc-one",
+           "placement": {"env": "dev", "purpose": "app", "residency": "alpha"},
+           "labels": {"surface": "beta"}}]}
+```
+
+**Its own preparation.** `Manager.TransformChangesWith` rewrites a change before it is submitted
+to the door, so what a person approves is what will actually be applied:
+
+```go
+manager := estate.NewManager(door, floor, ports...).
+	TransformChangesWith(estate.ChangeTransformFunc(
+		func(ctx context.Context, team string, change estate.DesiredItem) (estate.DesiredItem, error) {
+			// Whatever THIS deployment must do to a change before anybody rules on it.
+			return change, nil
+		}))
+```
+
+Transform, then govern, then apply. A change that arrives already transformed — the approval
+path — is not transformed again, or the applied change would be what the rewrite produces now
+under an approval given for what it produced then. A transform that fails stops the change
+before the door: nothing is submitted, nothing is recorded as pending, no adapter is called.
+
 ## Status
 
 Early. The contracts are settled and exercised end to end against a real cluster; the
