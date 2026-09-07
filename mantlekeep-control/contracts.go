@@ -23,7 +23,7 @@ import (
 // input, the manifest schema, the wasm ABI); bump MINOR for additive, back-compatible
 // changes. Downstream pins this. The arch guard test enforces that the core stays
 // dependency-free so these ports never drag an adapter's concerns into the domain.
-const ContractVersion = "3.0.0"
+const ContractVersion = "3.1.0"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Identity — WHO is acting (RBAC). AD group is the single source of truth.
@@ -64,6 +64,50 @@ type ExternalIdentity struct {
 // roles. Impl: mock (MVP, by id) → gateway (groups→roles) → AD/LDAP (production).
 type IdentityResolver interface {
 	Resolve(ctx context.Context, ext ExternalIdentity) (Subject, error)
+}
+
+// SubjectLister is the OPTIONAL capability of an [IdentityResolver] that can name its whole
+// population — "who holds which role", which Resolve alone can never answer because it
+// answers about one person at a time.
+//
+// It is optional BECAUSE a real directory cannot do it. You do not enumerate an LDAP tree
+// through an authentication API, and a resolver that offered to would be lying about a call
+// that pages, times out, or is simply refused. So the capability is discovered with a type
+// assertion — a resolver that can list implements it, a resolver that cannot says nothing —
+// and a surface that finds nothing must SAY the directory cannot be listed rather than
+// render an empty list. An empty user list on a permissions screen reads as "nobody has
+// access", which is the most dangerous wrong answer such a screen can give.
+//
+// An implementation returns the population it would resolve FROM, not a cache of who has
+// logged in. A partial answer is an error, not a short list.
+type SubjectLister interface {
+	Subjects(ctx context.Context) ([]Subject, error)
+}
+
+// DirectoryDescriber is the OPTIONAL capability of an [IdentityResolver] that can say what
+// it IS — so a surface can tell a directory of record from a fixture.
+//
+// A dev resolver and a corporate directory answer Resolve identically, and a screen that
+// showed a hand-seeded demo set as though it were the organisation's staff directory would be
+// believed. The resolver is the only thing that knows which it is, so it is the thing that
+// says so.
+type DirectoryDescriber interface {
+	DescribeDirectory() DirectoryDescription
+}
+
+// DirectoryDescription is what a resolver says about itself.
+type DirectoryDescription struct {
+	// Name is the directory in one phrase, for a person: "the built-in dev directory",
+	// "corporate AD via the SSO gateway".
+	Name string
+	// Authoritative is true only when this is a directory OF RECORD — the place the
+	// organisation actually keeps who its people are. False for anything asserted by
+	// configuration or seeded for a demo, however real its answers look.
+	Authoritative bool
+	// Note is the one line a surface prints beside the name, saying what a reader must not
+	// conclude from it. Required when Authoritative is false, where the whole point is to
+	// stop somebody treating a fixture as the truth.
+	Note string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

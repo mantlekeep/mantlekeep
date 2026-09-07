@@ -14,7 +14,7 @@ import (
 // who you are; MantleKeep decides what that means. This is the host-tier resolver.
 type Gateway struct {
 	table    map[string][]mantlekeep.Role // IdP group → MantleKeep roles
-	aiGroups map[string]bool          // groups that mark a subject as an AI agent
+	aiGroups map[string]bool              // groups that mark a subject as an AI agent
 }
 
 // NewGateway builds the resolver from a group→roles table. Groups in aiGroups (or
@@ -25,6 +25,28 @@ func NewGateway(table map[string][]mantlekeep.Role, aiGroups ...string) *Gateway
 		ai[g] = true
 	}
 	return &Gateway{table: table, aiGroups: ai}
+}
+
+var (
+	_ mantlekeep.IdentityResolver   = (*Gateway)(nil)
+	_ mantlekeep.DirectoryDescriber = (*Gateway)(nil)
+)
+
+// DescribeDirectory implements [mantlekeep.DirectoryDescriber].
+//
+// It deliberately does NOT implement [mantlekeep.SubjectLister], and that is not an omission.
+// This resolver holds a group→role table, never a list of people: the people are in the
+// IdP behind the SSO gateway, and nothing in this process can enumerate them. A Subjects
+// method here could only return the table's groups dressed as users, which is a plausible
+// wrong answer — the worst kind on a screen about who has access.
+func (g *Gateway) DescribeDirectory() mantlekeep.DirectoryDescription {
+	return mantlekeep.DirectoryDescription{
+		Name:          "your SSO gateway's verified groups, mapped to roles by this deployment's configuration",
+		Authoritative: true,
+		Note: "The people live in the identity provider behind the gateway and cannot be " +
+			"listed from here; roles are decided from the groups it asserts. Ask about one " +
+			"person by id.",
+	}
 }
 
 // Resolve maps the verified groups to the union of granted roles.
