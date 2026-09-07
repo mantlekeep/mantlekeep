@@ -155,28 +155,6 @@ func liveRBAC(ctx context.Context, dyn ...policy.ActionAuthorizer) *policy.RBAC 
 	return eng
 }
 
-// currentLayers reads the env-configured cascade (least specific first). It is called
-// both at boot (verbose=true, logs each layer once) and on every watcher poll
-// (verbose=false, silent) — the single source of truth for "what are the layers now".
-func currentLayers(verbose bool) ([]policy.Layer, error) {
-	layers := []policy.Layer{policy.DefaultLayer()}
-
-	// Platform layer FIRST (so its seals bind the team layer that follows), then team. A
-	// SET-but-invalid layer is a hard error that propagates — the cascade is never built from
-	// a partially-loaded config.
-	if l, ok, err := loadLayer("MANTLEKEEP_PLATFORM_CONFIG", "platform", verbose); err != nil {
-		return nil, err
-	} else if ok {
-		layers = append(layers, l)
-	}
-	if l, ok, err := loadLayer("MANTLEKEEP_TEAM_CONFIG", "team", verbose); err != nil {
-		return nil, err
-	} else if ok {
-		layers = append(layers, l)
-	}
-	return layers, nil
-}
-
 // reloadInterval is the watcher poll period from MANTLEKEEP_POLICY_RELOAD (seconds),
 // defaulting to 2s. Poll is the honest floor: a change is live in <= this interval.
 func reloadInterval() time.Duration {

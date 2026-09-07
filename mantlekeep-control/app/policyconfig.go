@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
@@ -107,66 +106,64 @@ func toRoleMap(in map[string]string) map[string]mantlekeep.Role {
 	return out
 }
 
-// loadScopes reads a DIRECTORY of per-scope layer files (MANTLEKEEP_SCOPE_CONFIG). Each
-// <scope>.json is that scope's override layer, same schema as the platform/team layers. A
-// scope is the GENERIC tenancy tier — the SDLC product maps its "project" onto it; other
-// products use a tenant/app/namespace. Returns scope→Layer; empty when unset or unreadable.
-func loadScopes(envVar string, verbose bool) map[string]policy.Layer {
-	dir := os.Getenv(envVar)
-	if dir == "" {
-		return nil
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "scope config %s: %v — ignored\n", dir, err)
-		return nil
-	}
-	out := map[string]policy.Layer{}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		name := strings.TrimSuffix(e.Name(), ".json")
-		data, err := safeio.ReadConfigFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			continue
-		}
-		var raw layerFile
-		if err := json.Unmarshal(data, &raw); err != nil {
-			fmt.Fprintf(os.Stderr, "scope %q: bad JSON — ignored\n", name)
-			continue
-		}
-		out[name] = policy.Layer{
-			Name:        "scope:" + name,
-			ActionRoles: toRoleMap(raw.ActionRoles),
-			Sealed:      raw.Sealed,
-		}
-		if verbose {
-			fmt.Printf("policy: scope layer %q loaded (%d action, %d sealed)\n",
-				name, len(raw.ActionRoles), len(raw.Sealed))
-		}
-	}
-	return out
-}
+// currentLayers reads the env-configured cascade (least specific first). It is called
+// both at boot (verbose=true, logs each layer once) and on every watcher poll
+// (verbose=false, silent) — the single source of truth for "what are the layers now".
+func currentLayers(verbose bool) ([]policy.Layer, error) {
+	layers := []policy.Layer{policy.DefaultLayer()}
+	// Paths run parallel to layers[1:]. They travel only so the boot diagnostic can NAME the
+	// file it is talking about; Layer.Name carries a label, not a path a person can open.
+	var paths []string
 
-// attachScopes wires per-scope resolution onto an engine when MANTLEKEEP_SCOPE_CONFIG defines
-// any scope layers. base is the shared cascade (default→platform→team); fallback is the
-// product registry, re-attached so per-scope resolutions keep runtime-added products' RunAs.
-// No scopes configured → the engine is returned untouched (the default path is unchanged).
-func attachScopes(eng *policy.RBAC, base []policy.Layer, fallback policy.ActionAuthorizer, ladder policy.RoleLadder, verbose bool) *policy.RBAC {
-	scopes := loadScopes("MANTLEKEEP_SCOPE_CONFIG", verbose)
-	if len(scopes) == 0 {
-		return eng
+	// Platform layer FIRST (so its seals bind the team layer that follows), then team. A
+	// SET-but-invalid layer is a hard error that propagates — the cascade is never built from
+	// a partially-loaded config.
+	if l, ok, err := loadLayer("MANTLEKEEP_PLATFORM_CONFIG", "platform", verbose); err != nil {
+		return nil, err
+	} else if ok {
+		layers = append(layers, l)
+		paths = append(paths, os.Getenv("MANTLEKEEP_PLATFORM_CONFIG"))
 	}
-	sr := policy.NewScopeResolver(ladder, base...)
-	if fallback != nil {
-		sr.WithFallback(fallback)
-	}
-	for name, l := range scopes {
-		sr.SetScope(name, l)
+	if l, ok, err := loadLayer("MANTLEKEEP_TEAM_CONFIG", "team", verbose); err != nil {
+		return nil, err
+	} else if ok {
+		layers = append(layers, l)
+		paths = append(paths, os.Getenv("MANTLEKEEP_TEAM_CONFIG"))
 	}
 	if verbose {
-		fmt.Printf("policy: per-scope resolution enabled (%d scopes) — known scopes resolve their own tier, others use the base\n", len(scopes))
+		reportPrecedence(layers, paths)
 	}
-	return eng.WithScopes(sr)
+	return layers, nil
+}
+
+// reportPrecedence emits the boot diagnostic for each loaded layer — the actions where that
+// layer now DECIDES an action a grant document also grants (see policy.PrecedenceNotices).
+//
+// Reported AFTER the cascade is assembled, not as each file is read: a layer's own value is
+// what it asked for, and only the resolved cascade knows whether a sealed floor above it let
+// that value through.
+//
+// A layer set that does not validate is about to refuse startup (the caller runs
+// ValidateLayers and exits), so it is passed over in silence rather than described — notices
+// about a law that will not run are noise in front of the error that matters.
+func reportPrecedence(layers []policy.Layer, paths []string) {
+	ladder := policy.LadderFrom(layers...)
+	if policy.ValidateLayers(ladder, layers...) != nil {
+		return
+	}
+	for i, path := range paths {
+		printPrecedenceNotices(ladder, path, layers[i+1], policy.Resolve(ladder, layers[:i+2]...))
+	}
+}
+
+// printPrecedenceNotices reports, at BOOT only, every action where this layer now overrides a
+// grant document — see policy.PrecedenceNotices for what it says and why it says it.
+//
+// To stderr, where the other policy-config warnings go: this is diagnostic output about a
+// governance change, not part of the normal "loaded" narration. The hot-reload watcher's poll
+// path passes verbose=false and never reaches here, so a two-second poll cannot spam it.
+func printPrecedenceNotices(ladder policy.RoleLadder, path string, layer policy.Layer, cascade policy.ActionAuthorizer) {
+	for _, notice := range policy.PrecedenceNotices(ladder, path, layer, cascade) {
+		fmt.Fprintln(os.Stderr, notice)
+	}
 }
