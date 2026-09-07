@@ -5,6 +5,41 @@ Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](htt
 
 ## [Unreleased]
 
+## [mantlekeep-control/v0.2.0] — 2026-09-07
+
+Go module only. The Java and Python SDKs are unchanged since `0.1.1` and are **not** re-released:
+a version number should mean something changed, and for them nothing did.
+
+**A minor bump because this breaks the Go API** — which under SemVer major-zero is the correct
+signal. `0.x` still means the surface is not stable; `1.0.0` would claim a maturity nothing here
+has yet earned.
+
+### Why upgrade
+
+- **`doorserver` refuses a credential header as the caller-identity header.** Pointed at
+  `Authorization` or `Cookie`, the door would have written a live bearer token into the
+  append-only hash chain — where it cannot be redacted without breaking the proof the record was
+  not edited. Now refused at construction. This is the reason not to stay on `v0.1.3`.
+- **`internal/audit` has tests**, which it did not before. It is the hash-chained evidence spine.
+- Six functions split under the cognitive-complexity limit; `registry.Register`/`Ingest` take a
+  `Registration` value instead of six consecutive strings, where transposing two compiled cleanly
+  and stored the wrong thing under the right name.
+
+### Breaking
+
+See **Changed — BREAKING (Go API)** below for the migration table. Four exported single-method
+interfaces are renamed for the method they declare. Renames only — no behaviour changes, no
+signature changes beyond the names.
+
+### Also in this tag
+
+`mantlekeep-estate` now carries a `replace` directive for `mantlekeep-control`, so a clone of this
+repository builds every module **from itself**. Without it, building the estate as a standalone
+module downloaded a *different* control than the one sitting beside it — so an organisation that
+clones, scans, and then builds one module per pipeline would have built against code the scan
+never saw.
+
+
 ### Added
 - **`mantlekeep-kafka` — the governed-grant adapter for Apache Kafka.** A new Go module, sibling to
   `mantlekeep-control`, that applies an **already approved** grant to a Kafka cluster through the
