@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/grants"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/policy"
 )
@@ -42,3 +43,14 @@ func (PolicyInForce) Load(context.Context) (*grants.Grants, *grants.Floors, gran
 	held, floors := policy.InForce()
 	return held, floors, grants.RevisionOfDocuments(held, floors), nil
 }
+
+// EvaluationOrder publishes the order the default engine asks its questions in.
+//
+// Exposed because a refusal is only actionable when a person can see WHICH stage produced it and
+// whether that stage is a document they may argue with or an engine floor they may not. The list
+// is published by the engine and held to the engine's real behaviour by a test, so a surface that
+// renders it is quoting the code rather than describing it.
+//
+// It describes the CORE's default engine. A deployment that injects its own evaluator is not
+// described by this, and a surface must say so rather than present it as the order in force.
+func EvaluationOrder() []mantlekeep.EvaluationStep { return policy.EvaluationOrder() }

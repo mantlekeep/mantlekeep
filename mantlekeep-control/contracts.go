@@ -202,6 +202,17 @@ type Decision struct {
 	RequiredApprovers []Role         // for require_approval — who may sign off
 	PolicyID          string         // which policy produced this (audit)
 	Warnings          []string       // non-blocking flags (e.g. budget at 85%)
+
+	// Step names the evaluation stage that produced this decision, matching an
+	// [EvaluationStep].Name the engine publishes. It exists so a surface can tell a person
+	// WHICH question refused them — and whether that question is a document they may argue
+	// with or an engine floor they may not — without matching on the reason text, which is a
+	// second engine that breaks silently when a message is reworded.
+	//
+	// It is separate from Category: Category says what KIND of denial this is, Step says which
+	// stage asked. A "separation of duties" denial can come from the AI guardrail or from the
+	// requester check, and those send a person to different places.
+	Step string
 }
 
 // DecisionError carries the full Decision out of Submit when the outcome is not an allow.
