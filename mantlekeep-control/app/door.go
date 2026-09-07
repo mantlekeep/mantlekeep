@@ -32,6 +32,9 @@ func BuildDoor(ctx context.Context, ids mantlekeep.IdentityResolver, override ma
 	// action) FAILS FAST here, not on the first governed request. Idempotent; the RBAC engine reuses
 	// the same cache. The lazy readers stay lazy for tests that set the source in TestMain.
 	policy.EnsureLoaded()
+	// ...and keep them current afterwards. The boot load decides whether this process may
+	// START; the watcher decides what it enforces from then on, without another one.
+	startGrantsWatcher(ctx)
 	if override != nil {
 		base = override
 		fmt.Println("policy: injected by adapter module (core links no policy engine but RBAC)")
