@@ -61,6 +61,16 @@ func RevisionOf(documents ...[]byte) Revision {
 	return Revision(hex.EncodeToString(digest.Sum(nil))[:16])
 }
 
+// RevisionOfDocuments derives the revision of a RESOLVED policy: the grants and the floors, in
+// that order, each rendered canonically.
+//
+// Exported so every producer of a revision derives it the same way. Two sources that hash the
+// same policy differently are not two opinions — they are a broken join: a decision recorded
+// under one revision cannot be matched to the policy view that showed the other.
+func RevisionOfDocuments(held *Grants, floors *Floors) Revision {
+	return RevisionOf(canonical(held), canonical(floors))
+}
+
 // EnvSource is the source this binary uses when a deployment configures nothing else: the
 // embedded defaults, overridden by the MANTLEKEEP_POLICY_* environment.
 //
@@ -82,7 +92,7 @@ func (EnvSource) Load(context.Context) (*Grants, *Floors, Revision, error) {
 	// The revision is derived from the RESOLVED documents rather than the raw files, because
 	// what governs is what was merged: two deployments with different files that resolve to
 	// the same policy are serving the same policy, and should say so.
-	return grants, floors, RevisionOf(canonical(grants), canonical(floors)), nil
+	return grants, floors, RevisionOfDocuments(grants, floors), nil
 }
 
 // canonical renders a document for hashing.
