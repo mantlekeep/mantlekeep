@@ -15,6 +15,21 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [v0.1.1] — 2026-09-08
+
+No API change. Cut so a repository-wide scan of this module is clean: v0.1.0 carried findings that
+a SonarQube profile stricter than this project's own blocks a release on, and a module proxy tag
+can never be replaced.
+
+### Changed
+
+Three `if` statements in the boundary tests bound a variable used once in their own condition.
+`if bad.Validate() == nil` is the claim; the name added nothing the call did not already say.
+
+Six functions over the cognitive-complexity limit were split in an earlier commit on this line.
+
+No behaviour changed — the same two packages pass.
+
 ## [v0.1.0] — 2026-08-30
 
 *Backfilled 2026-09-08.*
