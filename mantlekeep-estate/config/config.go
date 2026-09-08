@@ -27,6 +27,8 @@ import (
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 )
 
+const wrapConfig = "config: %w"
+
 // Config is everything a deployment chooses about how grants are floored and judged.
 type Config struct {
 	// Floor is what a team may consume, per tier. Validated on load.
@@ -59,11 +61,11 @@ func Load(path string) (Config, error) {
 	}
 	clean, err := safepath.Clean(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("config: %w", err)
+		return Config{}, fmt.Errorf(wrapConfig, err)
 	}
 	content, err := os.ReadFile(clean) // #nosec G304 -- operator-supplied path, guarded above
 	if err != nil {
-		return Config{}, fmt.Errorf("config: %w", err)
+		return Config{}, fmt.Errorf(wrapConfig, err)
 	}
 	return Parse(content)
 }
@@ -76,7 +78,7 @@ func Parse(content []byte) (Config, error) {
 
 	var parsed document
 	if err := decoder.Decode(&parsed); err != nil {
-		return Config{}, fmt.Errorf("config: %w", err)
+		return Config{}, fmt.Errorf(wrapConfig, err)
 	}
 
 	floor := parsed.Floor.toFloor()

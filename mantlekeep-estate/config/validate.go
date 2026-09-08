@@ -35,31 +35,55 @@ func validateFloor(floor estate.Floor) error {
 		}
 	}
 
-	if len(floor.App) == 0 {
+	if err := validateAppFloor(floor.App); err != nil {
+		return err
+	}
+	return validateFleet(floor.Fleet)
+}
+
+// validateAppFloor refuses an app floor that leaves a runtime or a tier unbounded.
+//
+// Split out of validateFloor so that function reads as the three things it checks — the per-asset
+// floors, the app runtimes, the fleet — rather than as one of them written out in full while the
+// other two are calls.
+func validateAppFloor(app map[estate.Runtime]map[estate.Tier]estate.AppLimits) error {
+	if len(app) == 0 {
 		return fmt.Errorf(
 			"config: the floor configures no app runtimes — the floor is the only place runtimes " +
 				"are enumerated, so an empty one means no app can ever be resolved")
 	}
-	for runtime, byTier := range floor.App {
+	for runtime, byTier := range app {
 		for _, tier := range tiers {
-			limits, ok := byTier[tier]
-			if !ok {
-				return missing("app runtime "+string(runtime), tier)
-			}
-			if err := positive(string(runtime), tier, "replicas", int64(limits.Replicas)); err != nil {
+			if err := validateRuntimeTier(runtime, tier, byTier); err != nil {
 				return err
-			}
-			if err := positive(string(runtime), tier, "memoryMiB", int64(limits.MemoryMiB)); err != nil {
-				return err
-			}
-			if limits.CPULimit == "" {
-				return fmt.Errorf(
-					"config: floor app.%s.%s.cpuLimit is empty — an app with no CPU ceiling can "+
-						"starve every other app on the node", runtime, tier)
 			}
 		}
 	}
-	return validateFleet(floor.Fleet)
+	return nil
+}
+
+// validateRuntimeTier refuses one runtime's limits at one tier.
+func validateRuntimeTier(runtime estate.Runtime, tier estate.Tier,
+	byTier map[estate.Tier]estate.AppLimits) error {
+
+	limits, ok := byTier[tier]
+	if !ok {
+		return missing("app runtime "+string(runtime), tier)
+	}
+	if err := positive(string(runtime), tier, "replicas", int64(limits.Replicas)); err != nil {
+		return err
+	}
+	if err := positive(string(runtime), tier, "memoryMiB", int64(limits.MemoryMiB)); err != nil {
+		return err
+	}
+	if limits.CPULimit == "" {
+		// An app with no CPU ceiling is the one that takes the node down with it, so an empty
+		// value is refused rather than defaulted — a default here would be a limit nobody chose.
+		return fmt.Errorf(
+			"config: floor app.%s.%s.cpuLimit is empty — an app with no CPU ceiling can "+
+				"starve every other app on the node", runtime, tier)
+	}
+	return nil
 }
 
 // validateFleet refuses a runtime floor that bounds nothing.

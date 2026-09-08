@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+const litManifestParseV = "parse: %v"
+const litManifestResolveV = "resolve: %v"
+
 // The sealed floor, tested from the outside: every one of these is a way a team might try to
 // widen its own limits, and each must fail at PARSE time rather than be ignored at apply time.
 // Silently dropping an unrecognised field is how a team believes it set a limit that was never
@@ -79,7 +82,7 @@ func TestTheDefaultManifestIsFourLinesAndNeedsNoGate(t *testing.T) {
 	desired, err := ResolveWith(m, DefaultFloor(), NewPlacer([]Cluster{{Name: "dev-app-region-a-1", Env: "dev", Purpose: "app",
 		Residency: "region-a", Reachable: true}}), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litManifestResolveV, err)
 	}
 	if desired.NeedsGate() {
 		t.Fatal("a dev-tier footprint asked for human attention — gating a playground is the " +
@@ -111,12 +114,12 @@ func TestOneProdItemGatesOnlyItself(t *testing.T) {
 	m, err := ParseManifest([]byte(`{"team":"payments","owns":"payments","tier":"dev",
 	    "kafka":{"topics":["orders",{"name":"settlements","tier":"prod"}]}}`))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litManifestParseV, err)
 	}
 	desired, err := ResolveWith(m, DefaultFloor(), NewPlacer([]Cluster{{Name: "dev-app-region-a-1", Env: "dev", Purpose: "app",
 		Residency: "region-a", Reachable: true}}), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litManifestResolveV, err)
 	}
 
 	gates := map[string]Gate{}
@@ -141,12 +144,12 @@ func TestPostgresBindingsHandleSharedAndMultiCluster(t *testing.T) {
 	    {"cluster":"shared-oltp","database":"appdb","schema":"payments","readers":["risk"]},
 	    {"cluster":"payments-analytics","database":"analytics","schema":"main","tier":"shared"}]}`))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litManifestParseV, err)
 	}
 	desired, err := ResolveWith(m, DefaultFloor(), NewPlacer([]Cluster{{Name: "dev-app-region-a-1", Env: "dev", Purpose: "app",
 		Residency: "region-a", Reachable: true}}), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litManifestResolveV, err)
 	}
 
 	var schemas []DesiredItem
@@ -209,7 +212,7 @@ func TestAddingARuntimeIsConfigNotARelease(t *testing.T) {
 	m, err := ParseManifest([]byte(`{"team":"payments","owns":"payments","tier":"dev",
 	    "apps":[{"name":"etl","runtime":"spark","image":"h/p/etl","placement":{"env":"dev","purpose":"app","residency":"region-a"}}]}`))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litManifestParseV, err)
 	}
 	desired, err := ResolveWith(m, floor, NewPlacer([]Cluster{{Name: "dev-app-region-a-1", Env: "dev", Purpose: "app",
 		Residency: "region-a", Reachable: true}}), nil)

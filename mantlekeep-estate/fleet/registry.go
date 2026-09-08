@@ -16,6 +16,8 @@ import (
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 )
 
+const wrapFleet = "fleet: %w"
+
 // document is the registry file's shape.
 type document struct {
 	Clusters []cluster `json:"clusters"`
@@ -43,11 +45,11 @@ func Load(path string) ([]estate.Cluster, error) {
 	}
 	clean, err := safepath.Clean(path)
 	if err != nil {
-		return nil, fmt.Errorf("fleet: %w", err)
+		return nil, fmt.Errorf(wrapFleet, err)
 	}
 	content, err := os.ReadFile(clean) // #nosec G304 -- operator-supplied path, guarded above
 	if err != nil {
-		return nil, fmt.Errorf("fleet: %w", err)
+		return nil, fmt.Errorf(wrapFleet, err)
 	}
 	return Parse(content)
 }
@@ -59,7 +61,7 @@ func Parse(content []byte) ([]estate.Cluster, error) {
 
 	var doc document
 	if err := decoder.Decode(&doc); err != nil {
-		return nil, fmt.Errorf("fleet: %w", err)
+		return nil, fmt.Errorf(wrapFleet, err)
 	}
 	if len(doc.Clusters) == 0 {
 		return nil, fmt.Errorf("fleet: the registry names no clusters")

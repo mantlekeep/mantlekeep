@@ -225,23 +225,31 @@ func (m Manifest) validate() error {
 	if !m.Tier.valid() {
 		return fmt.Errorf("manifest: tier %q is not one of dev, shared, prod", m.Tier)
 	}
+	if err := m.validateDeclarations(); err != nil {
+		return err
+	}
+	return m.validateLabels()
+}
+
+// validateDeclarations checks everything a team DECLARED, asset by asset.
+//
+// Split from validate so that function reads as its two halves — who this manifest is for, then
+// what it asks for. Kafka and Harbor are pointers because a manifest that declares neither is
+// ordinary; nil means "not declared" and is not an error.
+func (m Manifest) validateDeclarations() error {
 	for _, app := range m.Apps {
 		if err := m.validateApp(app); err != nil {
 			return err
 		}
 	}
 	if m.Kafka != nil {
-		for _, topic := range m.Kafka.Topics {
-			if err := m.checkItem("kafka topic", topic); err != nil {
-				return err
-			}
+		if err := m.checkItems("kafka topic", m.Kafka.Topics); err != nil {
+			return err
 		}
 	}
 	if m.Harbor != nil {
-		for _, robot := range m.Harbor.Robots {
-			if err := m.checkItem("harbor robot", robot); err != nil {
-				return err
-			}
+		if err := m.checkItems("harbor robot", m.Harbor.Robots); err != nil {
+			return err
 		}
 	}
 	for _, bind := range m.Postgres {
@@ -249,7 +257,17 @@ func (m Manifest) validate() error {
 			return err
 		}
 	}
-	return m.validateLabels()
+	return nil
+}
+
+// checkItems checks every declared item of one kind.
+func (m Manifest) checkItems(kind string, items []Item) error {
+	for _, item := range items {
+		if err := m.checkItem(kind, item); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // validateApp checks one app declaration.

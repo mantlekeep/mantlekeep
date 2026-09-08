@@ -102,7 +102,7 @@ func TestAChangeOfAnUnhandledKindIsRefused(t *testing.T) {
 	change := appChange()
 	change.Kind = "statefulset"
 
-	if err := port.Apply(context.Background(), liveToken(), change); err == nil {
+	if port.Apply(context.Background(), liveToken(), change) == nil {
 		t.Fatal("an adapter applied a kind it does not handle")
 	}
 }

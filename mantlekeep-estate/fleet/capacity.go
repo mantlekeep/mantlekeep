@@ -80,26 +80,8 @@ func (k *KSM) free(ctx context.Context, endpoint string) (float64, error) {
 		return 0, fmt.Errorf("ksm: %s returned %d", endpoint, response.StatusCode)
 	}
 
-	allocatable, requested := 0.0, 0.0
-	scanner := bufio.NewScanner(io.LimitReader(response.Body, 32<<20))
-	scanner.Buffer(make([]byte, 0, 64<<10), 1<<20)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) == 0 || line[0] == '#' {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(line, "kube_node_status_allocatable"):
-			if v, ok := memoryValue(line); ok {
-				allocatable += v
-			}
-		case strings.HasPrefix(line, "kube_pod_container_resource_requests"):
-			if v, ok := memoryValue(line); ok {
-				requested += v
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
+	allocatable, requested, err := readMemory(response.Body)
+	if err != nil {
 		return 0, err
 	}
 	if allocatable <= 0 {
@@ -113,6 +95,33 @@ func (k *KSM) free(ctx context.Context, endpoint string) (float64, error) {
 		free = 0 // over-committed: full, and honestly so
 	}
 	return free, nil
+}
+
+// readMemory totals the allocatable and requested memory in a kube-state-metrics exposition.
+//
+// Split out of free so that function reads as what it decides — fetch, total, judge — rather than
+// having a scanner loop in the middle of an HTTP call. The reader is bounded because this is a
+// remote endpoint: an unbounded scan of a cluster that is misbehaving is a second outage.
+func readMemory(body io.Reader) (allocatable, requested float64, err error) {
+	scanner := bufio.NewScanner(io.LimitReader(body, 32<<20))
+	scanner.Buffer(make([]byte, 0, 64<<10), 1<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		value, ok := memoryValue(line)
+		if !ok {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "kube_node_status_allocatable"):
+			allocatable += value
+		case strings.HasPrefix(line, "kube_pod_container_resource_requests"):
+			requested += value
+		}
+	}
+	return allocatable, requested, scanner.Err()
 }
 
 // memoryValue pulls the sample value from a metric line, if it is about memory.

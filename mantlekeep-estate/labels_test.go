@@ -7,6 +7,9 @@ import (
 	"testing"
 )
 
+const litLabelsMarshalV = "marshal: %v"
+const litLabelsResolveV = "resolve: %v"
+
 // labelledManifest is the fixture these tests declare against. Deliberately anonymous: this
 // module knows no organisation's structure, and a fixture that borrowed one would teach the
 // vocabulary back to every reader of the tests.
@@ -171,7 +174,7 @@ func TestALabelCannotCarryANewlineOrUnboundedText(t *testing.T) {
 				"labels": map[string]string{testCase.key: testCase.value},
 			})
 			if err != nil {
-				t.Fatalf("marshal: %v", err)
+				t.Fatalf(litLabelsMarshalV, err)
 			}
 			if _, err := ParseManifest(document); err == nil {
 				t.Fatalf("accepted %q = %q", testCase.key, testCase.value)
@@ -186,7 +189,7 @@ func TestALabelCannotCarryANewlineOrUnboundedText(t *testing.T) {
 		"labels": map[string]string{"stream": strings.Repeat("a", maxLabelValue)},
 	})
 	if err != nil {
-		t.Fatalf("marshal: %v", err)
+		t.Fatalf(litLabelsMarshalV, err)
 	}
 	if _, err := ParseManifest(atLimit); err != nil {
 		t.Fatalf("a value exactly at the bound was refused: %v", err)
@@ -205,7 +208,7 @@ func TestLabelsReachTheResolvedChange(t *testing.T) {
 
 	desired, err := ResolveWith(manifest, DefaultFloor(), labelPlacer(), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litLabelsResolveV, err)
 	}
 	if len(desired.Changes) < 3 {
 		t.Fatalf("expected the boundary, the topic and the app; got %d", len(desired.Changes))
@@ -243,7 +246,7 @@ func TestOneChangesLabelsAreNotEveryChangesLabels(t *testing.T) {
 
 	desired, err := Resolve(manifest, DefaultFloor())
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litLabelsResolveV, err)
 	}
 	desired.Changes[0].Labels["stream"] = "mutated"
 	for _, change := range desired.Changes[1:] {
@@ -262,11 +265,11 @@ func TestAnUnlabelledManifestResolvesWithNoLabelsField(t *testing.T) {
 
 	desired, err := Resolve(manifest, DefaultFloor())
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litLabelsResolveV, err)
 	}
 	document, err := json.Marshal(desired)
 	if err != nil {
-		t.Fatalf("marshal: %v", err)
+		t.Fatalf(litLabelsMarshalV, err)
 	}
 	if strings.Contains(string(document), "labels") {
 		t.Fatalf("a manifest that declares no labels resolved to a document mentioning them: %s",

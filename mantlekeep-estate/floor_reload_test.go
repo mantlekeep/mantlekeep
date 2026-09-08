@@ -7,6 +7,9 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
+const litFloorReloadApplyV = "apply: %v"
+const litFloorReloadParseV = "parse: %v"
+
 // A reloaded floor has to change the ANSWER, not just the value in a struct. This drives the
 // door with a floor that changes underneath a live manager, which is the only way to tell a
 // working reload from one that reports success and governs under the boot config forever.
@@ -20,11 +23,11 @@ func TestAReloadedFloorChangesTheGateOnTheNextChange(t *testing.T) {
 	manifest, err := ParseManifest([]byte(
 		`{"team":"payments","owns":"payments","tier":"dev","kafka":{"topics":["orders"]}}`))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litFloorReloadParseV, err)
 	}
 
 	if _, err := manager.Apply(context.Background(), actor, manifest); err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litFloorReloadApplyV, err)
 	}
 	if got := door.submitted[0].Params["gate"]; got != string(GateNone) {
 		t.Fatalf("gate = %v before the reload, want none", got)
@@ -65,11 +68,11 @@ func TestEveryDecisionRecordsWhichFloorMadeIt(t *testing.T) {
 	manifest, err := ParseManifest([]byte(
 		`{"team":"payments","owns":"payments","tier":"dev","kafka":{"topics":["orders"]}}`))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litFloorReloadParseV, err)
 	}
 	if _, err := manager.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"},
 		manifest); err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litFloorReloadApplyV, err)
 	}
 
 	if len(door.submitted) == 0 {
@@ -101,11 +104,11 @@ func TestOneManifestIsGovernedUnderExactlyOneFloorRevision(t *testing.T) {
 		`{"team":"payments","owns":"payments","tier":"dev",
 		  "kafka":{"topics":["orders","payments","refunds"]}}`))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litFloorReloadParseV, err)
 	}
 	if _, err := manager.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"},
 		manifest); err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litFloorReloadApplyV, err)
 	}
 
 	if len(door.submitted) < 3 {

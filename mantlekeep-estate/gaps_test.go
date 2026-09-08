@@ -10,6 +10,8 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
+const litGapsApplyV = "apply: %v"
+
 // GAP 2 — a manifest-declared app had no slot, so it lost the side-by-side protection and
 // compared by name against slot-keyed observations.
 func TestAManifestDeclaredAppGetsASlot(t *testing.T) {
@@ -133,7 +135,7 @@ func TestTheManagerNamesTheActorSoTheDoorCanEnforceSoD(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"},
 		manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litGapsApplyV, err)
 	}
 	// An anonymous intent would make the chain unable to say who acted, and SoD unenforceable.
 	for _, refused := range outcome.Refused {
@@ -157,7 +159,7 @@ func TestADoorRefusingOnSoDStopsTheChange(t *testing.T) {
 	outcome, err := alwaysSelfApproved.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"},
 		manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litGapsApplyV, err)
 	}
 	if len(outcome.Applied) != 0 {
 		t.Fatal("a change the door refused on separation of duties reached the asset")
@@ -189,7 +191,7 @@ func TestAGatedChangeIsParkedForAPersonNotRefusedAsASelfApproval(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"},
 		manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litGapsApplyV, err)
 	}
 	// sodDoor allows anything that is not a self-approval, and a submission is not one — so the
 	// SoD rule must not have fired here at all.
@@ -216,7 +218,7 @@ func TestAnApprovalCarriesBothNamesSoTheDoorCanEnforceSoD(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"},
 		manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litGapsApplyV, err)
 	}
 	var pending string
 	for _, refused := range outcome.Refused {

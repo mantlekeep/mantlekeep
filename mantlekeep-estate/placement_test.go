@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+const litPlacementPlaceV = "place: %v"
+
 func fleet() []Cluster {
 	return []Cluster{
 		{Name: "dev-app-region-a-1", Provider: "gke", Region: "region-a", Env: "dev", Purpose: "app", Residency: "region-a", Reachable: true},
@@ -77,7 +79,7 @@ func TestAPlacedAppStaysPutEvenWhenAnEmptierClusterExists(t *testing.T) {
 
 	decision, err := placer.Place(Placement{Env: "dev", Purpose: "app", Residency: "region-a"}, "dev-app-region-a-1")
 	if err != nil {
-		t.Fatalf("place: %v", err)
+		t.Fatalf(litPlacementPlaceV, err)
 	}
 	if decision.Cluster != "dev-app-region-a-1" {
 		t.Fatalf("a running app was migrated to %q by a reconcile pass — moving a placed app "+
@@ -95,7 +97,7 @@ func TestAnAppMovesWhenItsClusterBecomesIllegal(t *testing.T) {
 	decision, err := placer.Place(Placement{Env: "dev", Purpose: "app", Residency: "region-a"},
 		"dev-app-region-b-1") // was in HK; no longer permitted for UK data
 	if err != nil {
-		t.Fatalf("place: %v", err)
+		t.Fatalf(litPlacementPlaceV, err)
 	}
 	if strings.Contains(decision.Cluster, "region-b") {
 		t.Fatal("it stayed on an illegal cluster — stickiness must not outrank residency")
@@ -114,7 +116,7 @@ func TestOverflowPicksTheEmptierOfTwoIdenticalClusters(t *testing.T) {
 
 	decision, err := placer.Place(Placement{Env: "dev", Purpose: "app", Residency: "region-a"}, "")
 	if err != nil {
-		t.Fatalf("place: %v", err)
+		t.Fatalf(litPlacementPlaceV, err)
 	}
 	if decision.Cluster != "dev-app-uk-2" {
 		t.Fatalf("the full cluster was chosen; got %q", decision.Cluster)
@@ -150,7 +152,7 @@ func TestPurposeSeparatesAppFromCore(t *testing.T) {
 	decision, err := NewPlacer(fleet()).Place(
 		Placement{Env: "dev", Purpose: "app", Residency: "region-a"}, "")
 	if err != nil {
-		t.Fatalf("place: %v", err)
+		t.Fatalf(litPlacementPlaceV, err)
 	}
 	for _, considered := range decision.Considered {
 		if strings.Contains(considered, "core") {
@@ -164,7 +166,7 @@ func TestTheDecisionRecordsWhatItConsidered(t *testing.T) {
 	decision, err := NewPlacer(fleet()).Place(
 		Placement{Env: "dev", Purpose: "app", Residency: "region-a"}, "")
 	if err != nil {
-		t.Fatalf("place: %v", err)
+		t.Fatalf(litPlacementPlaceV, err)
 	}
 	if len(decision.Considered) != 2 {
 		t.Fatalf("both permitted UK app clusters must be recorded; got %v", decision.Considered)

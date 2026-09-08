@@ -12,6 +12,8 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
+const litTransformApplyV = "apply: %v"
+
 // capturingPort keeps every change it was handed, whole and in order. The property under test
 // is what the change LOOKED LIKE when it arrived, so a port that remembered only its name would
 // answer a different question.
@@ -76,7 +78,7 @@ func TestWithNoTransformTheDoorSeesExactlyTheResolvedChange(t *testing.T) {
 	port := &capturingPort{asset: "kafka"}
 	manager := NewManager(&loggingDoor{}, DefaultFloor(), port)
 	if _, err := manager.Apply(context.Background(), transformActor(), manifest); err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litTransformApplyV, err)
 	}
 
 	want, err := json.Marshal(resolved.Changes)
@@ -114,7 +116,7 @@ func TestATransformRunsBeforeTheDoorAndItsOutputIsWhatIsGoverned(t *testing.T) {
 
 	if _, err := manager.Apply(context.Background(), transformActor(),
 		transformFixture(t, "dev")); err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litTransformApplyV, err)
 	}
 
 	for _, change := range port.applied {
@@ -160,7 +162,7 @@ func TestAnAlreadyTransformedChangeIsNotTransformedTwice(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(),
 		mantlekeep.Subject{ID: "person-one"}, transformFixture(t, "prod"))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litTransformApplyV, err)
 	}
 	if len(outcome.Refused) == 0 || outcome.Refused[0].Approval == "" {
 		t.Fatalf("the fixture must produce a gated change to approve: %+v", outcome)
@@ -220,7 +222,7 @@ func TestAFailingTransformStopsTheChangeBeforeTheDoor(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(), transformActor(),
 		transformFixture(t, "dev"))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litTransformApplyV, err)
 	}
 
 	if len(door.submitted) != 0 {
@@ -267,7 +269,7 @@ func TestATransformMayNotChangeWhichChangeThisIs(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(), transformActor(),
 		transformFixture(t, "dev"))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litTransformApplyV, err)
 	}
 	if len(door.submitted) != 0 || len(port.applied) != 0 {
 		t.Fatal("a transform moved a change to another identity and it was still governed")

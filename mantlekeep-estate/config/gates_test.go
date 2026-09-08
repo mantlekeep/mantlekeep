@@ -9,6 +9,10 @@ import (
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 )
 
+const litGatesTestParse = "parse: %v"
+
+const litDevOwningTeam = `{"dev": "owning-team"}`
+
 // withGates splices a gates block into the known-good document, so these tests differ from the
 // passing one by exactly the thing under test.
 func withGates(t *testing.T, gates string) string {
@@ -24,7 +28,7 @@ func withGates(t *testing.T, gates string) string {
 func TestADeploymentMayRaiseAGateOnATierTheDefaultTreatsAsHarmless(t *testing.T) {
 	// The case this exists for: a shared DEV cluster that ten teams depend on is not the
 	// playground the built-in ladder assumes, and saying so must not cost a release.
-	config, err := Parse([]byte(withGates(t, `{"dev": "owning-team"}`)))
+	config, err := Parse([]byte(withGates(t, litDevOwningTeam)))
 	if err != nil {
 		t.Fatalf("raising dev to owning-team was refused: %v", err)
 	}
@@ -59,11 +63,11 @@ func TestAnUnrecognisedGateIsRefusedRatherThanAssumedPermissive(t *testing.T) {
 func TestTheFloorRevisionIsDerivedFromContentAndCannotBeDeclared(t *testing.T) {
 	first, err := Parse([]byte(validDocument))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litGatesTestParse, err)
 	}
 	again, err := Parse([]byte(validDocument))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litGatesTestParse, err)
 	}
 	if first.Floor.Revision == "" {
 		t.Fatal("no revision — a decision made under this floor could not name which floor")
@@ -73,9 +77,9 @@ func TestTheFloorRevisionIsDerivedFromContentAndCannotBeDeclared(t *testing.T) {
 			"disagree about which rules they are running")
 	}
 
-	edited, err := Parse([]byte(withGates(t, `{"dev": "owning-team"}`)))
+	edited, err := Parse([]byte(withGates(t, litDevOwningTeam)))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litGatesTestParse, err)
 	}
 	if edited.Floor.Revision == first.Floor.Revision {
 		t.Error("an edited floor kept the old revision — an operator's change would be " +
@@ -135,7 +139,7 @@ func TestAGoodReloadReplacesTheFloorWithoutARestart(t *testing.T) {
 		t.Fatalf("dev gate = %q, want none before the edit", got)
 	}
 
-	if err := os.WriteFile(path, []byte(withGates(t, `{"dev": "owning-team"}`)), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(withGates(t, litDevOwningTeam)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := live.Reload(); err != nil {

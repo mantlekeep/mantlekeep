@@ -10,6 +10,8 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
+const litManagerApplyV = "apply: %v"
+
 // fakeDoor records what it was asked to allow, and refuses whatever the test names. Denial is
 // an error carrying the decision's own words, exactly as the real door reports it.
 type fakeDoor struct {
@@ -81,7 +83,7 @@ func TestTheAdapterReceivesTheDoorsToken(t *testing.T) {
 
 	outcome, err := manager.Apply(context.Background(), actor(), manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litManagerApplyV, err)
 	}
 	if len(outcome.Applied) == 0 {
 		t.Fatalf("nothing was applied: %+v", outcome)
@@ -111,7 +113,7 @@ func TestARefusedChangeNeverReachesTheAsset(t *testing.T) {
 
 	outcome, err := manager.Apply(context.Background(), actor(), manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litManagerApplyV, err)
 	}
 
 	if _, reached := port.tokens["payments.settlements"]; reached {
@@ -136,7 +138,7 @@ func TestOneRefusalDoesNotBlockTheRest(t *testing.T) {
 
 	outcome, err := manager.Apply(context.Background(), actor(), manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litManagerApplyV, err)
 	}
 	if _, reached := port.tokens["payments.orders"]; !reached {
 		t.Fatal("the dev topic was blocked by an unrelated refusal")
@@ -152,7 +154,7 @@ func TestTheIntentCarriesTierAndGateSoPolicyNeedNotKnowTheAsset(t *testing.T) {
 	manager := NewManager(door, DefaultFloor(), &recordingPort{asset: "kafka"})
 
 	if _, err := manager.Apply(context.Background(), actor(), manifestWithProdTopic(t)); err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litManagerApplyV, err)
 	}
 
 	var sawProd bool
@@ -182,7 +184,7 @@ func TestAnAssetWithNoAdapterIsReportedNotSilentlyApproved(t *testing.T) {
 
 	outcome, err := manager.Apply(context.Background(), actor(), manifestWithProdTopic(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litManagerApplyV, err)
 	}
 	if len(outcome.Failed) == 0 {
 		t.Fatal("a change with no adapter was not reported")
