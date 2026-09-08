@@ -85,6 +85,66 @@ what `Resolve` produces.
   fall back to the demo set. The result still describes itself as ASSERTED, not of record.
 - `ContractVersion` is `3.1.0` — additive ports, no signature changed.
 
+## [mantlekeep-control/v0.4.0] — 2026-09-08
+
+Purely ADDITIVE. No exported symbol was removed or renamed, so a consumer on v0.3.0 upgrades by
+changing one line in `go.mod` — asserted rather than assumed: the diff from v0.3.0 contains zero
+removed exported declarations.
+
+### Added — policy that changes without a restart
+
+`doorkit.ReloadPolicy(ctx, grants.Loader)` re-reads the grant and floor documents and installs
+them if they are valid. `doorkit.PolicyRevisionInForce()` reports what is actually deciding.
+
+The whole snapshot is built BEFORE anything is installed, so a malformed document, an unreadable
+file or a product doc violating the platform seal fails while the previous policy is still in
+force. There is no window where the door runs on half a policy, and no path where a broken file
+empties the grants — which would not look like an outage, it would look like a working deny-all.
+
+Boot still fails fast and a reload never does: at boot nothing is serving, so a bad document means
+the process must not start; during a reload something IS serving valid policy, and turning a typo
+into an outage of the component that says no is the worse failure.
+
+### Added — one way to ask what the door decided
+
+`DecisionFrom(err) (Decision, bool)` and `AwaitingApproval(err) bool`.
+
+Submit reports a non-allow outcome as an error, and two shapes carry a decision: `DecisionError`
+(what the door returns) and `Refused` (narrower, still constructed by some callers). A caller
+checking only one gets no compile error when it meets the other — it gets an assertion that
+silently misses and reports a change WAITING FOR A PERSON as forbidden. That happened, was fixed,
+and happened again in a second handler when the error type changed.
+
+### Added — the policy READ surfaces
+
+`PolicyInputFor`, `app.PolicyInForce` (a `grants.Loader` over what the ENGINE accepted, not the
+file on disk), `app.Explainer` (what the door WOULD decide, recording nothing and issuing no
+token), and `app.EvaluationOrder()` with `Decision.Step`.
+
+`Decision.Step` names the stage that produced a decision, so a surface can locate a refusal in the
+evaluation order without matching on the reason text — a second engine that breaks silently
+whenever a message is reworded. It is separate from `Category`: category says what KIND of denial,
+step says which question asked.
+
+### Added — `policybundle`: one policy for the door and a gateway
+
+Serves the documents in force as an OPA bundle, so a gateway evaluates LOCALLY against the same
+documents the door enforces. It links no OPA — a bundle is a gzipped tar of JSON — and reads
+through `grants.Loader`, so it publishes whatever source the deployment already uses.
+
+Tagged with the revision derived from the documents, the SAME string the door reports, so "the
+gateway and the door agree" is a comparison an operator can run rather than an assurance.
+
+### Added — `grants.RevisionOfDocuments`
+
+One canonical derivation, so every producer of a revision derives it identically. Two sources that
+hash the same policy differently are not two opinions; they are a broken join.
+
+### Note for consumers
+
+`Decision` gained a field. Struct literals that name their fields are unaffected; an UNKEYED
+literal (`Decision{a, b, c}`) will not compile. `go vet`'s composites check flags those already.
+
 ## [mantlekeep-control/v0.2.0] — 2026-09-07
 
 Go module only. The Java and Python SDKs are unchanged since `0.1.1` and are **not** re-released:
