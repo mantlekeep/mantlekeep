@@ -29,21 +29,7 @@ func main() {
 	if len(roots) == 0 {
 		roots = []string{"."}
 	}
-	found := false
-	for _, root := range roots {
-		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
-				return nil
-			}
-			if !*tests && strings.HasSuffix(path, "_test.go") {
-				return nil
-			}
-			if reportFile(path, *min, *times) {
-				found = true
-			}
-			return nil
-		})
-	}
+	found := reportDuplicateLiterals(roots, *min, *times, *tests)
 	if reportIfDecls(roots, *tests) {
 		found = true
 	}
@@ -53,6 +39,30 @@ func main() {
 	if found {
 		os.Exit(1)
 	}
+}
+
+// reportDuplicateLiterals walks the roots looking for over-repeated literals.
+//
+// The walk lives here rather than in main so main reads as the three rules it runs. Every rule
+// has the same shape — walk, parse, report — and main should show that rather than open with one
+// of them written out in full.
+func reportDuplicateLiterals(roots []string, min, times int, includeTests bool) bool {
+	found := false
+	for _, root := range roots {
+		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			if !includeTests && strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			if reportFile(path, min, times) {
+				found = true
+			}
+			return nil
+		})
+	}
+	return found
 }
 
 // reportFile prints every over-repeated literal in one file, and says whether it found any.

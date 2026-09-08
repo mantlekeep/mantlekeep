@@ -17,9 +17,14 @@ package main
 //   +1  for each sequence of boolean operators
 //   +1  for else / else-if
 //
-// It is an APPROXIMATION of Sonar's, which is why the threshold here is the same 15 but a
-// function measured at 14 should still be treated as close. Sonar counts a few constructs this
-// does not, so it can read higher there — never lower.
+// It is an APPROXIMATION of Sonar's, and the difference goes BOTH ways — measured, not assumed:
+//
+//	validateFleet, PrecedenceNotices, parseQuantity   identical
+//	serve.Run        this reads 16, gocognit 14       closure nesting, which Sonar also charges
+//	this main()      this read 15, SONAR SAID 16      Sonar was stricter than this
+//
+// So treat anything from about 13 up as at risk rather than trusting the number. Passing here is
+// evidence, not proof; the only instance whose opinion counts is the one gating the release.
 
 import (
 	"fmt"
