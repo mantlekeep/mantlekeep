@@ -33,42 +33,63 @@ func reportIfDecls(roots []string, includeTests bool) bool {
 			if !includeTests && strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			fset := token.NewFileSet()
-			file, perr := parser.ParseFile(fset, path, nil, 0)
-			if perr != nil {
-				return nil
-			}
-			ast.Inspect(file, func(n ast.Node) bool {
-				stmt, ok := n.(*ast.IfStmt)
-				if !ok || stmt.Init == nil {
-					return true
-				}
-				assign, ok := stmt.Init.(*ast.AssignStmt)
-				if !ok || assign.Tok != token.DEFINE || len(assign.Lhs) != 1 {
-					return true
-				}
-				name, ok := assign.Lhs[0].(*ast.Ident)
-				if !ok || name.Name == "_" {
-					return true
-				}
-				// Used more than once in the condition, or at all in either branch? Then the
-				// binding is doing work.
-				if uses(stmt.Cond, name.Name) != 1 {
-					return true
-				}
-				if uses(stmt.Body, name.Name) > 0 || (stmt.Else != nil && uses(stmt.Else, name.Name) > 0) {
-					return true
-				}
-				pos := fset.Position(stmt.Pos())
-				fmt.Printf("   S1854  %s:%d\n          %q is declared and used once — put the expression in the condition\n",
-					path, pos.Line, name.Name)
+			if reportIfDeclsIn(path) {
 				found = true
-				return true
-			})
+			}
 			return nil
 		})
 	}
 	return found
+}
+
+// reportIfDeclsIn walks one file's if-statements.
+func reportIfDeclsIn(path string) bool {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		return false
+	}
+	found := false
+	ast.Inspect(file, func(n ast.Node) bool {
+		stmt, ok := n.(*ast.IfStmt)
+		if !ok {
+			return true
+		}
+		name, ok := needlessBinding(stmt)
+		if !ok {
+			return true
+		}
+		fmt.Printf("   S1854  %s:%d\n          %q is declared and used once — put the expression in the condition\n",
+			path, fset.Position(stmt.Pos()).Line, name)
+		found = true
+		return true
+	})
+	return found
+}
+
+// needlessBinding reports the name an if-statement declares for no reason.
+//
+// Only when the variable appears ONCE in the condition and NOWHERE in either branch — then the
+// name is pure ceremony. Used twice, or used inside a branch, and it is earning its keep.
+func needlessBinding(stmt *ast.IfStmt) (string, bool) {
+	if stmt.Init == nil {
+		return "", false
+	}
+	assign, ok := stmt.Init.(*ast.AssignStmt)
+	if !ok || assign.Tok != token.DEFINE || len(assign.Lhs) != 1 {
+		return "", false
+	}
+	name, ok := assign.Lhs[0].(*ast.Ident)
+	if !ok || name.Name == "_" {
+		return "", false
+	}
+	if uses(stmt.Cond, name.Name) != 1 || uses(stmt.Body, name.Name) > 0 {
+		return "", false
+	}
+	if stmt.Else != nil && uses(stmt.Else, name.Name) > 0 {
+		return "", false
+	}
+	return name.Name, true
 }
 
 // uses counts how many times an identifier appears in a subtree.

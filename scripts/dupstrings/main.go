@@ -58,29 +58,7 @@ func reportFile(path string, min, times int) bool {
 	if err != nil {
 		return false // unparseable is a compiler's problem, not this tool's
 	}
-
-	counts := map[string]int{}
-	first := map[string]token.Position{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		lit, ok := n.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		value, err := strconv.Unquote(lit.Value)
-		if err != nil || len(value) < min {
-			return true
-		}
-		// A struct tag is DATA and belongs at every use; so is anything with no space and no
-		// format verb, which is a key or an identifier rather than a message.
-		if !strings.ContainsAny(value, " %") || strings.Contains(value, ",omitempty") {
-			return true
-		}
-		counts[value]++
-		if _, seen := first[value]; !seen {
-			first[value] = fset.Position(lit.Pos())
-		}
-		return true
-	})
+	counts, first := countLiterals(fset, file, min)
 
 	over := make([]string, 0, len(counts))
 	for value, n := range counts {
@@ -97,4 +75,33 @@ func reportFile(path string, min, times int) bool {
 			path, first[value].Line, value, counts[value])
 	}
 	return true
+}
+
+// countLiterals tallies every message-shaped string literal in one file.
+//
+// A struct tag is DATA and belongs at every use; so is anything with no space and no format verb,
+// which is a key or an identifier rather than a message. Counting those would make this report
+// things nobody should change, and a checker that cries wolf gets switched off.
+func countLiterals(fset *token.FileSet, file *ast.File, min int) (map[string]int, map[string]token.Position) {
+	counts := map[string]int{}
+	first := map[string]token.Position{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		lit, ok := n.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		value, err := strconv.Unquote(lit.Value)
+		if err != nil || len(value) < min {
+			return true
+		}
+		if !strings.ContainsAny(value, " %") || strings.Contains(value, ",omitempty") {
+			return true
+		}
+		counts[value]++
+		if _, seen := first[value]; !seen {
+			first[value] = fset.Position(lit.Pos())
+		}
+		return true
+	})
+	return counts, first
 }

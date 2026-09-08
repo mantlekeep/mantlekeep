@@ -182,8 +182,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
+      # Pinned, not @latest. An unpinned tool means this job can start failing on a morning
+      # nobody changed anything, and a gate that fails for reasons outside the diff is a gate
+      # people learn to re-run rather than read.
       - name: install gocognit
-        run: go install github.com/uudashr/gocognit/cmd/gocognit@latest
+        run: go install github.com/uudashr/gocognit/cmd/gocognit@v1.2.1
       # Four rules, each of which has blocked a release on a downstream SonarQube stricter than
       # our own SonarCloud profile: duplicated literals, needless if-bindings, cognitive
       # complexity, and files created in the shared temp directory. Finding them here costs a
