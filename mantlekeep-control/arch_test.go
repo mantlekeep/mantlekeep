@@ -1,6 +1,7 @@
 package mantlekeep
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -34,20 +35,30 @@ func TestCoreDependsOnStdlibOnly(t *testing.T) {
 			t.Fatalf("parse %s: %v", name, err)
 		}
 		scanned++
-		for _, imp := range f.Imports {
-			path := strings.Trim(imp.Path.Value, `"`)
-			first := path
-			if i := strings.IndexByte(path, '/'); i >= 0 {
-				first = path[:i]
-			}
-			if strings.Contains(first, ".") {
-				t.Errorf("%s imports %q — the core hexagon must depend on stdlib only "+
-					"(no adapters, no third-party). Put this behind a port instead.", name, path)
-			}
-		}
+		checkImportsAreStdlib(t, name, f)
 	}
 	if scanned == 0 {
 		t.Fatal("no core source files scanned — guard would pass vacuously")
+	}
+}
+
+// checkImportsAreStdlib reports any import in one file that is not from the standard library.
+//
+// A path's first segment carries a dot only when it is a domain — "github.com/…" against "net",
+// "strings", "go/parser". That is the whole test: the core hexagon depends on stdlib alone, and
+// anything else belongs behind a port.
+func checkImportsAreStdlib(t *testing.T, name string, f *ast.File) {
+	t.Helper()
+	for _, imp := range f.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+		first := path
+		if i := strings.IndexByte(path, '/'); i >= 0 {
+			first = path[:i]
+		}
+		if strings.Contains(first, ".") {
+			t.Errorf("%s imports %q — the core hexagon must depend on stdlib only "+
+				"(no adapters, no third-party). Put this behind a port instead.", name, path)
+		}
 	}
 }
 

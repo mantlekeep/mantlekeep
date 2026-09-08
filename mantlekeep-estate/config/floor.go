@@ -17,7 +17,7 @@ type duration time.Duration
 
 func (d *duration) UnmarshalJSON(data []byte) error {
 	var text string
-	if err := json.Unmarshal(data, &text); err != nil {
+	if json.Unmarshal(data, &text) != nil {
 		return fmt.Errorf(
 			"a duration must be a quoted string such as \"168h\" or \"30s\", not %s — a bare "+
 				"number would be read as nanoseconds, where a dropped zero silently shortens the "+

@@ -8,6 +8,10 @@ import (
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 )
 
+const litConfigTestParse = "parse: %v"
+
+const litOwnershipEmpty = `"ownership": {}`
+
 // validDocument is a complete, well-formed config. Tests damage a copy of it, so each case
 // changes exactly one thing and the failure it asserts is the thing it changed.
 const validDocument = `{
@@ -54,7 +58,7 @@ const validDocument = `{
 func TestAValidDocumentLoadsItsLimits(t *testing.T) {
 	config, err := Parse([]byte(validDocument))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litConfigTestParse, err)
 	}
 	if got := config.Floor.Kafka[estate.TierDev].Retention; got != 168*time.Hour {
 		t.Errorf("dev kafka retention = %v, want 168h — the authored string must become the "+
@@ -152,11 +156,11 @@ func TestAnEmptyInstanceTypeListIsRefused(t *testing.T) {
 // Config chooses the policy; it can never reach the guarantee. Naming a governed field under
 // "watched" must not demote it, because that would remove a control by adding a word.
 func TestConfigCannotDemoteAGovernedFieldToWatched(t *testing.T) {
-	document := strings.Replace(validDocument, `"ownership": {}`,
+	document := strings.Replace(validDocument, litOwnershipEmpty,
 		`"ownership": {"watched": ["digest"]}`, 1)
 	config, err := Parse([]byte(document))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litConfigTestParse, err)
 	}
 	if !config.Ownership.Owns("digest") {
 		t.Fatal("config demoted 'digest' to watched — an unapproved artifact would become a " +
@@ -169,11 +173,11 @@ func TestConfigCannotDemoteAGovernedFieldToWatched(t *testing.T) {
 
 // Tightening is always allowed: a deployment may take ownership of a field the default watches.
 func TestConfigMayPromoteAWatchedFieldToGoverned(t *testing.T) {
-	document := strings.Replace(validDocument, `"ownership": {}`,
+	document := strings.Replace(validDocument, litOwnershipEmpty,
 		`"ownership": {"governed": ["replicas"]}`, 1)
 	config, err := Parse([]byte(document))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litConfigTestParse, err)
 	}
 	if !config.Ownership.Owns("replicas") {
 		t.Fatal("config could not take ownership of 'replicas' — tightening must be permitted")
@@ -186,11 +190,11 @@ func TestConfigMayPromoteAWatchedFieldToGoverned(t *testing.T) {
 // A field the default knows nothing about is added, not dropped: a field in NEITHER map is
 // skipped by the differ, which reads exactly like "no drift".
 func TestConfigMayAddANewField(t *testing.T) {
-	document := strings.Replace(validDocument, `"ownership": {}`,
+	document := strings.Replace(validDocument, litOwnershipEmpty,
 		`"ownership": {"governed": ["encryptionAtRest"], "watched": ["lastScannedAt"]}`, 1)
 	config, err := Parse([]byte(document))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litConfigTestParse, err)
 	}
 	if !config.Ownership.Owns("encryptionAtRest") {
 		t.Error("a newly governed field was not added")

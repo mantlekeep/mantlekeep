@@ -31,7 +31,7 @@ func TestAReadOnlyDeploymentRefusesAValidChange(t *testing.T) {
 // never received, which is worse than either applying or refusing.
 func TestAReadOnlyApplyIsNeverASilentSuccess(t *testing.T) {
 	port := estate.ReadOnly(estate.Guarded(&recordingAdapter{asset: "app"}))
-	if err := port.Apply(context.Background(), liveToken(), appChange()); err == nil {
+	if port.Apply(context.Background(), liveToken(), appChange()) == nil {
 		t.Fatal("a read-only Apply returned success")
 	}
 }

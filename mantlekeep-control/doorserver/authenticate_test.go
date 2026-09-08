@@ -98,7 +98,7 @@ func TestOffLoopbackRefusesUnverifiedIdentity(t *testing.T) {
 // Dev-login mints a session for any named user with no credential check at all. Off loopback
 // it is the same hole with a friendlier interface.
 func TestOffLoopbackRefusesDevLoginToo(t *testing.T) {
-	if err := checkIdentityTier(Options{DevLogin: true}, ":8080", false); err == nil {
+	if checkIdentityTier(Options{DevLogin: true}, ":8080", false) == nil {
 		t.Fatal("dev-login was accepted on a non-loopback address")
 	}
 }

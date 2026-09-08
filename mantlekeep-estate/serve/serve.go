@@ -92,14 +92,7 @@ func Run(options Options) error {
 	// Capacity is REPORTED and optional. Without it placement still works; it simply cannot
 	// prefer the emptier of two equally permitted clusters, which is a worse answer rather
 	// than a wrong one. A cluster whose KSM is silent is UNKNOWN, never full.
-	buildPlacer := func(clusters []estate.Cluster) (*estate.Placer, []string) {
-		placer := estate.NewPlacer(clusters)
-		if endpoints := parseKSM(*ksmSpec); len(endpoints) > 0 {
-			reports, unread := fleet.NewKSM(endpoints).Read(context.Background())
-			return placer.WithCapacity(reports), unread
-		}
-		return placer, nil
-	}
+	buildPlacer := placerBuilder(*ksmSpec)
 	placer, unreadKSM := buildPlacer(clusters)
 
 	// The fleet is held the same way the floor is, and for a sharper reason: a cluster that
@@ -145,26 +138,8 @@ func Run(options Options) error {
 	signal.Notify(reloads, syscall.SIGHUP)
 	go func() {
 		for range reloads {
-			reloaded, err := live.Reload()
-			if err != nil {
-				slog.Error("floor reload REFUSED — the previous floor is still in force",
-					"error", err, "revision", reloaded.Floor.Revision)
-			} else {
-				slog.Info("floor reloaded", "revision", reloaded.Floor.Revision)
-			}
-
-			// The fleet reloads independently. A bad registry must not discard a good floor
-			// reload, and vice versa — one signal, two decisions, each reported on its own.
-			refreshed, err := fleet.Load(*fleetPath)
-			if err != nil {
-				slog.Error("fleet reload REFUSED — the previous registry is still in force",
-					"error", err)
-				continue
-			}
-			refreshed = fleet.MarkReachable(refreshed, fleet.AssumeReachable().Reachable(refreshed))
-			next, _ := buildPlacer(refreshed)
-			livePlacer.Store(next)
-			slog.Info("fleet reloaded", "clusters", len(refreshed))
+			reloadFloor(live)
+			reloadFleet(*fleetPath, buildPlacer, &livePlacer)
 		}
 	}()
 
@@ -282,4 +257,59 @@ func envOr(name, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+// placerBuilder returns the function that turns a cluster set into a Placer.
+//
+// A named constructor rather than a closure in the middle of Run: it is called twice — once at
+// boot and once on every SIGHUP — and a reader following a reload should not have to scroll back
+// into startup to find out what a reload rebuilds.
+//
+// Capacity is REPORTED and optional. Without it placement still works; it simply cannot prefer
+// the emptier of two equally permitted clusters, which is a worse answer rather than a wrong one.
+// A cluster whose KSM is silent is UNKNOWN, never full.
+func placerBuilder(ksmSpec string) func([]estate.Cluster) (*estate.Placer, []string) {
+	return func(clusters []estate.Cluster) (*estate.Placer, []string) {
+		placer := estate.NewPlacer(clusters)
+		endpoints := parseKSM(ksmSpec)
+		if len(endpoints) == 0 {
+			return placer, nil
+		}
+		reports, unread := fleet.NewKSM(endpoints).Read(context.Background())
+		return placer.WithCapacity(reports), unread
+	}
+}
+
+// reloadFloor re-reads the floor and reports which one is now in force.
+//
+// A bad file changes nothing: the previous floor keeps serving and the failure is logged at ERROR
+// with the revision still deciding, so an operator can see that their edit did NOT take rather
+// than assuming it did.
+func reloadFloor(live *config.Live) {
+	reloaded, err := live.Reload()
+	if err != nil {
+		slog.Error("floor reload REFUSED — the previous floor is still in force",
+			"error", err, "revision", reloaded.Floor.Revision)
+		return
+	}
+	slog.Info("floor reloaded", "revision", reloaded.Floor.Revision)
+}
+
+// reloadFleet re-reads the cluster registry and swaps the placer.
+//
+// Separate from the floor on purpose: one signal, two decisions. A bad registry must not discard
+// a good floor reload, and a bad floor must not discard a good registry — reporting them together
+// would make an operator guess which half failed.
+func reloadFleet(path string, build func([]estate.Cluster) (*estate.Placer, []string),
+	livePlacer *atomic.Pointer[estate.Placer]) {
+
+	refreshed, err := fleet.Load(path)
+	if err != nil {
+		slog.Error("fleet reload REFUSED — the previous registry is still in force", "error", err)
+		return
+	}
+	refreshed = fleet.MarkReachable(refreshed, fleet.AssumeReachable().Reachable(refreshed))
+	next, _ := build(refreshed)
+	livePlacer.Store(next)
+	slog.Info("fleet reloaded", "clusters", len(refreshed))
 }

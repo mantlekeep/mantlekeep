@@ -15,6 +15,9 @@ import (
 	"github.com/mantlekeep/mantlekeep/mantlekeep-policy-postgres/sqlstore"
 )
 
+const litIntegrationLoadingV = "loading: %v"
+const litIntegrationHeadV = "Head: %v"
+
 // dsnEnv names a THROWAWAY Postgres database to run the integration tests against. The suite
 // drops and recreates the policy tables, so it must never point at anything that matters.
 //
@@ -125,7 +128,7 @@ func seedingNeverOverwrites(t *testing.T, db *sql.DB) {
 	store := seededStore(t, db)
 	_, _, before, err := pgpolicy.New(store).Load(context.Background())
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		t.Fatalf(litIntegrationLoadingV, err)
 	}
 
 	other, _, err := pgpolicy.Encode(&grants.Grants{RoleActions: map[string][]string{
@@ -144,7 +147,7 @@ func seedingNeverOverwrites(t *testing.T, db *sql.DB) {
 
 	_, _, after, err := pgpolicy.New(store).Load(context.Background())
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		t.Fatalf(litIntegrationLoadingV, err)
 	}
 	if after != before {
 		t.Errorf("the policy changed under a re-seed: %s became %s", before, after)
@@ -160,7 +163,7 @@ func anUnrenderableChangeWritesNothing(t *testing.T, db *sql.DB) {
 	store := seededStore(t, db)
 	head, err := store.Head(context.Background())
 	if err != nil {
-		t.Fatalf("Head: %v", err)
+		t.Fatalf(litIntegrationHeadV, err)
 	}
 
 	refused := errors.New("the caller could not render the change")
@@ -173,7 +176,7 @@ func anUnrenderableChangeWritesNothing(t *testing.T, db *sql.DB) {
 
 	after, err := store.Head(context.Background())
 	if err != nil {
-		t.Fatalf("Head: %v", err)
+		t.Fatalf(litIntegrationHeadV, err)
 	}
 	if after.StoredRevision != head.StoredRevision {
 		t.Errorf("an abandoned update still changed the head: %s became %s",
@@ -266,12 +269,12 @@ func storedDocumentsMigrateBackToFiles(t *testing.T, db *sql.DB) {
 	}
 	_, _, served, err := policy.Load(context.Background())
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		t.Fatalf(litIntegrationLoadingV, err)
 	}
 
 	head, err := store.Head(context.Background())
 	if err != nil {
-		t.Fatalf("Head: %v", err)
+		t.Fatalf(litIntegrationHeadV, err)
 	}
 	directory := t.TempDir()
 	grantsPath := filepath.Join(directory, "grants.json")
@@ -305,7 +308,7 @@ func historyAnswersPointInTime(t *testing.T, db *sql.DB) {
 
 	_, _, atSeed, err := policy.Load(context.Background())
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		t.Fatalf(litIntegrationLoadingV, err)
 	}
 	if _, err := policy.Write(context.Background(), grants.Change{
 		Role: "L2-Operator", Action: "deploy.prod", Grant: true, Reason: "release window"}); err != nil {
@@ -332,7 +335,7 @@ func historyAnswersPointInTime(t *testing.T, db *sql.DB) {
 	// And the current policy is back where it started, revision included.
 	_, _, now, err := policy.Load(context.Background())
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		t.Fatalf(litIntegrationLoadingV, err)
 	}
 	if now != atSeed {
 		t.Errorf("a grant and its revoke did not return to %s: the policy is at %s", atSeed, now)

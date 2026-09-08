@@ -10,6 +10,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+const litAuditVerifyV = "Verify: %v"
+
 // open returns a Bolt log on a fresh temp database, closed when the test ends.
 func open(t *testing.T) *Bolt {
 	t.Helper()
@@ -65,7 +67,7 @@ func TestVerifyReportsAnUntouchedChainIntact(t *testing.T) {
 
 	intact, err := b.Verify(context.Background())
 	if err != nil {
-		t.Fatalf("Verify: %v", err)
+		t.Fatalf(litAuditVerifyV, err)
 	}
 	if !intact {
 		t.Error("an untouched chain verified as broken")
@@ -101,7 +103,7 @@ func TestVerifyDetectsAnEditedRecord(t *testing.T) {
 
 	intact, err := b.Verify(context.Background())
 	if err != nil {
-		t.Fatalf("Verify: %v", err)
+		t.Fatalf(litAuditVerifyV, err)
 	}
 	if intact {
 		t.Error("an edited record verified as intact — tampering is undetectable")
@@ -125,7 +127,7 @@ func TestVerifyDetectsAnUnreadableRecord(t *testing.T) {
 
 	intact, err := b.Verify(context.Background())
 	if err != nil {
-		t.Fatalf("Verify: %v", err)
+		t.Fatalf(litAuditVerifyV, err)
 	}
 	if intact {
 		t.Error("an unreadable record verified as intact")

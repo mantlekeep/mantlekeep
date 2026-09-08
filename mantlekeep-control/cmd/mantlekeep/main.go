@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/app"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 	"os"
 	"path/filepath"
 
@@ -71,9 +73,17 @@ func main() {
 
 	ctx := context.Background()
 
-	// Unique 0700 dir (not a predictable shared-temp name) — avoids a symlink/pre-create attack on
-	// the audit file. os.MkdirTemp creates it owner-only; we clean it up on exit.
-	dir, err := os.MkdirTemp("", "mantlekeep-*")
+	// A throwaway chain for the smoke test, under the deployment's OWN data directory rather
+	// than the shared temp dir.
+	//
+	// os.MkdirTemp would give an owner-only directory with an unguessable name, which defeats
+	// the symlink and pre-create attacks — but it creates that inside a world-writable directory
+	// shared with every process on the host. For a demo that is survivable; the reason not to do
+	// it anyway is that this binary is what somebody reads to learn where the chain goes, and a
+	// governance engine that keeps its evidence in /tmp teaches exactly the wrong habit.
+	//
+	// Removed on exit: this run is a demonstration, not a record.
+	dir, err := safeio.EnsureConfigDir(filepath.Join(app.DataDir(), "smoke-run"))
 	must(err)
 	defer func() { _ = os.RemoveAll(dir) }()
 	aud, err := audit.Open(filepath.Join(dir, "audit.db"))

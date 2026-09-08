@@ -9,6 +9,8 @@ import (
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 )
 
+const litApprovalFlowApplyV = "apply: %v"
+
 // These tests drive the WHOLE gated loop against a door that behaves the way the real one does,
 // rather than one that refuses unconditionally. That distinction is the point: the manager could
 // always open an approval record, and could never produce one, because the submission named the
@@ -75,7 +77,7 @@ func TestASubmissionNeverClaimsToBeItsOwnApproval(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(),
 		mantlekeep.Subject{ID: "dev-alice"}, gatedManifest(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litApprovalFlowApplyV, err)
 	}
 
 	if requester := door.lastIntent(t).Params["requester"]; requester != "" {
@@ -104,7 +106,7 @@ func TestAGatedChangeCompletesWhenASecondPersonApproves(t *testing.T) {
 	outcome, err := manager.Apply(context.Background(),
 		mantlekeep.Subject{ID: "dev-alice"}, gatedManifest(t))
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litApprovalFlowApplyV, err)
 	}
 	if len(outcome.Refused) == 0 || outcome.Refused[0].Approval == "" {
 		t.Fatalf("no approval was opened to act on: %+v", outcome)
@@ -185,7 +187,7 @@ func TestAnUngatedChangeStillAppliesImmediately(t *testing.T) {
 	}
 	outcome, err := manager.Apply(context.Background(), mantlekeep.Subject{ID: "dev-alice"}, manifest)
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(litApprovalFlowApplyV, err)
 	}
 	if len(outcome.Applied) == 0 || len(outcome.Refused) != 0 {
 		t.Fatalf("an ungated change did not apply straight through: %+v", outcome)

@@ -21,6 +21,10 @@ import (
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 )
 
+// wrapGrants is the one place this package says which document failed to load. Named rather
+// than repeated so a reader sees one origin for the message, and a change to it is one edit.
+const wrapGrants = "policy grants: %w"
+
 // defaultDoc is the embedded default — now EMPTY. The core binary carries NO policy: the platform
 // baseline is IT's external MANTLEKEEP_PLATFORM_POLICY and products supply MANTLEKEEP_POLICY_DIR docs, so the
 // whole policy is dynamic config, changeable with no recompile. This embed only guarantees Load() a
@@ -77,7 +81,7 @@ func baselineGrants() (*Grants, error) {
 	}
 	var g Grants
 	if err := json.Unmarshal(doc, &g); err != nil {
-		return nil, fmt.Errorf("policy grants: %w", err)
+		return nil, fmt.Errorf(wrapGrants, err)
 	}
 	if g.RoleActions == nil {
 		g.RoleActions = map[string][]string{}
@@ -100,7 +104,7 @@ func applyPlatformLayer(g *Grants) (map[string]bool, error) {
 	sealed := map[string]bool{}
 	plat, err := platformDoc()
 	if err != nil {
-		return nil, fmt.Errorf("policy grants: %w", err)
+		return nil, fmt.Errorf(wrapGrants, err)
 	}
 	if plat == nil {
 		return sealed, nil
@@ -125,7 +129,7 @@ func applyPlatformLayer(g *Grants) (map[string]bool, error) {
 func applyProductLayers(g *Grants, sealed map[string]bool) error {
 	docs, err := productDocs()
 	if err != nil {
-		return fmt.Errorf("policy grants: %w", err)
+		return fmt.Errorf(wrapGrants, err)
 	}
 	for _, d := range docs {
 		for role, acts := range d.RoleActions {

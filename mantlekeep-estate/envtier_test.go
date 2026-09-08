@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+const litEnvtierResolveV = "resolve: %v"
+
 // fleetFor builds a placer over one cluster per environment, so a manifest can target any of
 // them and the only variable under test is the tier it gets governed at.
 func fleetFor(t *testing.T) *Placer {
@@ -46,7 +48,7 @@ func TestAProductionEnvironmentCannotBeGovernedAtDevTier(t *testing.T) {
 	floor := DefaultFloor()
 	desired, err := ResolveWith(appManifest(t, "dev", "prod"), floor, fleetFor(t), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litEnvtierResolveV, err)
 	}
 	item := appItem(t, desired)
 
@@ -68,7 +70,7 @@ func TestAnAppMayBeGovernedMoreStrictlyThanItsEnvironmentDemands(t *testing.T) {
 	// and must survive.
 	desired, err := ResolveWith(appManifest(t, "prod", "dev"), DefaultFloor(), fleetFor(t), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litEnvtierResolveV, err)
 	}
 	if got := appItem(t, desired).Tier; got != TierProd {
 		t.Errorf("tier = %q, want prod — the environment lowered a tier the team chose", got)
@@ -90,7 +92,7 @@ func TestAnEnvironmentTheFloorHasNotRuledOnIsRefusedRatherThanGuessed(t *testing
 func TestTheEnvironmentTheTierWasAppliedToIsTheOnePlacedInto(t *testing.T) {
 	desired, err := ResolveWith(appManifest(t, "dev", "sit"), DefaultFloor(), fleetFor(t), nil)
 	if err != nil {
-		t.Fatalf("resolve: %v", err)
+		t.Fatalf(litEnvtierResolveV, err)
 	}
 	item := appItem(t, desired)
 	if item.Placement == nil || item.Placement.Env != "sit" {

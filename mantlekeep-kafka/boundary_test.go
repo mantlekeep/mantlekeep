@@ -74,7 +74,7 @@ func TestValidateResourceNameEnforcesKafkasLimits(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if err := validateResourceName(testCase.topic, "topic"); err == nil {
+			if validateResourceName(testCase.topic, "topic") == nil {
 				t.Fatalf("validateResourceName(%q) = nil, want a refusal", testCase.topic)
 			}
 		})
@@ -99,7 +99,7 @@ func TestPrincipalSplitsTypeFromName(t *testing.T) {
 	}
 
 	for _, bad := range []Principal{"", "svc-payments", "User:", ":svc-payments"} {
-		if err := bad.Validate(); err == nil {
+		if bad.Validate() == nil {
 			t.Fatalf("Principal(%q).Validate() = nil, want a refusal", string(bad))
 		}
 	}
@@ -107,7 +107,7 @@ func TestPrincipalSplitsTypeFromName(t *testing.T) {
 
 func TestQuotaMustBoundSomething(t *testing.T) {
 	for _, quota := range []Quota{{}, {ProducerByteRate: 1}, {ConsumerByteRate: 1}, {ProducerByteRate: -1, ConsumerByteRate: 1}} {
-		if err := quota.Validate(); err == nil {
+		if quota.Validate() == nil {
 			t.Fatalf("Quota%+v.Validate() = nil, want a refusal — an unbounded principal can starve the cluster", quota)
 		}
 	}
