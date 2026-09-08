@@ -19,8 +19,11 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 	"os"
 	"path/filepath"
+	"strings"
 
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/audit"
@@ -77,10 +80,19 @@ func New(ctx context.Context, opts ...Option) (*App, error) {
 		a.policy = policy.NewFailsafe(policy.NewRBAC())
 	}
 	if a.audit == nil {
-		// Unique 0700 dir, not a predictable shared-temp name (avoids a symlink/pre-create attack).
-		dir, err := os.MkdirTemp("", "mantlekeep-sdk-*")
+		// The audit chain is the EVIDENCE, so it does not go in the shared temp directory.
+		//
+		// os.MkdirTemp creates an owner-only directory with a random name, which defeats the
+		// symlink and pre-create attacks — but the directory it creates that in is still world
+		// writable, still shared with every other user and process on the host, and still the
+		// first thing a reboot or a cleaner removes. A governance engine whose answer to "where
+		// is the chain" is "/tmp, until something tidies it" has no chain.
+		//
+		// It goes under the deployment's own data directory instead: 0750, owner and group only,
+		// traversal-rejected, and in a place somebody chose. MANTLEKEEP_DATA_DIR names it.
+		dir, err := safeio.EnsureConfigDir(dataDir())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("app: preparing the data directory for the audit chain: %w", err)
 		}
 		aud, err := audit.Open(filepath.Join(dir, "audit.db"))
 		if err != nil {
@@ -106,3 +118,15 @@ func (a *App) Stores() *provider.Registry[mantlekeep.Store] { return a.stores }
 
 // Audit exposes the audit-logger plugin (e.g. to verify the hash chain).
 func (a *App) Audit() mantlekeep.AuditLogger { return a.audit }
+
+// dataDir is where this process keeps durable state.
+//
+// Deliberately a relative default rather than an absolute one: an absolute default would be a
+// path this library chose for somebody else's deployment, and the one place it must never choose
+// is where the evidence lives. A deployment that wants it elsewhere sets MANTLEKEEP_DATA_DIR.
+func dataDir() string {
+	if d := strings.TrimSpace(os.Getenv("MANTLEKEEP_DATA_DIR")); d != "" {
+		return d
+	}
+	return "mantlekeep-data"
+}

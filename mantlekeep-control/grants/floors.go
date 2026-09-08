@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+const wrapFloors = "policy floors: %w"
+
 // This file holds the SHARED attribute-FLOOR document: the per-action admission rules a product's
 // IT-owned floor is expressed as, as ONE data document that both the pure-Go engine
 // (internal/policy) and the OPA adapter (mantlekeep.dev/opa) read. Keeping the floor as GENERIC DATA —
@@ -74,7 +76,7 @@ func LoadFloors() (*Floors, error) {
 	}
 	var f Floors
 	if err := json.Unmarshal(doc, &f); err != nil {
-		return nil, fmt.Errorf("policy floors: %w", err)
+		return nil, fmt.Errorf(wrapFloors, err)
 	}
 	if f.Floors == nil {
 		f.Floors = map[string][]FloorRule{}
@@ -83,7 +85,7 @@ func LoadFloors() (*Floors, error) {
 	// Floors are APPEND-ONLY at every layer: a product can only ADD rules (tighten), never loosen — so
 	// no seal is needed here (more rules ⇒ stricter). A product's attribute floor lives in ITS doc.
 	if plat, err := platformDoc(); err != nil {
-		return nil, fmt.Errorf("policy floors: %w", err)
+		return nil, fmt.Errorf(wrapFloors, err)
 	} else if plat != nil {
 		for action, rules := range plat.Floors {
 			f.Floors[action] = append(f.Floors[action], rules...)
@@ -91,7 +93,7 @@ func LoadFloors() (*Floors, error) {
 	}
 	docs, err := productDocs()
 	if err != nil {
-		return nil, fmt.Errorf("policy floors: %w", err)
+		return nil, fmt.Errorf(wrapFloors, err)
 	}
 	for _, d := range docs {
 		for action, rules := range d.Floors {

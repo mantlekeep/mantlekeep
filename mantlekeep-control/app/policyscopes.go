@@ -49,7 +49,7 @@ func loadScopes(envVar string, verbose bool) map[string]scopeLayerFile {
 			continue
 		}
 		var raw layerFile
-		if err := json.Unmarshal(data, &raw); err != nil {
+		if json.Unmarshal(data, &raw) != nil {
 			fmt.Fprintf(os.Stderr, "scope %q: bad JSON — ignored\n", name)
 			continue
 		}

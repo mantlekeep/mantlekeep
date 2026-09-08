@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+const litLoadTestLoad = "Load: %v"
+
+const litArchitectGrant = `{"role_actions": {"L1-Architect": ["policy.change"]}}`
+
 // These pin the LAYERING that Load() performs: the embedded (empty) baseline, then the
 // IT-owned PLATFORM doc which is exempt from the seal and defines it, then the PRODUCT
 // docs which are subject to it. The seal is the governance claim in this file — a
@@ -31,7 +35,7 @@ func TestLoadWithNothingConfiguredYieldsNoGrants(t *testing.T) {
 
 	g, err := Load()
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf(litLoadTestLoad, err)
 	}
 	if g.RoleActions == nil {
 		t.Error("RoleActions is nil — a caller would panic writing to it")
@@ -50,16 +54,16 @@ func TestLoadWithNothingConfiguredYieldsNoGrants(t *testing.T) {
 func TestAnOverrideOmittingRoleActionsStillMergesThePlatformLayer(t *testing.T) {
 	t.Setenv(EnvOverride, `{}`)
 	t.Setenv(PolicyDirEnv, "")
-	t.Setenv(PlatformPolicyEnv, `{"role_actions": {"L1-Architect": ["policy.change"]}}`)
+	t.Setenv(PlatformPolicyEnv, litArchitectGrant)
 
 	g, err := Load()
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf(litLoadTestLoad, err)
 	}
 	if g.RoleActions == nil {
 		t.Fatal("RoleActions is nil — the next write to it panics")
 	}
-	if got := g.RoleActions["L1-Architect"]; len(got) != 1 || got[0] != "policy.change" {
+	if len((g.RoleActions["L1-Architect"])) != 1 || (g.RoleActions["L1-Architect"])[0] != "policy.change" {
 		t.Errorf("platform grants did not merge onto an override with no role_actions: %v", g.RoleActions)
 	}
 }
@@ -73,7 +77,7 @@ func TestLoadAcceptsTheOverrideAsInlineJSONOrAsAPath(t *testing.T) {
 		t.Setenv(EnvOverride, doc)
 		g, err := Load()
 		if err != nil {
-			t.Fatalf("Load: %v", err)
+			t.Fatalf(litLoadTestLoad, err)
 		}
 		if got := g.RoleActions["L2-Operator"]; len(got) != 1 || got[0] != "job.run" {
 			t.Errorf("inline override not applied: %v", g.RoleActions)
@@ -84,7 +88,7 @@ func TestLoadAcceptsTheOverrideAsInlineJSONOrAsAPath(t *testing.T) {
 		t.Setenv(EnvOverride, writeDoc(t, t.TempDir(), "grants.json", doc))
 		g, err := Load()
 		if err != nil {
-			t.Fatalf("Load: %v", err)
+			t.Fatalf(litLoadTestLoad, err)
 		}
 		if got := g.RoleActions["L2-Operator"]; len(got) != 1 || got[0] != "job.run" {
 			t.Errorf("file override not applied: %v", g.RoleActions)
@@ -112,7 +116,7 @@ func TestPlatformGrantsMergeInAndProductsInheritThem(t *testing.T) {
 
 	g, err := Load()
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf(litLoadTestLoad, err)
 	}
 	if got := g.RoleActions["L1-Architect"]; len(got) != 1 || got[0] != "policy.change" {
 		t.Errorf("platform grants did not merge: %v", g.RoleActions)
@@ -126,7 +130,7 @@ func TestPlatformGrantsMergeInAndProductsInheritThem(t *testing.T) {
 // sealed automatically, even when sealed_actions never names it.
 func TestAProductMayNotGrantAVerbThePlatformGrants(t *testing.T) {
 	t.Setenv(EnvOverride, "")
-	t.Setenv(PlatformPolicyEnv, `{"role_actions": {"L1-Architect": ["policy.change"]}}`)
+	t.Setenv(PlatformPolicyEnv, litArchitectGrant)
 
 	dir := t.TempDir()
 	writeDoc(t, dir, "product.json", `{"role_actions": {"L3-Consumer": ["policy.change"]}}`)
@@ -160,7 +164,7 @@ func TestSealedActionsSealVerbsThePlatformDoesNotGrant(t *testing.T) {
 
 func TestAProductMayGrantItsOwnActions(t *testing.T) {
 	t.Setenv(EnvOverride, "")
-	t.Setenv(PlatformPolicyEnv, `{"role_actions": {"L1-Architect": ["policy.change"]}}`)
+	t.Setenv(PlatformPolicyEnv, litArchitectGrant)
 
 	dir := t.TempDir()
 	writeDoc(t, dir, "product.json", `{
@@ -180,7 +184,7 @@ func TestAProductMayGrantItsOwnActions(t *testing.T) {
 		t.Errorf("product approval actions did not merge: %v", g.ApprovalActions)
 	}
 	// The platform layer is still there underneath.
-	if got := g.RoleActions["L1-Architect"]; len(got) != 1 {
+	if len(g.RoleActions["L1-Architect"]) != 1 {
 		t.Errorf("the platform layer was lost: %v", g.RoleActions)
 	}
 }

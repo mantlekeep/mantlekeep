@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	bolt "go.etcd.io/bbolt"
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	bolt "go.etcd.io/bbolt"
 )
 
 // The bbolt driver is a PERSISTENT embedded mantlekeep.Store — no external database,

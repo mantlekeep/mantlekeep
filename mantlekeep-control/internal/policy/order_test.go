@@ -8,6 +8,8 @@ import (
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/grants"
 )
 
+const litOrderClusterIs = "cluster is not on the approved list"
+
 // EvaluationOrder is WORDS about code, and words about code go stale. These tests drive the
 // real engine once per described step, so a stage that is renamed, reordered, or quietly
 // stopped denying fails the build here rather than being explained wrongly to a person on a
@@ -126,7 +128,7 @@ func TestEveryPublishedStepProducesItsDeclaredOutcome(t *testing.T) {
 		"the attribute floor admits the request": func(t *testing.T) mantlekeep.Decision {
 			withFloorRules(t, orderAction, grants.FloorRule{
 				Kind: "allowlist", Param: "cluster", Values: []string{"approved-1"},
-				Message: "cluster is not on the approved list"})
+				Message: litOrderClusterIs})
 			return evaluateOrder(t, orderEngine(), mantlekeep.PolicyInput{
 				Subject: person,
 				Intent: mantlekeep.PolicyIntent{Action: orderAction, Goal: "g",
@@ -199,7 +201,7 @@ func TestEveryDenyIsAskedBeforeTheApprovalGate(t *testing.T) {
 	t.Run("the attribute floor refuses", func(t *testing.T) {
 		withFloorRules(t, orderAction, gate, grants.FloorRule{
 			Kind: "allowlist", Param: "cluster", Values: []string{"approved-1"},
-			Message: "cluster is not on the approved list"})
+			Message: litOrderClusterIs})
 		decision := evaluateOrder(t, orderEngine(), mantlekeep.PolicyInput{
 			Subject: person,
 			Intent: mantlekeep.PolicyIntent{Action: orderAction, Goal: "g",
@@ -213,7 +215,7 @@ func TestEveryDenyIsAskedBeforeTheApprovalGate(t *testing.T) {
 func TestTheMissingGrantIsReportedBeforeAnyFloorDetail(t *testing.T) {
 	withFloorRules(t, orderAction, grants.FloorRule{
 		Kind: "allowlist", Param: "cluster", Values: []string{"approved-1"},
-		Message: "cluster is not on the approved list"})
+		Message: litOrderClusterIs})
 
 	decision := evaluateOrder(t, NewRBAC(), mantlekeep.PolicyInput{
 		Subject: mantlekeep.PolicySubject{ID: "dev-alice", Roles: []mantlekeep.Role{mantlekeep.RoleConsumer}},
@@ -254,7 +256,7 @@ func TestInForceReportsTheEnginesOwnWildcard(t *testing.T) {
 func TestInForceHandsOutACopyOfTheLaw(t *testing.T) {
 	withFloorRules(t, orderAction, grants.FloorRule{
 		Kind: "allowlist", Param: "cluster", Values: []string{"approved-1"},
-		Message: "cluster is not on the approved list"})
+		Message: litOrderClusterIs})
 
 	roles, floors := InForce()
 	// Edit INSIDE the returned documents: a rule's message, a rule's values, a role's actions.

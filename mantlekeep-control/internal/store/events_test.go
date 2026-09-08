@@ -16,22 +16,7 @@ func TestBoltEventsSurviveReopen(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "events.db")
 
-	es, err := store.OpenBoltEvents(path)
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	for _, k := range []orchestrator.EventKind{orchestrator.RunStarted, orchestrator.StepSucceeded, orchestrator.RunSucceeded} {
-		if _, err := es.Append(ctx, orchestrator.Event{Run: "xva", Kind: k}); err != nil {
-			t.Fatalf("append: %v", err)
-		}
-	}
-	// A second run, interleaved, to prove per-run filtering survives too.
-	if _, err := es.Append(ctx, orchestrator.Event{Run: "other", Kind: orchestrator.RunStarted}); err != nil {
-		t.Fatalf("append other: %v", err)
-	}
-	if err := es.Close(); err != nil { // the "restart" boundary
-		t.Fatalf("close: %v", err)
-	}
+	writeThenClose(t, ctx, path)
 
 	reopened, err := store.OpenBoltEvents(path)
 	if err != nil {
@@ -63,5 +48,32 @@ func TestBoltEventsSurviveReopen(t *testing.T) {
 	}
 	if got.Seq <= evs[len(evs)-1].Seq {
 		t.Fatalf("Seq reset across restart: new %d not after %d", got.Seq, evs[len(evs)-1].Seq)
+	}
+}
+
+// writeThenClose records one run's history, plus a second run interleaved with it, and closes the
+// store — the "restart" boundary this test is about.
+//
+// Split out so the test reads as its two halves: what was written before the restart, and what
+// survived it. The interleaved second run is there so per-run filtering is proven to survive too,
+// not just the count.
+func writeThenClose(t *testing.T, ctx context.Context, path string) {
+	t.Helper()
+	es, err := store.OpenBoltEvents(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, k := range []orchestrator.EventKind{
+		orchestrator.RunStarted, orchestrator.StepSucceeded, orchestrator.RunSucceeded,
+	} {
+		if _, err := es.Append(ctx, orchestrator.Event{Run: "xva", Kind: k}); err != nil {
+			t.Fatalf("append: %v", err)
+		}
+	}
+	if _, err := es.Append(ctx, orchestrator.Event{Run: "other", Kind: orchestrator.RunStarted}); err != nil {
+		t.Fatalf("append other: %v", err)
+	}
+	if err := es.Close(); err != nil {
+		t.Fatalf("close: %v", err)
 	}
 }

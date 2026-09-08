@@ -27,6 +27,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 	"os"
 	"path/filepath"
 
@@ -60,8 +61,11 @@ func main() {
 	// 3. The SAME door as the stock binary — assembled through the public seam.
 	//    Nothing here is branded: the brand is the face, never the engine.
 	ctx := context.Background()
-	// Unique 0700 dir, not a predictable shared-temp name (avoids a symlink/pre-create attack).
-	dir, err := os.MkdirTemp("", "acme-govern-*")
+	// Under the deployment's OWN data directory, not the shared temp dir. os.MkdirTemp would be
+	// unguessable and owner-only, but it still creates that inside a world-writable directory —
+	// and this file exists to be COPIED, so where it puts the chain is what somebody's product
+	// will do too.
+	dir, err := safeio.EnsureConfigDir(filepath.Join(app.DataDir(), "acme-govern"))
 	must(err)
 	defer func() { _ = os.RemoveAll(dir) }()
 

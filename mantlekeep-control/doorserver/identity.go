@@ -160,7 +160,7 @@ func (s *Server) handleDevLogin(writer http.ResponseWriter, request *http.Reques
 	var body struct {
 		User string `json:"user"`
 	}
-	if err := json.NewDecoder(request.Body).Decode(&body); err != nil || body.User == "" {
+	if json.NewDecoder(request.Body).Decode(&body) != nil || body.User == "" {
 		writeJSON(writer, http.StatusBadRequest, map[string]any{"error": "expected {\"user\":\"…\"}"})
 		return
 	}

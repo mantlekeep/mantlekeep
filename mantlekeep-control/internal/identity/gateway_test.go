@@ -10,7 +10,7 @@ import (
 func TestGatewayMapsGroupsToRoles(t *testing.T) {
 	g := NewGateway(map[string][]mantlekeep.Role{
 		"platform-architects": {mantlekeep.RoleArchitect},
-		"ops-operators":  {mantlekeep.RoleOperator},
+		"ops-operators":       {mantlekeep.RoleOperator},
 		"ai-agents":           {mantlekeep.RoleAIAgent},
 	}, "ai-agents")
 

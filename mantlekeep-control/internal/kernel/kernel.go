@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mantlekeep/mantlekeep/mantlekeep-control/internal/safeio"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -77,7 +79,19 @@ func (r ScanResult) Summary() string {
 // Scan runs a wasm tool on input inside the sandbox. Per the kernel's scan contract:
 // exit 0 = clean, 1 = findings, 2 = error.
 func (k *Kernel) Scan(ctx context.Context, modulePath string, input []byte) (ScanResult, error) {
-	f, err := os.CreateTemp("", "mantlekeep-scan-in-*")
+	// The input file is written here and then read BY NAME by the sandbox, which is the shape
+	// that makes a shared temp directory the wrong place for it: between the write and the read,
+	// anything else on the host can act on that path. CreateTemp's unguessable name and 0600 mode
+	// make it hard, not impossible, and "hard" is not the standard for the file a scanner is about
+	// to trust.
+	//
+	// An owner-only directory under the deployment's own data dir removes the window instead of
+	// narrowing it — nothing else can reach the path at all.
+	dir, err := safeio.EnsureConfigDir(filepath.Join(dataDir(), "kernel-scan"))
+	if err != nil {
+		return ScanResult{}, fmt.Errorf("kernel: preparing the scan directory: %w", err)
+	}
+	f, err := os.CreateTemp(dir, "scan-in-*")
 	if err != nil {
 		return ScanResult{}, err
 	}
@@ -159,4 +173,12 @@ func firstLine(b []byte) string {
 		return strings.TrimSpace(s[:i])
 	}
 	return strings.TrimSpace(s)
+}
+
+// dataDir is where this process keeps state it must not share with the rest of the host.
+func dataDir() string {
+	if d := strings.TrimSpace(os.Getenv("MANTLEKEEP_DATA_DIR")); d != "" {
+		return d
+	}
+	return "mantlekeep-data"
 }

@@ -104,7 +104,7 @@ func TestDevSubjectsConfiguresTheDirectoryAndIsStillNotOfRecord(t *testing.T) {
 	if robot := byID["robot"]; !robot.IsAI {
 		t.Errorf("a subject configured as AI-Agent is not flagged IsAI: %+v", robot)
 	}
-	if described := resolver.(mantlekeep.DirectoryDescriber).DescribeDirectory(); described.Authoritative {
+	if (resolver.(mantlekeep.DirectoryDescriber).DescribeDirectory()).Authoritative {
 		t.Error("a directory named in configuration claims to be a directory of record")
 	}
 

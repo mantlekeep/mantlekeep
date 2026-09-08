@@ -2,6 +2,8 @@ package app
 
 import "testing"
 
+const litBrandAcmeControl = "Acme Control"
+
 // The contract a white-label wrapper depends on: it names its OWN prefix and its own
 // display values, and never types an engine variable name. These tests pin that.
 
@@ -11,10 +13,10 @@ func TestBrandAppliesDefaultsWithoutTheCallerNamingEngineVariables(t *testing.T)
 	t.Setenv("MANTLEKEEP_BRAND_KICKER", "")
 	t.Setenv("MANTLEKEEP_BRAND_TAGLINE", "")
 
-	Brand(BrandOptions{Prefix: "ACME", Name: "Acme Control", Mark: "◆", Tagline: "one door"})
+	Brand(BrandOptions{Prefix: "ACME", Name: litBrandAcmeControl, Mark: "◆", Tagline: "one door"})
 
 	got := CurrentBrand()
-	if got.Name != "Acme Control" || got.Mark != "◆" || got.Tagline != "one door" {
+	if got.Name != litBrandAcmeControl || got.Mark != "◆" || got.Tagline != "one door" {
 		t.Fatalf("brand defaults not applied: %+v", got)
 	}
 }
@@ -24,7 +26,7 @@ func TestOperatorEnvironmentWinsOverBrandDefaults(t *testing.T) {
 	t.Setenv("ACME_BRAND_NAME", "Northwind Governance")
 	t.Setenv("MANTLEKEEP_BRAND_NAME", "")
 
-	Brand(BrandOptions{Prefix: "ACME", Name: "Acme Control"})
+	Brand(BrandOptions{Prefix: "ACME", Name: litBrandAcmeControl})
 
 	if got := CurrentBrand().Name; got != "Northwind Governance" {
 		t.Fatalf("operator value must win over the brand default, got %q", got)

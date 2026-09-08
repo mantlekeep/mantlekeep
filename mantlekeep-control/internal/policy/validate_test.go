@@ -54,7 +54,7 @@ func TestValidateLayersDefaultsWhenNoRolesDeclared(t *testing.T) {
 	}
 	// And a role NOT in the default ladder still fails closed under defaults.
 	bad := Layer{Name: "team:example", ActionRoles: map[string]mantlekeep.Role{"x": "Nonexistent"}}
-	if err := ValidateLayers(nil, bad); err == nil {
+	if ValidateLayers(nil, bad) == nil {
 		t.Fatal("an undefined role must fail closed even under the default ladder")
 	}
 }
@@ -66,7 +66,7 @@ func TestValidateLayersRejectsMalformedSeal(t *testing.T) {
 	ladder := DefaultRoleLadder()
 	for _, bad := range []string{"session.deploy", "action:", "L1-Architect"} {
 		layer := Layer{Name: "team:example", Sealed: []string{bad}}
-		if err := ValidateLayers(ladder, layer); err == nil {
+		if ValidateLayers(ladder, layer) == nil {
 			t.Errorf("malformed seal %q must be a config error", bad)
 		}
 	}

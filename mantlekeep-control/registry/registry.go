@@ -48,21 +48,21 @@ const (
 
 // Version is one immutable release of an entry within a single env's registry.
 type Version struct {
-	Version     string          `json:"version"` // semver, e.g. "1.2.0"
-	Env         string          `json:"env"`     // the env this record lives in
-	Status      Status          `json:"status"`
+	Version     string            `json:"version"` // semver, e.g. "1.2.0"
+	Env         string            `json:"env"`     // the env this record lives in
+	Status      Status            `json:"status"`
 	Ref         string            `json:"ref,omitempty"`        // artifact content digest, e.g. "sha256:…"
 	Manifest    json.RawMessage   `json:"manifest,omitempty"`   // the template record
 	Provenance  map[string]string `json:"provenance,omitempty"` // where the artifact came from (upload / git repo+commit)
 	Default     bool              `json:"default,omitempty"`    // the env's fallback target
-	ProposedBy  string          `json:"proposedBy,omitempty"`
-	ApprovedBy  string          `json:"approvedBy,omitempty"`  // set on publish; SoD: != ProposedBy
-	ChangeRef   string          `json:"changeRef,omitempty"`   // external CR id when the org routes prod via a change request
-	TestPassed  bool            `json:"testPassed,omitempty"`  // a test-run has passed on this draft
-	TestedAt    time.Time       `json:"testedAt,omitempty"`
-	TestRef     string          `json:"testRef,omitempty"` // link to the test-run evidence (kernel I/O for a tool, a dev flow run)
-	PublishedAt time.Time       `json:"publishedAt,omitempty"`
-	UpdatedAt   time.Time       `json:"updatedAt"`
+	ProposedBy  string            `json:"proposedBy,omitempty"`
+	ApprovedBy  string            `json:"approvedBy,omitempty"` // set on publish; SoD: != ProposedBy
+	ChangeRef   string            `json:"changeRef,omitempty"`  // external CR id when the org routes prod via a change request
+	TestPassed  bool              `json:"testPassed,omitempty"` // a test-run has passed on this draft
+	TestedAt    time.Time         `json:"testedAt,omitempty"`
+	TestRef     string            `json:"testRef,omitempty"` // link to the test-run evidence (kernel I/O for a tool, a dev flow run)
+	PublishedAt time.Time         `json:"publishedAt,omitempty"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 // Entry is a named artifact with many versions.
@@ -134,7 +134,9 @@ func (r *Registry) Register(ctx context.Context, reg Registration) (Entry, error
 }
 
 // Get returns one artifact and all its versions.
-func (r *Registry) Get(ctx context.Context, name string) (Entry, bool, error) { return r.get(ctx, name) }
+func (r *Registry) Get(ctx context.Context, name string) (Entry, bool, error) {
+	return r.get(ctx, name)
+}
 
 // List returns every artifact, sorted by name, with manifests omitted (metadata view).
 func (r *Registry) List(ctx context.Context) ([]Entry, error) {
@@ -149,7 +151,7 @@ func (r *Registry) List(ctx context.Context) ([]Entry, error) {
 			continue
 		}
 		var e Entry
-		if err := json.Unmarshal(raw, &e); err != nil {
+		if json.Unmarshal(raw, &e) != nil {
 			continue
 		}
 		for i := range e.Versions {
