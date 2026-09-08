@@ -7,6 +7,8 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
+const litPlanPlanboundaryaclsV = "PlanBoundaryACLs: %v"
+
 func testBoundary() Boundary {
 	return Boundary{
 		Principal: "User:svc-payments",
@@ -20,7 +22,7 @@ func testBoundary() Boundary {
 func TestBoundaryACLsArePrefixedNeverLiteral(t *testing.T) {
 	bindings, err := PlanBoundaryACLs(testBoundary())
 	if err != nil {
-		t.Fatalf("PlanBoundaryACLs: %v", err)
+		t.Fatalf(litPlanPlanboundaryaclsV, err)
 	}
 	if len(bindings) == 0 {
 		t.Fatal("no bindings planned — the assertions below would pass vacuously")
@@ -52,7 +54,7 @@ func TestBoundaryACLsArePrefixedNeverLiteral(t *testing.T) {
 func TestBoundaryACLsWithholdCreate(t *testing.T) {
 	bindings, err := PlanBoundaryACLs(testBoundary())
 	if err != nil {
-		t.Fatalf("PlanBoundaryACLs: %v", err)
+		t.Fatalf(litPlanPlanboundaryaclsV, err)
 	}
 	for _, binding := range bindings {
 		switch binding.Operation {
@@ -73,7 +75,7 @@ func TestBoundaryACLsWithholdCreate(t *testing.T) {
 func TestBoundaryACLsGrantExactlyTheNamespaceOperations(t *testing.T) {
 	bindings, err := PlanBoundaryACLs(testBoundary())
 	if err != nil {
-		t.Fatalf("PlanBoundaryACLs: %v", err)
+		t.Fatalf(litPlanPlanboundaryaclsV, err)
 	}
 	topicOperations := map[kmsg.ACLOperation]bool{}
 	groupOperations := map[kmsg.ACLOperation]bool{}
