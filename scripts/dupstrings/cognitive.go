@@ -83,52 +83,58 @@ func reportComplexityIn(path string, limit int) bool {
 func complexityOf(node ast.Node, nesting int) int {
 	score := 0
 	ast.Inspect(node, func(n ast.Node) bool {
-		switch stmt := n.(type) {
-		case *ast.IfStmt:
-			score += 1 + nesting
-			if stmt.Else != nil {
-				score++ // an else is its own thing to hold
-			}
-			score += complexityOf(stmt.Body, nesting+1)
-			if stmt.Else != nil {
-				score += complexityOf(stmt.Else, nesting+1)
-			}
-			score += booleans(stmt.Cond)
-			return false // handled, including children
-		case *ast.ForStmt:
-			score += 1 + nesting + complexityOf(stmt.Body, nesting+1)
-			return false
-		case *ast.RangeStmt:
-			score += 1 + nesting + complexityOf(stmt.Body, nesting+1)
-			return false
-		case *ast.SwitchStmt:
-			score += 1 + nesting + complexityOf(stmt.Body, nesting+1)
-			return false
-		case *ast.TypeSwitchStmt:
-			score += 1 + nesting + complexityOf(stmt.Body, nesting+1)
-			return false
-		case *ast.SelectStmt:
-			score += 1 + nesting + complexityOf(stmt.Body, nesting+1)
-			return false
-		case *ast.CaseClause:
-			score++ // each case is a branch to follow
-			for _, s := range stmt.Body {
-				score += complexityOf(s, nesting)
-			}
-			return false
-		case *ast.CommClause:
-			score++
-			for _, s := range stmt.Body {
-				score += complexityOf(s, nesting)
-			}
-			return false
-		case *ast.FuncLit:
-			// A closure's body nests inside whatever holds it.
-			score += complexityOf(stmt.Body, nesting+1)
-			return false
-		}
-		return true
+		add, descend := scoreNode(n, nesting)
+		score += add
+		return descend
 	})
+	return score
+}
+
+// scoreNode charges one construct and says whether ast.Inspect should keep going.
+//
+// It returns false for anything it has already recursed into itself: a branch scored twice is a
+// function that looks twice as hard to read as it is, and a checker that overstates gets argued
+// with rather than acted on.
+func scoreNode(n ast.Node, nesting int) (score int, descend bool) {
+	switch stmt := n.(type) {
+	case *ast.IfStmt:
+		return scoreIf(stmt, nesting), false
+	case *ast.ForStmt:
+		return 1 + nesting + complexityOf(stmt.Body, nesting+1), false
+	case *ast.RangeStmt:
+		return 1 + nesting + complexityOf(stmt.Body, nesting+1), false
+	case *ast.SwitchStmt:
+		return 1 + nesting + complexityOf(stmt.Body, nesting+1), false
+	case *ast.TypeSwitchStmt:
+		return 1 + nesting + complexityOf(stmt.Body, nesting+1), false
+	case *ast.SelectStmt:
+		return 1 + nesting + complexityOf(stmt.Body, nesting+1), false
+	case *ast.CaseClause:
+		return 1 + scoreBody(stmt.Body, nesting), false
+	case *ast.CommClause:
+		return 1 + scoreBody(stmt.Body, nesting), false
+	case *ast.FuncLit:
+		// A closure's body nests inside whatever holds it. Sonar charges this; some tools do not.
+		return complexityOf(stmt.Body, nesting+1), false
+	}
+	return 0, true
+}
+
+// scoreIf charges an if, its else, and the boolean sequences in its condition.
+func scoreIf(stmt *ast.IfStmt, nesting int) int {
+	score := 1 + nesting + complexityOf(stmt.Body, nesting+1) + booleans(stmt.Cond)
+	if stmt.Else != nil {
+		score += 1 + complexityOf(stmt.Else, nesting+1) // an else is its own thing to hold
+	}
+	return score
+}
+
+// scoreBody charges a list of statements at the current nesting.
+func scoreBody(body []ast.Stmt, nesting int) int {
+	score := 0
+	for _, s := range body {
+		score += complexityOf(s, nesting)
+	}
 	return score
 }
 
