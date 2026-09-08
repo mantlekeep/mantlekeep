@@ -15,6 +15,31 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [v0.3.1] — 2026-09-08
+
+### Fixed — a consumer resolved an older mantlekeep-control than this module is tested against
+
+`go.mod` declared `mantlekeep-control v0.2.0` while every build and test in this repository ran
+against the copy of mantlekeep-control sitting beside it. Both statements were true at once
+because the module also carries a `replace` for its siblings, and **Go ignores a `replace` in a
+dependency's `go.mod`** — only the main module's applies. So the graph under test and the graph a
+consumer resolved were two different graphs, and nothing compared them.
+
+Nothing in v0.3.0 is broken by this on its own: v0.3.0 compiles and passes its full test suite
+against v0.2.0. The cost lands on the consumer's side of the boundary. Taking this module alone
+pinned mantlekeep-control back to v0.2.0, so code written against the current mantlekeep-control
+API — `DecisionFrom`, which is how an approval decision is read off an error — failed to compile
+in a project that had done nothing wrong.
+
+- The declared pin is now `mantlekeep-control v0.4.1`: what a consumer resolves is what this
+  module is built and tested against.
+- `scripts/check-release-pins.sh` now refuses a release whose declared sibling pin is not that
+  sibling's newest released tag, and re-runs each module's own tests with the `replace` lines
+  stripped — the graph that ships is the graph that gets tested.
+
+No API change: no exported declaration was added, changed or removed. A consumer already resolving
+mantlekeep-control v0.4.1 for other reasons sees no difference at all.
+
 ## [v0.3.0] — 2026-09-08
 
 ### Added — two seams for a deployment the framework cannot see
