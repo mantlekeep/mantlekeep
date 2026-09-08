@@ -1,7 +1,26 @@
 # Changelog
 
-All notable changes to MantleKeep are documented here.
-Format: [Keep a Changelog](https://keepachangelog.com); versioning: [SemVer](https://semver.org).
+MantleKeep is several modules, each **tagged and released on its own**. A module's release notes
+live WITH the module, because that is what a consumer actually receives — a `go get` downloads the
+module directory, and a note at the repository root is not in it.
+
+| Module | What it is | Notes |
+|---|---|---|
+| `mantlekeep-control` | the governance engine — one door, policy, the hash chain | [CHANGELOG](mantlekeep-control/CHANGELOG.md) |
+| `mantlekeep-estate` | governs what runs where | [CHANGELOG](mantlekeep-estate/CHANGELOG.md) |
+| `mantlekeep-kafka` | applies an approved grant to Kafka | [CHANGELOG](mantlekeep-kafka/CHANGELOG.md) |
+| `mantlekeep-policy-postgres` | holds the policy documents in Postgres | [CHANGELOG](mantlekeep-policy-postgres/CHANGELOG.md) |
+
+Rendered notes for each release are on the [Releases page](https://github.com/mantlekeep/mantlekeep/releases).
+
+---
+
+## Before the split
+
+Everything below is from when ONE version described the whole repository — the Java and Python
+SDKs still use this line, frozen at `v0.1.1`. Kept here rather than divided up: these entries
+describe the repository as it was, and splitting them between modules would attribute changes to
+boundaries that did not exist yet.
 
 ## [Unreleased]
 
@@ -84,150 +103,6 @@ what `Resolve` produces.
   than the six names compiled into the binary. Set-but-empty is a hard startup error, not a quiet
   fall back to the demo set. The result still describes itself as ASSERTED, not of record.
 - `ContractVersion` is `3.1.0` — additive ports, no signature changed.
-
-## [mantlekeep-control/v0.2.0] — 2026-09-07
-
-Go module only. The Java and Python SDKs are unchanged since `0.1.1` and are **not** re-released:
-a version number should mean something changed, and for them nothing did.
-
-**A minor bump because this breaks the Go API** — which under SemVer major-zero is the correct
-signal. `0.x` still means the surface is not stable; `1.0.0` would claim a maturity nothing here
-has yet earned.
-
-### Why upgrade
-
-- **`doorserver` refuses a credential header as the caller-identity header.** Pointed at
-  `Authorization` or `Cookie`, the door would have written a live bearer token into the
-  append-only hash chain — where it cannot be redacted without breaking the proof the record was
-  not edited. Now refused at construction. This is the reason not to stay on `v0.1.3`.
-- **`internal/audit` has tests**, which it did not before. It is the hash-chained evidence spine.
-- Six functions split under the cognitive-complexity limit; `registry.Register`/`Ingest` take a
-  `Registration` value instead of six consecutive strings, where transposing two compiled cleanly
-  and stored the wrong thing under the right name.
-
-### Breaking
-
-See **Changed — BREAKING (Go API)** below for the migration table. Four exported single-method
-interfaces are renamed for the method they declare. Renames only — no behaviour changes, no
-signature changes beyond the names.
-
-### Also in this tag
-
-`mantlekeep-estate` now carries a `replace` directive for `mantlekeep-control`, so a clone of this
-repository builds every module **from itself**. Without it, building the estate as a standalone
-module downloaded a *different* control than the one sitting beside it — so an organisation that
-clones, scans, and then builds one module per pipeline would have built against code the scan
-never saw.
-
-
-### Added
-- **`mantlekeep-kafka` — the governed-grant adapter for Apache Kafka.** A new Go module, sibling to
-  `mantlekeep-control`, that applies an **already approved** grant to a Kafka cluster through the
-  Admin API. It decides nothing; the door decided before it was called.
-
-  Two operations, and the **asymmetry is the design**:
-  - **`OnboardTeam(boundary)`** — rare, gated. Gives a team a namespace it owns: **PREFIXED** ACLs
-    over its prefix (TOPIC: `READ`/`WRITE`/`DESCRIBE`, GROUP: `READ`) plus a producer/consumer
-    byte-rate **quota** for its principal. **`CREATE` is deliberately not granted** — the team may
-    read and write everything under its prefix and still cannot bring a topic into existence, so
-    topic creation stays a governed act. PREFIXED rather than LITERAL because a literal ACL per
-    topic recreates ACL sprawl and turns every playground topic into a governance event; a golden
-    path slower than the bypass stops being used.
-  - **`Provision(grant)`** — frequent, instant. Creates one topic inside a namespace the team
-    already owns. It grants nothing new (the prefix ACL already covers it), refuses a name outside
-    the granted prefix, and is idempotent: an existing topic is success, not failure.
-
-  Every artifact is **read back** from the cluster (`DescribeACLs` / `DescribeClientQuotas` /
-  `DescribeTopicConfigs`), never echoed from the request — a result reported from its own input is
-  testimony, not evidence. Limits (quota, retention, partitions, replication factor) are **inputs**;
-  the adapter invents none of them.
-
-- **The workspace now holds one module per dependency tree**, with the rule written into `go.work`:
-  the core links only bbolt, and each adapter carries its own heavy client. `mantlekeep-kafka`
-  depends on the core; the core depends on no adapter. A CVE or a registry quarantine in the Kafka
-  tree therefore cannot block the engine's build — proven, not asserted: the dependency guard runs
-  per module in CI and the core's budget stays at **1**.
-
-- **CI and security gates extended to the new module** — `go vet` · staticcheck · govulncheck · test
-  in `ci.yml`, and gosec · staticcheck · govulncheck in `security.yml`, each scanning the adapter's
-  dependency tree separately from the engine's. **No broker is required to run the tests**: the
-  cluster sits behind an `Admin` interface, so prefix refusal, ACL shape, quota shape and
-  already-exists idempotency are all decided — and asserted — without one.
-
-### Changed — BREAKING (Go API)
-
-Three exported single-method interfaces (and one internal) are renamed for the method they
-declare, the Go convention
-(`Reader`/`Writer`/`CloseNotifier`); a name that shares nothing with its method makes a reader
-open the type to find out what implementing it costs. Renames only — **no behaviour changes**,
-and no signature changes beyond the names themselves.
-
-| Was | Now | Why |
-| --- | --- | --- |
-| `mantlekeep.WorkflowEngine` | `mantlekeep.WorkflowRunner` | its method is `Run` |
-| `extension.RouteRegistrar` | `extension.Router` | see below — the method is renamed too |
-| `registry.Source` | `registry.Fetcher` | its method is `Fetch` |
-| `registry.GitFetcher` | `registry.GitCloner` | frees the `Fetcher` name for the interface above; this is the narrower git-clone port injected into `GitSource`, not the registry's ingestion port |
-| `registry.GitSource{Fetcher: …}` | `registry.GitSource{Clone: …}` | the field holds a `GitCloner` |
-
-`registry.Register` and `registry.Ingest` now take a `registry.Registration` value instead of a
-positional parameter list:
-
-```go
-// was
-r.Register(ctx, "scan-tool", "tool", "Scanner", "alice", "1.0.0", "sha256:aaa", nil)
-// now
-r.Register(ctx, registry.Registration{
-    Name: "scan-tool", Kind: "tool", Title: "Scanner",
-    Owner: "alice", Version: "1.0.0", Ref: "sha256:aaa",
-})
-```
-
-`Register` took six consecutive strings — title, owner, version and ref among them — so
-transposing any two of them compiled cleanly and stored the wrong thing under the right name.
-`Ingest` took nine parameters in total. `Ingest` still supplies `Ref` itself (the digest of the
-bytes that actually arrived) and still falls back to the source's descriptor for an empty
-`Manifest`.
-
-`extension.Router`'s method is renamed `Handle` → `Route`. The value REGISTERS a handler
-against a pattern; it does not serve the request. `Handle` invited the reader to expect an
-`http.Handler`, which is the one thing it is not.
-
-**To adopt:** rename at the call sites. An implementor of `extension.RouteRegistrar` renames its
-`Handle` method to `Route`; nothing else changes shape. `internal/policy`'s `Source`/`SourceFunc`
-became `Loader`/`LoaderFunc` in the same pass but are internal, so no consumer sees them.
-
-### Security
-
-- **`doorserver.New` refuses a credential-bearing header as the caller-identity header.**
-  `TrustedUserHeader` / `DelegatedSubjectHeader` set to `Authorization`, `Proxy-Authorization`,
-  `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key` or `X-Auth-Token` is now rejected at
-  construction (case-insensitive, whitespace-trimmed) rather than accepted.
-
-  The door records the caller's id as the SUBJECT of every decision — in the console decision
-  log and in the **hash-chained audit record**. Pointing the identity header at a credential
-  header made the door write a live bearer token there as a user id, into an append-only,
-  tamper-evident log where it cannot be redacted afterwards without breaking the chain that
-  proves the record was not edited. A one-character configuration slip with a permanent
-  consequence, so it is now a machine-enforced refusal instead of a documented caution.
-
-  **To adopt:** only a deployment that was already recording credentials as user ids is
-  affected, and it fails fast at startup with a message naming what to set instead.
-
-### Removed
-
-- **`internal/policy.liveSnapshot`** — it declared `RequiredRole(string) (Role, bool)`, which is
-  exactly `ActionAuthorizer`, in the same file. Two names for one contract let the two drift.
-  `WithLive` now takes `ActionAuthorizer` directly; internal, so no consumer sees it.
-
-### Added
-
-- **`internal/audit` is tested.** The bbolt hash-chained audit log — the framework's evidence
-  spine — had no tests. Now covered: the chain link between records, an intact walk, a record
-  edited behind the logger's back, an unreadable record, `Count` on an empty vs populated chain,
-  and `Records`' newest-first order and limit.
-- **`var _ mantlekeep.WorkflowRunner = (*orchestrator.Engine)(nil)`** — the doc comment claimed the
-  Engine implements the core contract; now the compiler checks it.
 
 ## [0.1.2] — 2026-08-14
 
