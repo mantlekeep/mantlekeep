@@ -92,14 +92,7 @@ func Run(options Options) error {
 	// Capacity is REPORTED and optional. Without it placement still works; it simply cannot
 	// prefer the emptier of two equally permitted clusters, which is a worse answer rather
 	// than a wrong one. A cluster whose KSM is silent is UNKNOWN, never full.
-	buildPlacer := func(clusters []estate.Cluster) (*estate.Placer, []string) {
-		placer := estate.NewPlacer(clusters)
-		if endpoints := parseKSM(*ksmSpec); len(endpoints) > 0 {
-			reports, unread := fleet.NewKSM(endpoints).Read(context.Background())
-			return placer.WithCapacity(reports), unread
-		}
-		return placer, nil
-	}
+	buildPlacer := placerBuilder(*ksmSpec)
 	placer, unreadKSM := buildPlacer(clusters)
 
 	// The fleet is held the same way the floor is, and for a sharper reason: a cluster that
@@ -264,6 +257,27 @@ func envOr(name, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+// placerBuilder returns the function that turns a cluster set into a Placer.
+//
+// A named constructor rather than a closure in the middle of Run: it is called twice — once at
+// boot and once on every SIGHUP — and a reader following a reload should not have to scroll back
+// into startup to find out what a reload rebuilds.
+//
+// Capacity is REPORTED and optional. Without it placement still works; it simply cannot prefer
+// the emptier of two equally permitted clusters, which is a worse answer rather than a wrong one.
+// A cluster whose KSM is silent is UNKNOWN, never full.
+func placerBuilder(ksmSpec string) func([]estate.Cluster) (*estate.Placer, []string) {
+	return func(clusters []estate.Cluster) (*estate.Placer, []string) {
+		placer := estate.NewPlacer(clusters)
+		endpoints := parseKSM(ksmSpec)
+		if len(endpoints) == 0 {
+			return placer, nil
+		}
+		reports, unread := fleet.NewKSM(endpoints).Read(context.Background())
+		return placer.WithCapacity(reports), unread
+	}
 }
 
 // reloadFloor re-reads the floor and reports which one is now in force.
