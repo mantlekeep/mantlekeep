@@ -16,6 +16,9 @@ import reactor.test.StepVerifier;
  */
 class ClaudeRunnerUsageTest {
 
+
+    /** Named because it is asserted in more than one place; one message, one origin. */
+    private static final String DRAFTED_SPEC = "drafted spec";
     /** A representative terminating line, verbatim in the shape the CLI emits it. */
     private static final String RESULT_LINE = """
             {"type":"result","subtype":"success","duration_ms":1441,"result":"hi",\
@@ -59,11 +62,11 @@ class ClaudeRunnerUsageTest {
     void aStreamWithoutAResultLineCompletesAndReportsNoUsage() {
         // The default ClaudeRunner has no result line to parse — the text still flows,
         // the sink is simply never invoked, and the caller reads that as Usage.NONE.
-        ClaudeRunner runner = prompt -> Mono.just("drafted spec");
+        ClaudeRunner runner = prompt -> Mono.just(DRAFTED_SPEC);
         List<Usage> reported = new ArrayList<>();
 
         StepVerifier.create(runner.stream("prompt", reported::add))
-                .expectNext("drafted spec")
+                .expectNext(DRAFTED_SPEC)
                 .verifyComplete();
 
         assertThat(reported).isEmpty();
@@ -71,10 +74,10 @@ class ClaudeRunnerUsageTest {
 
     @Test
     void theTextOnlyOverloadStillStreamsUnchanged() {
-        ClaudeRunner runner = prompt -> Mono.just("drafted spec");
+        ClaudeRunner runner = prompt -> Mono.just(DRAFTED_SPEC);
 
         StepVerifier.create(runner.stream("prompt"))
-                .expectNext("drafted spec")
+                .expectNext(DRAFTED_SPEC)
                 .verifyComplete();
     }
 }
