@@ -145,6 +145,53 @@ hash the same policy differently are not two opinions; they are a broken join.
 `Decision` gained a field. Struct literals that name their fields are unaffected; an UNKEYED
 literal (`Decision{a, b, c}`) will not compile. `go vet`'s composites check flags those already.
 
+## [mantlekeep-control/v0.3.0] — 2026-09-07
+
+*Backfilled 2026-09-08. This tag shipped without a release note; the entry is reconstructed from
+the diff and the commits, and says only what those support.*
+
+### Added — a layer cascade that can TIGHTEN a grant
+
+A configuration layer that names an action now decides it, where before a grant document decided
+alone. The rule only ever REFUSES more: a case that gains an ability under the new rule is a
+governance regression, not a fix. Exactly 3 of 60 live decisions changed when it landed, all
+allow→deny, proven by building an engine on the old rule and reproducing the previous matrix
+byte-identically.
+
+### Added — a boot diagnostic that names what a layer decides
+
+Startup reports which actions a layer now decides, and when a platform seal REJECTED a layer's
+value. A cascade whose effect is invisible until somebody is refused is a cascade nobody can
+review before it refuses them.
+
+### Added — a directory that admits what it is
+
+`DevSubjectsEnv` (`MANTLEKEEP_DEV_SUBJECTS`) lets a deployment name its own dev population. More
+importantly, a directory that cannot be listed now SAYS SO rather than answering with an empty
+list — an empty directory and an unreachable one send a person to entirely different places, and
+reporting the second as the first is how a permissions screen lies confidently.
+
+## [mantlekeep-estate/v0.2.0] — 2026-09-07
+
+*Backfilled 2026-09-08.*
+
+### Added — the estate verifies identity for itself
+
+Token verification moved into its own module so the estate's own dependency scan stays clean, and
+`PS256` is accepted alongside the algorithms already supported.
+
+**The fence that matters:** the trusted-identity header is refused OFF LOOPBACK unless a
+deployment explicitly chooses otherwise. Bound to an address other people can reach, a believed
+header means anyone who can route to the port is anybody — which was proven with `curl`, not
+argued. A deployment that supplies its own resolver needs no fence; one that relies on the header
+must say out loud that something in front of it strips and re-sets that header.
+
+### Fixed — a team that has declared nothing
+
+Asking for the estate of a team with no manifest answered as though the team did not exist.
+Declaring an EMPTY estate and never having declared one are different facts, and a reader acting
+on the first would remove what the second still has.
+
 ## [mantlekeep-control/v0.2.0] — 2026-09-07
 
 Go module only. The Java and Python SDKs are unchanged since `0.1.1` and are **not** re-released:
@@ -288,6 +335,65 @@ became `Loader`/`LoaderFunc` in the same pass but are internal, so no consumer s
   and `Records`' newest-first order and limit.
 - **`var _ mantlekeep.WorkflowRunner = (*orchestrator.Engine)(nil)`** — the doc comment claimed the
   Engine implements the core contract; now the compiler checks it.
+
+## [mantlekeep-control/v0.1.3] — 2026-09-06
+
+*Backfilled 2026-09-08. Cut so `mantlekeep-estate` could be published against a real tag rather
+than a `replace`.*
+
+### Added — the two things a gated change needs
+
+- **`Refused`** — a TYPED refusal carrying the action, the reason, and who may sign off. An error
+  string alone loses the distinction that matters most: "deny" is final, while a
+  `require_approval` is a change WAITING for a person. A caller that cannot tell them apart
+  reports a pending approval as a failure, which is how a governed change looks broken to whoever
+  submitted it.
+- **`require_approval_when`** — the floor rule kind that makes gating reachable at all. Without
+  it the approval machinery was complete and permanently unreachable, which is the defect a live
+  cluster surfaced the night before.
+
+Both were additive, and both existed because `mantlekeep-estate` could not be published without
+them: a tag whose consumer cannot compile is a tag that has to be replaced, and module proxy tags
+are cached permanently and can never be replaced.
+
+## [mantlekeep-estate/v0.1.0] — 2026-09-06
+
+*Backfilled 2026-09-08.*
+
+First published release of the estate: a team declares what it needs; the platform decides
+whether, where and under what limits, and every one of those decisions is on the hash chain.
+
+### Added
+
+- **manifest → floor → gate → placement → drift → promotion**, with the floor hot-reloadable on
+  `SIGHUP`: a bad file keeps the good one serving, and every decision records the floor revision
+  that made it.
+- **A CLI** so the person writing a manifest can check it before a service sees one. It accepts
+  YAML (including KYAML) and hands it to the SAME strict parser the service uses, so a mistyped
+  key is named and a bad indent is reported with its line.
+- **Branding** — environment names a deployment can make its own, and a role that reaches the
+  chain.
+- `web/` became `api/`: in a tree whose folders name layers, "web" reads as UI, and it serves
+  JSON.
+
+### Depends on
+
+`mantlekeep-control` as a published module, with the local `replace` deleted — so what is
+released is what a consumer gets.
+
+## [mantlekeep-kafka/v0.1.0] — 2026-08-30
+
+*Backfilled 2026-09-08.*
+
+### Added
+
+A governed-grant adapter for Apache Kafka: the estate declares a topic, the door decides, and this
+module is what carries out what was approved. It holds the BACKEND knowledge so the core does not
+— the core knows only the port, and swapping Kafka for something else is a wiring change rather
+than an edit to the engine.
+
+Published as its own module so a deployment that governs no Kafka links no Kafka client, and a CVE
+in that client cannot block a core build.
 
 ## [0.1.2] — 2026-08-14
 
