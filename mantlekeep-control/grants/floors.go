@@ -81,26 +81,40 @@ func LoadFloors() (*Floors, error) {
 	if f.Floors == nil {
 		f.Floors = map[string][]FloorRule{}
 	}
-	// The IT PLATFORM doc may carry floors too (append), then each PRODUCT doc's floors append on top.
-	// Floors are APPEND-ONLY at every layer: a product can only ADD rules (tighten), never loosen — so
-	// no seal is needed here (more rules ⇒ stricter). A product's attribute floor lives in ITS doc.
-	if plat, err := platformDoc(); err != nil {
-		return nil, fmt.Errorf(wrapFloors, err)
-	} else if plat != nil {
-		for action, rules := range plat.Floors {
-			f.Floors[action] = append(f.Floors[action], rules...)
-		}
+	if err := appendLayeredFloors(&f); err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+// appendLayeredFloors folds the platform and product documents onto the base floors.
+//
+// APPEND-ONLY at every layer: a product can only ADD rules, never remove one, so more layers can
+// only ever mean stricter. That is why no seal is needed here — unlike grants, where a product
+// CAN name an action the platform granted and the seal is what refuses it.
+func appendLayeredFloors(f *Floors) error {
+	plat, err := platformDoc()
+	if err != nil {
+		return fmt.Errorf(wrapFloors, err)
+	}
+	if plat != nil {
+		mergeFloors(f, plat.Floors)
 	}
 	docs, err := productDocs()
 	if err != nil {
-		return nil, fmt.Errorf(wrapFloors, err)
+		return fmt.Errorf(wrapFloors, err)
 	}
 	for _, d := range docs {
-		for action, rules := range d.Floors {
-			f.Floors[action] = append(f.Floors[action], rules...)
-		}
+		mergeFloors(f, d.Floors)
 	}
-	return &f, nil
+	return nil
+}
+
+// mergeFloors appends one document's rules onto the floors in force.
+func mergeFloors(f *Floors, rules map[string][]FloorRule) {
+	for action, list := range rules {
+		f.Floors[action] = append(f.Floors[action], list...)
+	}
 }
 
 // MustLoadFloors is LoadFloors or panic — a malformed embedded default (or a bad override) is a
