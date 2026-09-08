@@ -16,6 +16,44 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [v0.4.1] — 2026-09-08
+
+A correctness and hardening release. No API change: the diff from v0.4.0 removes zero exported
+declarations, so upgrading is a one-line change in `go.mod`.
+
+Cut because v0.4.0 turned out to carry findings that a SonarQube profile stricter than this
+project's own blocked a downstream release on. A module proxy tag can never be replaced, so the
+answer to a tag with findings in it is the next tag.
+
+### Fixed — the audit chain no longer defaults into the shared temp directory
+
+Four files wrote there, including the SDK's DEFAULT audit chain and the kernel's scan input.
+
+`os.MkdirTemp` creates an owner-only directory with an unguessable name, which defeats the symlink
+and pre-create attacks. But the directory it creates that in is world-writable, shared with every
+process on the host, and the first thing a reboot or a cleaner removes. A governance engine whose
+answer to "where is the chain" is "/tmp, until something tidies it" has no chain.
+
+They now write under the deployment's own data directory — 0750, owner and group only,
+traversal-rejected, named by `MANTLEKEEP_DATA_DIR`.
+
+The kernel's case is the sharpest. It wrote the scan input and then handed the PATH to the
+sandbox, so anything on the host could act between the write and the read. An owner-only directory
+removes that window rather than narrowing it.
+
+**If you rely on the default audit path**, it has moved from a temporary directory to
+`mantlekeep-data/` relative to the working directory. That is a behaviour change, and it is the
+point: the previous default did not survive a reboot.
+
+### Changed — long functions split, repeated messages named
+
+`LoadFloors` gained `appendLayeredFloors` and `mergeFloors`; two test helpers were split. Nine
+`if` statements that bound a variable used once in their own condition now put the expression in
+the condition. `"policy grants: %w"` and `"policy floors: %w"` are named constants, so a reader
+sees one origin for each message.
+
+No behaviour changed with them — the same 18 packages pass.
+
 ## [v0.4.0] — 2026-09-08
 
 Purely ADDITIVE. No exported symbol was removed or renamed, so a consumer on v0.3.0 upgrades by
