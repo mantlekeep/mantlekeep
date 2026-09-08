@@ -22,6 +22,7 @@ func main() {
 	min := flag.Int("min", 8, "shortest literal to consider")
 	times := flag.Int("times", 3, "how many repeats before it is reported")
 	tests := flag.Bool("tests", true, "include _test.go files, as Sonar does")
+	limit := flag.Int("limit", 15, "cognitive complexity ceiling")
 	flag.Parse()
 
 	roots := flag.Args()
@@ -44,6 +45,9 @@ func main() {
 		})
 	}
 	if reportIfDecls(roots, *tests) {
+		found = true
+	}
+	if reportComplexity(roots, *limit, *tests) {
 		found = true
 	}
 	if found {

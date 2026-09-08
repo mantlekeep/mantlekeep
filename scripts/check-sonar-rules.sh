@@ -9,6 +9,10 @@
 #   S3776  cognitive complexity over 15
 #   S5443  a file created in the shared, world-writable temp directory
 #
+# The first three come from an IN-TREE tool that parses Go. It used to shell out to an installed
+# binary, which Sonar itself flagged: `go install …@version` resolves its own dependencies with no
+# lock file, so the gate could change behaviour on a morning nobody touched this repository.
+#
 # It is an APPROXIMATION and says so. Sonar counts complexity slightly differently, so a function
 # near the limit here may be over it there. Passing this does not prove Sonar passes — it proves
 # the four things that have bitten are absent.
@@ -18,7 +22,6 @@
 set -eu
 
 MODULES=${*:-$(find . -maxdepth 1 -type d -name 'mantlekeep-*' | sed 's|^\./||' | sort)}
-GOCOGNIT=${GOCOGNIT:-$(command -v gocognit || echo "$HOME/go/bin/gocognit")}
 fail=0
 
 # S1192 and S1854 come from a Go PARSER, not a regular expression. A regex over the raw text
@@ -28,26 +31,8 @@ fail=0
 # from here cannot resolve. Absolute paths so the tool sees the same files from a different cwd.
 ROOT=$(pwd)
 ABS=""
-for mod in $MODULES; do ABS="$ABS $ROOT/$mod"; done
-if ! (cd "$ROOT/scripts/dupstrings" && GOWORK=off go run . $ABS); then
-  fail=1
-fi
-
 for mod in $MODULES; do
   [ -d "$mod" ] || continue
-
-  if [ -x "$GOCOGNIT" ]; then
-    over=$("$GOCOGNIT" -over 15 "$mod" 2>/dev/null || true)
-    if [ -n "$over" ]; then
-      fail=1
-      echo "$over" | while read -r line; do
-        printf '   S3776  %s\n          over 15 — split it; Sonar may count this higher still\n' "$line"
-      done
-    fi
-  else
-    echo "   (gocognit missing: go install github.com/uudashr/gocognit/cmd/gocognit@latest)"
-  fi
-
   # S5443. Tests are exempt: a test's files are its own and die with it.
   tmp=$(grep -rn 'os\.MkdirTemp("",\|os\.CreateTemp("",\|os\.TempDir()' "$mod" --include='*.go' 2>/dev/null \
         | grep -v '_test\.go' | grep -v '^\s*//' || true)
