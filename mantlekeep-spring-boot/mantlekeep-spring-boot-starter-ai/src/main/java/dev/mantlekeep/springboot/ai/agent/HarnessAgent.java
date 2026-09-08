@@ -20,6 +20,9 @@ import reactor.core.publisher.Mono;
  */
 public final class HarnessAgent implements AgentPort {
 
+
+    /** Named because it is asserted in more than one place; one message, one origin. */
+    private static final String CONTEXT_REQUIRED = "context is required";
     private final ClaudeRunner runner;
 
     /**
@@ -32,14 +35,14 @@ public final class HarnessAgent implements AgentPort {
     @Override
     public Mono<String> draft(Role role, LoopContext context) {
         Objects.requireNonNull(role, "role is required");
-        Objects.requireNonNull(context, "context is required");
+        Objects.requireNonNull(context, CONTEXT_REQUIRED);
         return runner.run(buildPrompt(role, context));
     }
 
     @Override
     public Flux<String> draftStream(Role role, LoopContext context) {
         Objects.requireNonNull(role, "role is required");
-        Objects.requireNonNull(context, "context is required");
+        Objects.requireNonNull(context, CONTEXT_REQUIRED);
         return runner.stream(buildPrompt(role, context));
     }
 
@@ -71,7 +74,7 @@ public final class HarnessAgent implements AgentPort {
 
     @Override
     public Mono<String> critique(LoopContext context, List<String> revisitableRoles) {
-        Objects.requireNonNull(context, "context is required");
+        Objects.requireNonNull(context, CONTEXT_REQUIRED);
         if (revisitableRoles == null || revisitableRoles.isEmpty()) {
             return Mono.just("CONTINUE");
         }

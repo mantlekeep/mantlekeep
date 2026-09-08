@@ -21,7 +21,10 @@
 #   sh scripts/check-sonar-rules.sh mantlekeep-estate  # one
 set -eu
 
-MODULES=${*:-$(find . -maxdepth 1 -type d -name 'mantlekeep-*' | sed 's|^\./||' | sort)}
+# The WHOLE repository by default, because that is what a downstream SonarQube scans — not the
+# four Go modules. Java, Python and the scripts are analysed there too, and a finding in the Java
+# SDK blocks the same release a finding in the core would.
+MODULES=${*:-.}
 fail=0
 
 # S1192 and S1854 come from a Go PARSER, not a regular expression. A regex over the raw text

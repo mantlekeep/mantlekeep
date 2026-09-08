@@ -36,6 +36,9 @@ func main() {
 	if reportComplexity(roots, *limit, *tests) {
 		found = true
 	}
+	if reportTextualDuplicates(roots, *min, *times) {
+		found = true
+	}
 	if found {
 		os.Exit(1)
 	}
