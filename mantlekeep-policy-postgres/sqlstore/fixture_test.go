@@ -15,6 +15,8 @@ import (
 	"github.com/mantlekeep/mantlekeep/mantlekeep-policy-postgres/sqlstore"
 )
 
+const litFixtureReadingHistory = "reading history: %v"
+
 // freshStore drops the policy tables and recreates them from the SHIPPED DDL — the same text
 // an operator runs, so this suite cannot pass against a schema it invented for itself.
 func freshStore(t *testing.T, db *sql.DB) *sqlstore.Store {
@@ -78,7 +80,7 @@ func assertHistoryChains(t *testing.T, db *sql.DB) {
 	t.Helper()
 	rows, err := db.Query(`SELECT seq, parent_revision, revision FROM mantlekeep_policy_history ORDER BY seq`)
 	if err != nil {
-		t.Fatalf("reading history: %v", err)
+		t.Fatalf(litFixtureReadingHistory, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -90,7 +92,7 @@ func assertHistoryChains(t *testing.T, db *sql.DB) {
 			parent, current string
 		)
 		if err := rows.Scan(&seq, &parent, &current); err != nil {
-			t.Fatalf("reading history: %v", err)
+			t.Fatalf(litFixtureReadingHistory, err)
 		}
 		if !first && parent != previous {
 			t.Errorf("history row %d was applied to %q, but the row before it produced %q — "+
@@ -100,7 +102,7 @@ func assertHistoryChains(t *testing.T, db *sql.DB) {
 		previous, first = current, false
 	}
 	if err := rows.Err(); err != nil {
-		t.Fatalf("reading history: %v", err)
+		t.Fatalf(litFixtureReadingHistory, err)
 	}
 }
 
