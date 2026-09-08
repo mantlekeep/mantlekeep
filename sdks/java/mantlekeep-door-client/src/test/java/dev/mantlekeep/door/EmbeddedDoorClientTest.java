@@ -101,6 +101,10 @@ class EmbeddedDoorClientTest {
 
             @Override
             public void close() {
+                // Nothing to release: this stand-in core holds its decisions in memory and
+                // opens no file, socket or thread. Empty is the correct behaviour, not an
+                // unfinished one -- the test closes it through try-with-resources, so
+                // throwing here would fail a passing test.
             }
         };
         try (EmbeddedDoorClient doorClient = new EmbeddedDoorClient(reviewCore)) {

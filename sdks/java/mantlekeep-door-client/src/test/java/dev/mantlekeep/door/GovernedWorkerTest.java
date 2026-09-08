@@ -52,7 +52,10 @@ class GovernedWorkerTest {
             }
 
             @Override
-            public void close() {}
+            public void close() {
+                // Nothing to release: this stand-in core answers from memory and holds no
+                // resource. Empty is the correct behaviour, not an unfinished one.
+            }
         };
     }
 
