@@ -25,16 +25,21 @@ BODY=$(awk -v v="## [$VERSION]" '
   found { print }
 ' "$CHANGELOG")
 
-case "$(printf '%s' "$BODY" | tr -d '[:space:]')" in
-  "") echo "no '## [$VERSION]' section in $CHANGELOG — write the note before tagging" >&2; exit 1 ;;
-esac
+# Blank means the heading was not found, or was found with nothing under it. Both are the same
+# failure to a reader: a release page with no words. Tested for emptiness AFTER stripping
+# whitespace, so a section containing only a blank line is caught too.
+if [ -z "$(printf '%s' "$BODY" | tr -d '[:space:]')" ]; then
+  echo "no '## [$VERSION]' section in $CHANGELOG — write the note before tagging" >&2
+  exit 1
+fi
 
 # The module's purpose, lifted from the top of its CHANGELOG so a reader who lands on the release
 # page cold knows what this thing IS before reading what changed in it.
 PURPOSE=$(awk '/<!-- purpose -->/{flag=1;next} /<!-- \/purpose -->/{exit} flag' "$CHANGELOG")
-case "$(printf '%s' "$PURPOSE" | tr -d '[:space:]')" in
-  "") echo "no <!-- purpose --> block in $CHANGELOG — a release page a reader lands on cold must say what the module IS" >&2; exit 1 ;;
-esac
+if [ -z "$(printf '%s' "$PURPOSE" | tr -d '[:space:]')" ]; then
+  echo "no <!-- purpose --> block in $CHANGELOG — a release page a reader lands on cold must say what the module IS" >&2
+  exit 1
+fi
 
 cat <<EOF
 $PURPOSE
