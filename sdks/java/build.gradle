@@ -34,6 +34,35 @@ allprojects {
     group = 'dev.mantlekeep'
     version = '0.1.1'
 
+    // ── Dependency LOCKING ───────────────────────────────────────────────────
+    // Without it, two builds of the same commit can resolve different transitive
+    // versions: every declared range, every plugin's own dependencies and every
+    // BOM-managed version is re-resolved against whatever the repository holds
+    // that day. "It built last week" then says nothing about what was in the jar,
+    // which is the question a dependency review actually asks.
+    //
+    // The lockfiles beside each module ARE the answer, committed and reviewable:
+    // a changed transitive version becomes a diff somebody approves rather than a
+    // silent difference between two builds of one commit.
+    //
+    // Regenerate after changing a dependency:
+    //     ./gradlew resolveAndLockAll --write-locks
+    //
+    // Locked: the configurations whose contents END UP IN THE JAR or on the classpath a
+    // consumer inherits. NOT the build's own tools.
+    //
+    // SpotBugs, FindSecBugs and their transitives are build-time only — they are excluded from
+    // the published jars by design, so pinning them answers no question anybody asks about what
+    // shipped. Locking them would also mean every routine plugin bump fails the build until
+    // somebody regenerates a lockfile by hand, which is how a control becomes the thing people
+    // route around.
+    configurations.matching {
+        it.name in ['compileClasspath', 'runtimeClasspath',
+                    'testCompileClasspath', 'testRuntimeClasspath']
+    }.configureEach {
+        resolutionStrategy.activateDependencyLocking()
+    }
+
     // SpotBugs + FindSecBugs on every java-library module. effort=max, reportLevel=low so the
     // security scan sees everything; HTML (human) + XML (CI/machine) reports. The build FAILS
     // on any remaining finding (spotbugs default) — false positives are justified out in
@@ -84,6 +113,33 @@ allprojects {
                     }
                 }
             }
+        }
+    }
+}
+
+// resolveAndLockAll regenerates every lockfile in one pass.
+//
+// A task rather than a documented command line because locking is only useful if
+// regenerating it is a single obvious step. The alternative — asking a person to
+// name the right configurations — is how lockfiles drift from the build they
+// claim to describe.
+//
+// It refuses to run without --write-locks: resolving every configuration is
+// expensive and pointless unless the result is being written down.
+tasks.register('resolveAndLockAll') {
+    group = 'build setup'
+    description = 'Regenerates every dependency lockfile. Run with --write-locks.'
+    notCompatibleWithConfigurationCache('resolves every configuration at execution time')
+    doFirst {
+        assert gradle.startParameter.writeDependencyLocks
+            : 'run with --write-locks, or this resolves everything and writes nothing'
+    }
+    doLast {
+        allprojects { project ->
+            project.configurations.findAll {
+                it.canBeResolved && it.name in ['compileClasspath', 'runtimeClasspath',
+                                                'testCompileClasspath', 'testRuntimeClasspath']
+            }.each { it.resolve() }
         }
     }
 }
