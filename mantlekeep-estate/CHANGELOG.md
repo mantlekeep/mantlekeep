@@ -15,6 +15,109 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [v0.3.0] — 2026-09-08
+
+### Added — two seams for a deployment the framework cannot see
+
+Both are ADDITIVE and both are optional. No existing signature changed, no new dependency was
+taken, and a deployment that configures neither behaves exactly as it did before — asserted, not
+assumed: with no transform configured, what reaches the adapter is compared byte-for-byte against
+what `Resolve` produces.
+
+- **`Labels` — a deployment's own grouping vocabulary.** `labels` on a manifest and on an app,
+  carried through to every resolved `DesiredItem`, so a consumer can group a resolved estate
+  without rebuilding the resolver's naming rule. An app's effective labels are its team's plus
+  its own: it may ADD a key, never restate one its team declared, or the estate would report an
+  app under a heading its own team disclaims.
+
+  A label is descriptive and nothing reads one to make a decision. That is why a label may not
+  take the name of a field the engine governs: it would render beside the real value, look
+  authoritative and govern nothing — and the day somebody wired it up, relabelling would become a
+  way out of the thing that field protects. **The forbidden set is DERIVED** by reflection over
+  the engine's own shapes rather than written down, so a field added tomorrow is reserved
+  tomorrow; a hand-written list would be a second place to edit and would fall behind on the
+  first change. Keys take the same narrow shape as every other name here, and values are bounded
+  and carry no control characters — a label reaches a UI, a log line and an evidence record,
+  where one line must stay one line.
+
+- **`ChangeTransform` — a change may be transformed before it is governed.** An optional hook,
+  wired with `Manager.TransformChangesWith`, that rewrites a change BEFORE it is submitted to the
+  door, so what a person approves is what will actually be applied. Preparation done after the
+  approval means a person signed a description and something else was produced from it
+  afterwards.
+
+  The ORDERING is the guarantee: transform, then govern, then apply. A change that arrives
+  already transformed is not transformed twice — the approval path replays a stored change, and
+  re-running the rewrite there would apply what it produces NOW under an approval given for what
+  it produced THEN. That is held by structure (`Approve` calls the door directly) rather than by a
+  flag, because a flag can be wrong. A transform that fails refuses the change before the door:
+  nothing is submitted, nothing is recorded as pending, and no adapter is called. A transform may
+  rewrite what a change is; it may never rewrite which change it is.
+
+  The interface names no tool and never will. One deployment may render a template, another may
+  ask a separate system to prepare the work — the framework says only that a change may be
+  transformed, which is what makes it a port rather than an integration.
+
+### Changed — BEHAVIOUR (policy precedence)
+
+- **A config layer can now TIGHTEN a grant document.** When both a grant document and the
+  resolved layer cascade name an action, the cascade decides. Grant is NECESSARY; the cascade is
+  SUFFICIENT-TO-REFUSE. Previously the document was asked first and returned on the spot, so a
+  scope file saying `{"actionRoles": {"service.deploy": "L1-Architect"}}` asserted nothing where a
+  document already granted `service.deploy` to a consumer — the file was read, the layer loaded,
+  the boot log named it, and every consumer still deployed. An operator got positive feedback for
+  a control that governed nothing.
+
+  **Nothing became more permissive.** The rule moved from `D ∨ (L ∧ H)` to `(L ∧ H) ∨ (¬L ∧ D)`;
+  only `D ∧ L ∧ ¬H` moves, and it moves from allow to DENY. `TestNothingBecameMorePermissive`
+  walks the whole cross-product of documents, layers and subjects against a literal transcription
+  of the old code rather than trusting that paragraph.
+
+  **What to check before upgrading:** any action that a layer names AND a grant document grants.
+  Subjects holding a role the layer does not reach will start being refused. The boot diagnostic
+  below prints exactly that list.
+
+### Added
+
+- **`policy.PrecedenceNotices`** — the boot diagnostic for the rule above. One line per action a
+  loaded layer changes, naming the FILE and the ACTION and the roles that lose it. Wired at boot
+  for the platform/team layers and for each per-scope layer; the hot-reload poll path stays
+  silent. It reports the **resolved** cascade, not the layer's own value: where a sealed floor
+  above rejected what the file asked for, the notice says both, because a diagnostic that quoted
+  the file would announce a requirement the engine does not have.
+- **`SubjectLister` and `DirectoryDescriber`** (with `DirectoryDescription`) — optional
+  capabilities of an `IdentityResolver`, discovered by type assertion. A resolver that cannot
+  enumerate its population says nothing, and a surface that finds nothing must SAY the directory
+  cannot be listed rather than render an empty one: an empty user list on a permissions screen
+  reads as "nobody has access". The gateway resolver deliberately does not implement
+  `SubjectLister` — it holds a group→role table, never people.
+- **`app.DevSubjectsEnv` (`MANTLEKEEP_DEV_SUBJECTS`)** — seeds the dev directory from
+  `"id=Role,Role;id2=Role"` so a deployment can look at itself with its own people in it rather
+  than the six names compiled into the binary. Set-but-empty is a hard startup error, not a quiet
+  fall back to the demo set. The result still describes itself as ASSERTED, not of record.
+- `ContractVersion` is `3.1.0` — additive ports, no signature changed.
+
+### Fixed — the findings a stricter SonarQube blocks a release on
+
+Three functions were well past the cognitive-complexity limit, each split along a seam that was
+already there rather than by cutting them in half:
+
+| | |
+|---|---|
+| `validateFloor` | 22 → 11, the app-runtime block became `validateAppFloor` |
+| `Manifest.validate` | 21 → 12, who the manifest is for, then what it asks for |
+| `serve.Run` | 21 → 14, the SIGHUP handler became `reloadFloor` + `reloadFleet` |
+| `KSM.free` | 18 → 6, the metrics scan became `readMemory` |
+
+`reloadFloor` and `reloadFleet` stay separate on purpose: one signal, two decisions. A bad
+registry must not discard a good floor reload, and reporting them together would make an operator
+guess which half failed.
+
+`"config: %w"` and `"fleet: %w"` are named constants. Three `if` statements that bound a variable
+used once in their own condition now put the expression in the condition.
+
+No behaviour changed with any of it — the same six packages pass.
+
 ## [v0.2.0] — 2026-09-07
 
 *Backfilled 2026-09-08.*

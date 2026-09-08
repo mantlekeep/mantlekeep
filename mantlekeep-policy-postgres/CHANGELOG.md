@@ -19,9 +19,10 @@ Versions here are this MODULE's own: it is tagged `mantlekeep-policy-postgres/vX
 independently. Format: [Keep a Changelog](https://keepachangelog.com); versioning:
 [SemVer](https://semver.org).
 
-## [Unreleased]
+## [v0.1.0] — 2026-09-08
 
-Not yet tagged. Everything below ships in the first release.
+The first release. It implements the two ports the core defines, so a deployment can hold its
+policy in Postgres without the core learning that Postgres exists.
 
 ### Added
 
