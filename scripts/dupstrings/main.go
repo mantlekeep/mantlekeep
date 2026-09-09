@@ -39,6 +39,9 @@ func main() {
 	if reportTextualDuplicates(roots, *min, *times) {
 		found = true
 	}
+	if reportEmptyBodies(roots) {
+		found = true
+	}
 	if found {
 		os.Exit(1)
 	}

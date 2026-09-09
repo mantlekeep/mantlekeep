@@ -15,7 +15,7 @@
 #
 # It is an APPROXIMATION and says so. Sonar counts complexity slightly differently, so a function
 # near the limit here may be over it there. Passing this does not prove Sonar passes — it proves
-# the four things that have bitten are absent.
+# the five things that have bitten are absent.
 #
 #   sh scripts/check-sonar-rules.sh                    # every module
 #   sh scripts/check-sonar-rules.sh mantlekeep-estate  # one
@@ -52,4 +52,4 @@ if [ "$fail" -ne 0 ]; then
   echo "Each finding above has blocked a release on a stricter SonarQube than ours."
   exit 1
 fi
-echo "✓ none of the four rules that have blocked a release are present"
+echo "✓ none of the five rules that have blocked a release are present"

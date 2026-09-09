@@ -37,6 +37,10 @@ final class RecordingDoorClient implements DoorClient {
 
     @Override
     public void close() {
+        // Nothing to release: this recorder keeps submitted intents in a list and owns no
+        // connection to close. Empty is the correct behaviour, not an unfinished one --
+        // Spring closes the bean on context shutdown, so throwing here would fail every
+        // test that stands the context up.
     }
 
     List<Intent> submittedIntents() {
