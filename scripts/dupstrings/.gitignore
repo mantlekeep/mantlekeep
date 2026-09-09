@@ -1,0 +1,3 @@
+
+# Built by `go build` in this directory; the checker is run with `go run`.
+/dupstrings
