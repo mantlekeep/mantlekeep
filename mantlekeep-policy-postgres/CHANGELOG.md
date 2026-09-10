@@ -45,3 +45,11 @@ policy in Postgres without the core learning that Postgres exists.
 - **A failed read is never an empty policy.** Empty grants deny everything, so a source that failed
   and one that legitimately grants nothing would be indistinguishable — and the first would look
   like a working deny-all rather than an outage.
+
+### Fixed — the declared mantlekeep-control pin is the one this module is tested against
+
+`go.mod` declared `mantlekeep-control v0.2.0` while every build and test ran against the copy
+beside it in the repository, because **Go ignores a `replace` in a dependency's `go.mod`** — only
+the main module's applies. A consumer therefore resolved v0.2.0, not the tree under test. The pin
+is now `mantlekeep-control v0.4.1`, and `scripts/check-release-pins.sh` fails any release where a
+declared sibling pin is not that sibling's newest released tag.

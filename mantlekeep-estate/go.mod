@@ -6,7 +6,7 @@ module github.com/mantlekeep/mantlekeep/mantlekeep-estate
 go 1.25.0
 
 require (
-	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.2.0
+	github.com/mantlekeep/mantlekeep/mantlekeep-control v0.4.1
 	sigs.k8s.io/yaml v1.6.0
 )
 

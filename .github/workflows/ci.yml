@@ -189,6 +189,27 @@ jobs:
       - name: sonar rules
         run: sh scripts/check-sonar-rules.sh
 
+  release-pins:
+    name: repo — the graph we ship is the graph we test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Needs every tag: the check compares each module's declared sibling pin against
+          # that sibling's newest RELEASED tag.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      # Every module carries a `replace` to its siblings so a clone builds against the tree
+      # beside it. Go IGNORES a dependency's `replace` — a consumer resolves the `require`
+      # line instead. So CI tests one graph and a consumer gets another, and until this ran
+      # nothing compared them: mantlekeep-estate/v0.3.0 shipped declaring mantlekeep-control
+      # v0.2.0 while every test passed against v0.4.1, and a consumer following the documented
+      # approval pattern got "undefined: DecisionFrom" on a fully green release.
+      - name: declared graph matches released siblings
+        run: sh scripts/check-release-pins.sh
+
   module-scope:
     name: repo — one change, one module
     runs-on: ubuntu-latest
