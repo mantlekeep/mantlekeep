@@ -34,8 +34,11 @@ in a project that had done nothing wrong.
 - The declared pin is now `mantlekeep-control v0.4.1`: what a consumer resolves is what this
   module is built and tested against.
 - `scripts/check-release-pins.sh` now refuses a release whose declared sibling pin is not that
-  sibling's newest released tag, and re-runs each module's own tests with the `replace` lines
-  stripped — the graph that ships is the graph that gets tested.
+  sibling's newest released tag — including refusing a sibling that has no released tag at all,
+  rather than skipping it. It also rebuilds each module with its `replace` lines stripped, which
+  catches a declared graph that will not compile; note that this second check runs a module's OWN
+  tests, and those may never touch the API a consumer uses. It is the pin check, not the rebuild,
+  that catches the defect described here.
 
 No API change: no exported declaration was added, changed or removed. A consumer already resolving
 mantlekeep-control v0.4.1 for other reasons sees no difference at all.
