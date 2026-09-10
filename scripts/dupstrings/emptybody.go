@@ -29,10 +29,23 @@ var (
 	methodOpensBody   = regexp.MustCompile(`\b\w+\s*\([^)]*\)\s*(throws\s[\w,.\s]+)?\{\s*$`)
 	methodEmptyInline = regexp.MustCompile(`\b\w+\s*\([^)]*\)\s*(throws\s[\w,.\s]+)?\{\s*\}\s*$`)
 	// Lines that end in `{` without being a method: types, control flow, lambdas, initialisers.
-	notAMethod = regexp.MustCompile(`\b(class|interface|enum|record|new|if|else|for|while|switch|try|catch|finally|do|synchronized)\b|->\s*\{\s*$`)
-	// A constructor: optional access modifier, then the name, then the parameter list. No
-	// return type sits between them, which is exactly what distinguishes it from a method.
-	constructor = regexp.MustCompile(`^(public\s+|protected\s+|private\s+)?[A-Z]\w*\s*\(`)
+	//
+	// Anchored to the START of the declaration, because these words are also ordinary
+	// identifiers: `void save(Record record) {` is a method, and a keyword-anywhere match
+	// silently skipped it — a false negative that a downstream scan still blocks a release on.
+	notAMethod = regexp.MustCompile(`^(class|interface|enum|record|new|if|else|for|while|switch|try|catch|finally|do|synchronized)\b`)
+	// A lambda body, wherever it appears on the line.
+	lambdaBody = regexp.MustCompile(`->\s*\{\s*$`)
+	// A constructor: the declaration's own name, then the parameter list, with NO return type
+	// between them — which is exactly what distinguishes it from a method.
+	//
+	// Matched AFTER leading annotations and modifiers are stripped. Anchoring on the modifier
+	// alone was wrong: `@Inject Probe() {` and `static Probe() {` both defeated it, so an
+	// annotated constructor was reported as an empty method — a false positive on a shape
+	// S1118 actively requires.
+	constructor = regexp.MustCompile(`^[A-Z]\w*\s*\(`)
+	// Annotations and modifiers that may precede a declaration, stripped before classifying it.
+	leadingNoise = regexp.MustCompile(`^\s*(@\w+(\([^)]*\))?\s+|(public|protected|private|static|final|abstract|synchronized|native|default|strictfp)\s+)+`)
 )
 
 // reportEmptyBodies walks the roots looking for Java methods whose body holds no statement and
@@ -94,9 +107,14 @@ func emptyBodiesIn(path string) []emptyBody {
 		lines = append(lines, scanner.Text())
 	}
 
-	for i, raw := range lines {
+	joined := joinWrappedSignatures(lines)
+
+	for i, raw := range joined {
 		line := strings.TrimSpace(raw)
-		if notAMethod.MatchString(line) || constructor.MatchString(line) {
+		// Classify the declaration with annotations and modifiers removed, so `@Override`,
+		// `public static` and friends do not change what a line IS.
+		declaration := leadingNoise.ReplaceAllString(line, "")
+		if lambdaBody.MatchString(line) || notAMethod.MatchString(declaration) || constructor.MatchString(declaration) {
 			continue
 		}
 		if methodEmptyInline.MatchString(line) {
@@ -106,7 +124,7 @@ func emptyBodiesIn(path string) []emptyBody {
 		if !methodOpensBody.MatchString(line) {
 			continue
 		}
-		if bodyIsEmpty(lines, i+1) {
+		if bodyIsEmpty(joined, i+1) {
 			found = append(found, emptyBody{number: i + 1, text: line})
 		}
 	}
@@ -126,4 +144,60 @@ func bodyIsEmpty(lines []string, start int) bool {
 		}
 	}
 	return false
+}
+
+// joinWrappedSignatures folds a parameter list split across lines back onto one line.
+//
+// Java wraps long signatures, and a line-at-a-time scanner sees `void wide(` followed by
+// `String a) {` — neither of which is a declaration it recognises. The method is then invisible,
+// which is a FALSE NEGATIVE: the downstream scan still reports it and still blocks the release.
+//
+// The fold is positional: the joined text is written back at the FIRST line's index and the
+// continuation lines are blanked, so every reported line number still points at the signature a
+// reader would look for.
+//
+// Parentheses are counted outside string and character literals. That is an approximation — it
+// does not track comments or escapes exhaustively — and this file says so rather than implying a
+// parser's accuracy.
+func joinWrappedSignatures(lines []string) []string {
+	folded := make([]string, len(lines))
+	copy(folded, lines)
+
+	for i := 0; i < len(folded); i++ {
+		if parenDepth(folded[i]) <= 0 {
+			continue
+		}
+		// An unclosed parameter list: pull in following lines until it balances.
+		for j := i + 1; j < len(folded) && parenDepth(folded[i]) > 0; j++ {
+			folded[i] = strings.TrimRight(folded[i], " \t") + " " + strings.TrimSpace(folded[j])
+			folded[j] = ""
+		}
+	}
+	return folded
+}
+
+// parenDepth counts unclosed parentheses in a line, ignoring those inside quotes.
+func parenDepth(line string) int {
+	depth, inString, inChar := 0, false, false
+	for index := 0; index < len(line); index++ {
+		switch character := line[index]; {
+		case (inString || inChar) && character == '\\':
+			index++ // skip whatever the backslash escapes
+		case inString && character == '"':
+			inString = false
+		case inChar && character == '\'':
+			inChar = false
+		case inString || inChar:
+			// inside a literal: parentheses there are text, not syntax
+		case character == '"':
+			inString = true
+		case character == '\'':
+			inChar = true
+		case character == '(':
+			depth++
+		case character == ')':
+			depth--
+		}
+	}
+	return depth
 }
