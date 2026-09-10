@@ -29,7 +29,7 @@ func TestTheActorTravelsAsAHeaderAndTheAppAuthenticatesAsItself(t *testing.T) {
 		gotAuthorization = r.Header.Get("Authorization")
 		gotOnBehalfOf = r.Header.Get(onBehalfOfHeader)
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		_ = json.NewEncoder(w).Encode(governResponse{Decision: "allow", Token: "tok-1"})
+		_ = json.NewEncoder(w).Encode(governResponse{Outcome: "allow", Token: "tok-1"})
 	}))
 	defer door.Close()
 
@@ -56,7 +56,7 @@ func TestARefusalCarriesTheDoorsOwnWords(t *testing.T) {
 	const reason = "estate floor: a platform-gated change needs a platform approver"
 	door := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(governResponse{Decision: "deny", Reason: reason})
+		_ = json.NewEncoder(w).Encode(governResponse{Outcome: "deny", Reasons: []wireReason{{Code: "DENY_POLICY", Message: reason}}})
 	}))
 	defer door.Close()
 
@@ -73,7 +73,8 @@ func TestARequireApprovalKeepsItsDecisionWord(t *testing.T) {
 	door := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(governResponse{
-			Decision: "require_approval", Reason: "a platform approver must sign off"})
+			Outcome: "require_approval",
+			Reasons: []wireReason{{Code: "REQUIRE_APPROVAL", Message: "a platform approver must sign off"}}})
 	}))
 	defer door.Close()
 
@@ -106,7 +107,7 @@ func TestAnUnreachableDoorIsNotARefusal(t *testing.T) {
 // An allow with no token is not an allow: the adapter would be handed nothing to act under.
 func TestAnAllowWithNoTokenIsRefused(t *testing.T) {
 	door := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(governResponse{Decision: "allow"})
+		_ = json.NewEncoder(w).Encode(governResponse{Outcome: "allow"})
 	}))
 	defer door.Close()
 
