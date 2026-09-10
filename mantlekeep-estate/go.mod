@@ -10,7 +10,11 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
-require go.yaml.in/yaml/v2 v2.4.2 // indirect
+require (
+	go.etcd.io/bbolt v1.5.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+)
 
 // No replace. The estate depends on the PUBLISHED core, which is the only arrangement a
 // consumer can reproduce: a replace applies to the main module alone, so a module that

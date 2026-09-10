@@ -63,18 +63,61 @@ type governRequest struct {
 }
 
 // governResponse is the door's published reply, for allow and refusal alike.
+//
+// The field names here MUST match what mantlekeep-control/doorserver writes. They did not: this
+// client read "decision", "expires" and a string "reason", while the door has always sent
+// "outcome", "expiresAt" and a "reasons" ARRAY — its own package comment says so:
+//
+//	allow            → {"outcome":"allow","token":…,"policyId":…,"expiresAt":…,"reasons":[]}
+//	deny             → {"outcome":"deny","reasons":[{"code":…,"message":…}],"policyId":…}
+//	require_approval → {"outcome":"require_approval","requiredApprovers":[…],"reasons":[…]}
+//
+// The consequence was silent and total: the door ALLOWED a change and issued a token, and this
+// client threw the answer away because it could not find a field named "decision" — reporting
+// "HTTP 200 with no decision", which reads as the door being broken.
+//
+// Neither module's tests caught it. Each tested its own side; nothing exercised the pair. See
+// roundtrip_test.go, which now does.
 type governResponse struct {
-	Decision string `json:"decision"`
+	Outcome string `json:"outcome"`
 	// IntentID is what the chain actually holds. Echoed back rather than assumed, because a
 	// caller that guesses at the door's id scheme is one door change away from citing a record
 	// that does not exist.
 	IntentID string `json:"intentId"`
 	Token    string `json:"token"`
-	Expires  string `json:"expires"`
-	Reason   string `json:"reason"`
-	// RequiredApprovers is who may sign off, when the decision was require_approval. Carried
+	Expires  string `json:"expiresAt"`
+	// Reasons is an array of coded reasons, not a sentence. A caller that needs one line calls
+	// summary(); a caller that needs to branch reads the codes.
+	Reasons []wireReason `json:"reasons,omitempty"`
+	// RequiredApprovers is who may sign off, when the outcome was require_approval. Carried
 	// because a refusal that cannot say who unblocks it is a dead end.
 	RequiredApprovers []string `json:"requiredApprovers,omitempty"`
+	// PolicyID names which policy decided, for the audit trail.
+	PolicyID string `json:"policyId,omitempty"`
+}
+
+// wireReason mirrors the door's reason shape exactly.
+type wireReason struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// summary flattens the door's reasons into one line for an error message.
+//
+// The codes are kept in the structured error; this is only for the human-readable text, so a
+// caller that branches on a code never has to parse this string.
+func (r governResponse) summary() string {
+	switch len(r.Reasons) {
+	case 0:
+		return ""
+	case 1:
+		return r.Reasons[0].Message
+	}
+	messages := make([]string, 0, len(r.Reasons))
+	for _, reason := range r.Reasons {
+		messages = append(messages, reason.Message)
+	}
+	return strings.Join(messages, "; ")
 }
 
 // Submit sends one intent to the door and returns the token it issued.
@@ -124,7 +167,7 @@ func (c *Client) Submit(ctx context.Context, intent mantlekeep.Intent) (mantleke
 			"door unreadable: HTTP %d with an undecodable body: %w", response.StatusCode, err)
 	}
 
-	if response.StatusCode != http.StatusOK || decoded.Decision != string(mantlekeep.ActionAllow) {
+	if response.StatusCode != http.StatusOK || decoded.Outcome != string(mantlekeep.ActionAllow) {
 		return mantlekeep.ExecutionToken{}, refusal(decoded, response.StatusCode)
 	}
 	if decoded.Token == "" {
@@ -152,13 +195,13 @@ func (c *Client) Submit(ctx context.Context, intent mantlekeep.Intent) (mantleke
 
 // refusal renders the door's verdict in the door's own words.
 func refusal(decoded governResponse, status int) error {
-	decision := decoded.Decision
+	decision := decoded.Outcome
 	if decision == "" {
 		// The door answered but named no decision — that is a broken contract, not a refusal,
 		// and must not be classified as one upstream.
-		return fmt.Errorf("door answered HTTP %d with no decision: %s", status, decoded.Reason)
+		return fmt.Errorf("door answered HTTP %d with no outcome: %s", status, decoded.summary())
 	}
-	reason := decoded.Reason
+	reason := decoded.summary()
 	if reason == "" {
 		reason = "no reason given"
 	}
