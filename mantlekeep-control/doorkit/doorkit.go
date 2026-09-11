@@ -11,6 +11,7 @@ package doorkit
 
 import (
 	"context"
+	"errors"
 
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-control/grants"
@@ -50,6 +51,38 @@ func NewInMemoryDoor(auditPath string, dyn ...policy.ActionAuthorizer) (*Door, e
 	if err != nil {
 		return nil, err
 	}
+	return NewDoorWithAudit(aud, dyn...)
+}
+
+// NewDoorWithAudit assembles a door over an audit chain the DEPLOYMENT supplies.
+//
+// # Why this exists
+//
+// NewInMemoryDoor opens a bbolt file, and bbolt takes an exclusive lock on it. That is correct for
+// one process and it is what fixes the door at a single replica: a second pod does not share the
+// volume, it fails to open it. The door is otherwise stateless — a decision is a pure function of
+// intent, policy and floor — so the replica limit comes entirely from where the chain lives.
+//
+// AuditLogger has always been the seam. Nothing could reach it, because the only constructor
+// hardcoded the bbolt store. This is that constructor, and it is the whole change: a chain backed
+// by a database that serialises appends lets N stateless pods share one chain.
+//
+// What a conforming logger must guarantee, and it is not negotiable:
+//
+//   - appends are SERIALISED. Each record links the previous record's hash, so two concurrent
+//     writers fork the chain, and a forked chain proves nothing. A store that appends in parallel
+//     is not an audit chain, whatever else it is.
+//   - Verify walks the whole chain and detects a break. A logger that returns true without
+//     checking turns tamper-evidence into a claim.
+//
+// A nil logger is refused rather than defaulted. A door that records nothing still decides, still
+// returns tokens, and still looks healthy — while producing no evidence that anything was governed.
+// That failure is silent and total, so it fails here instead.
+func NewDoorWithAudit(chain mantlekeep.AuditLogger, dyn ...policy.ActionAuthorizer) (*Door, error) {
+	if chain == nil {
+		return nil, errors.New("doorkit: no audit chain — a door that records nothing would " +
+			"decide, issue tokens and look healthy while proving nothing was ever governed")
+	}
 	rbac := policy.NewRBAC()
 	if len(dyn) > 0 && dyn[0] != nil {
 		rbac = rbac.WithDynamic(dyn[0])
@@ -57,9 +90,9 @@ func NewInMemoryDoor(auditPath string, dyn ...policy.ActionAuthorizer) (*Door, e
 	fs := policy.NewFailsafe(rbac)
 	ids := identity.NewMock()
 	return &Door{
-		Submitter: sdk.New(ids, fs, aud),
+		Submitter: sdk.New(ids, fs, chain),
 		Identity:  ids,
-		Audit:     aud,
+		Audit:     chain,
 		Failsafe:  fs,
 	}, nil
 }
