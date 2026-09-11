@@ -375,7 +375,29 @@ type AuditRecord struct {
 	// is taken over the marshalled record, so an absent Via must serialise to exactly
 	// the bytes it did before this field existed, or every pre-existing record in the
 	// chain would fail verification.
-	Via      string `json:"Via,omitempty"`
+	Via string `json:"Via,omitempty"`
+
+	// RunID, ParentID and StepID correlate the records of ONE execution.
+	//
+	// The chain is a flat, append-only log and knows nothing about pipelines — correctly, because
+	// the graph belongs to the product. But without a correlation key it cannot be FILTERED: two
+	// parallel runs of the same pipeline interleave their records and become indistinguishable,
+	// and a nested run (a sub-DAG) cannot be attributed to its parent at all. IntentID is unique
+	// per DECISION, not per run, so it cannot do this job.
+	//
+	// Three fields rather than one because the questions differ: RunID answers "which execution",
+	// ParentID answers "under what" (empty at the top level), StepID answers "which node". A
+	// product that has no notion of runs leaves all three empty and the record is byte-identical
+	// to one written before these existed.
+	//
+	// omitempty is LOAD-BEARING, exactly as it is for Via: the hash is taken over the marshalled
+	// record, so an absent field must serialise to precisely the bytes it did before the field
+	// existed, or every pre-existing record in every chain fails verification. There is no
+	// migration available for an append-only log — it is this, or the correlation never arrives.
+	RunID    string `json:"RunID,omitempty"`
+	ParentID string `json:"ParentID,omitempty"`
+	StepID   string `json:"StepID,omitempty"`
+
 	PrevHash string // SHA-256 of the previous record — the chain link
 	Hash     string // SHA-256 of this record (set by the logger)
 }
