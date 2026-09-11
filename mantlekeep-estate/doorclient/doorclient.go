@@ -26,6 +26,17 @@ import (
 // asking stays a property of the call. An actor in the payload is something any caller can claim.
 const onBehalfOfHeader = "X-On-Behalf-Of"
 
+// groupsHeader carries the directory groups the fronting gateway asserted for the subject.
+//
+// The door resolves ROLES from these groups using its own group->role table, so what travels is
+// a claim about membership and never a claim about authority — the same reason the subject's own
+// Roles are not sent. Without them a door on the SSO tier can resolve nobody: its resolver decides
+// roles from groups alone and refuses an identity whose groups map to nothing.
+//
+// The name matches the door's own TrustedGroupsHeader default, so one gateway configuration
+// serves the door and every service in front of it. Comma-separated, as gateways emit them.
+const groupsHeader = "X-Caller-Groups"
+
 // Client is the door, reached over HTTP.
 type Client struct {
 	baseURL string
@@ -151,6 +162,9 @@ func (c *Client) Submit(ctx context.Context, intent mantlekeep.Intent) (mantleke
 	request.Header.Set("Authorization", "Bearer "+c.serviceAccount)
 	if intent.Subject.ID != "" {
 		request.Header.Set(onBehalfOfHeader, intent.Subject.ID)
+	}
+	if len(intent.Subject.ADGroups) > 0 {
+		request.Header.Set(groupsHeader, strings.Join(intent.Subject.ADGroups, ","))
 	}
 
 	response, err := c.http.Do(request)
