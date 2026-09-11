@@ -33,6 +33,33 @@ if [ -z "$(printf '%s' "$BODY" | tr -d '[:space:]')" ]; then
   exit 1
 fi
 
+# A section heading in a CHANGELOG is a full sentence — "### Fixed — a consumer resolved an older
+# pin than this module is tested against". That reads well in a file and renders badly on a GitHub
+# release page, where ### is set large: a sentence at heading size looks like shouting, and the
+# page becomes three enormous lines with the actual explanation beneath them.
+#
+# So a section heading becomes a BOLD LEAD-IN instead. Same words, same order, set at body size:
+#
+#   ### Fixed — a consumer resolved …     →     **Fixed** — a consumer resolved …
+#
+# The label stays emphasised, which is what a reader scans for; the sentence stops pretending to be
+# a title. Sub-headings deeper than ### are demoted rather than converted, since those are usually
+# genuine short titles.
+BODY=$(printf '%s\n' "$BODY" | awk '
+  /^### [A-Za-z].* — / {
+    label = $0
+    sub(/^### /, "", label)
+    split(label, parts, / — /)
+    rest = label
+    sub(/^[^—]* — /, "", rest)
+    printf "**%s** — %s\n", parts[1], rest
+    next
+  }
+  /^### / { sub(/^### /, "**"); print $0 "**"; next }
+  /^#### / { sub(/^#### /, "**"); print $0 "**"; next }
+  { print }
+')
+
 # The module's purpose, lifted from the top of its CHANGELOG so a reader who lands on the release
 # page cold knows what this thing IS before reading what changed in it.
 PURPOSE=$(awk '/<!-- purpose -->/{flag=1;next} /<!-- \/purpose -->/{exit} flag' "$CHANGELOG")
@@ -50,7 +77,7 @@ $PURPOSE
 $BODY
 ---
 
-### Using it
+## Using it
 
 \`\`\`
 go get github.com/mantlekeep/mantlekeep/$MODULE@$VERSION
