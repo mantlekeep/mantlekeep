@@ -101,22 +101,39 @@ func (h *Handler) apply(writer http.ResponseWriter, request *http.Request) {
 // Straight to the service. No intent is submitted, because nothing happens as a result of a
 // read and there is no decision to record.
 func (h *Handler) read(writer http.ResponseWriter, request *http.Request) {
-	// Authenticated, though not governed. A read of another team's estate is still a
-	// disclosure, and an endpoint that answers anyone is one nobody can put on a network.
-	if _, err := h.callers.Caller(request); err != nil {
+	actor, err := h.callers.Caller(request)
+	if err != nil {
 		writeError(writer, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	footprint, err := h.service.Footprint(request.Context(), request.PathValue("team"))
+	// Through the MANAGER, not straight to the service. The manager is where the door is asked,
+	// and a read that reaches the service directly is authenticated and ungoverned — the team in
+	// the URL never compared to anything.
+	footprint, err := h.manager.Footprint(request.Context(), actor, request.PathValue("team"))
 	switch {
+	case errors.Is(err, estate.ErrReadRefused):
+		// 404, not 403. A 403 confirms the team exists, and the existence of another team's
+		// estate is part of what is being withheld. The door's own words are dropped for the
+		// same reason: "no role permits action estate.read" tells a caller there was something
+		// to permit.
+		writeError(writer, http.StatusNotFound, unknownTeam(request.PathValue("team")))
 	case errors.Is(err, estate.ErrUnknownTeam):
-		writeError(writer, http.StatusNotFound, err.Error())
+		writeError(writer, http.StatusNotFound, unknownTeam(request.PathValue("team")))
 	case err != nil:
 		writeError(writer, http.StatusInternalServerError, err.Error())
 	default:
 		writeJSON(writer, http.StatusOK, footprint)
 	}
+}
+
+// unknownTeam is the single sentence a caller gets for "no such team" and "not yours".
+//
+// One wording for both on purpose. Two different messages would let a caller tell the cases apart
+// by reading them, which is the disclosure the 404 exists to prevent — and the difference would be
+// invisible to whoever later changed one of the two strings.
+func unknownTeam(team string) string {
+	return "no estate is readable for team " + quote(team)
 }
 
 // reconcileReport is one pass: what it closed, and what it refused to close on its own.

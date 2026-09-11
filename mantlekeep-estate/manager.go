@@ -35,6 +35,10 @@ type Manager struct {
 	// nobody present — can resolve the same footprint without the team posting it again.
 	// Optional: without it Apply still governs and applies, but nothing can be read back.
 	manifests ManifestStore
+	// footprints resolves the read side, once the door has allowed the read. NOT optional in
+	// effect: [Manager.Footprint] refuses when it is absent rather than answering ungoverned.
+	// See [Manager.ReadFootprintsFrom].
+	footprints FootprintReader
 	ownership Ownership
 	// approvals holds changes awaiting a person. Optional: without it a gated change is still
 	// refused, correctly — it simply gives nobody anywhere to stand, which is a gate in name
