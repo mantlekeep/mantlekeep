@@ -35,8 +35,8 @@ import (
 // groupsOnly is the SSO-tier resolver: it knows groups, and refuses an id it cannot map.
 func groupsOnly() mantlekeep.IdentityResolver {
 	return identity.NewGateway(map[string][]mantlekeep.Role{
-		"InfoDir-FRAME-MANTLE-PAYMENTS-Reader":   {mantlekeep.RoleConsumer},
-		"InfoDir-FRAME-MANTLE-PAYMENTS-Operator": {mantlekeep.RoleOperator},
+		"directory-payments-readers":   {mantlekeep.RoleConsumer},
+		"directory-payments-operators": {mantlekeep.RoleOperator},
 	})
 }
 
@@ -101,7 +101,7 @@ func TestTheGroupsHeaderReachesTheResolver(t *testing.T) {
 	server := serveWithGroups(t, "X-Caller-Groups")
 
 	status, body := submit(t, server, "reader-rachel", "X-Caller-Groups",
-		"InfoDir-FRAME-MANTLE-PAYMENTS-Reader")
+		"directory-payments-readers")
 
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		t.Fatalf("identity failed for a caller whose group maps to a role: %d %s\n"+
@@ -128,7 +128,7 @@ func TestACallerWithNoGroupsIsStillRefused(t *testing.T) {
 func TestAnUnmappedGroupGrantsNothing(t *testing.T) {
 	server := serveWithGroups(t, "X-Caller-Groups")
 
-	status, _ := submit(t, server, "reader-rachel", "X-Caller-Groups", "SomeOther-AD-Group")
+	status, _ := submit(t, server, "reader-rachel", "X-Caller-Groups", "directory-some-other-group")
 	if status != http.StatusUnauthorized && status != http.StatusForbidden {
 		t.Errorf("an unmapped group must grant nothing, got %d", status)
 	}
