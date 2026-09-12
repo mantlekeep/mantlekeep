@@ -43,6 +43,28 @@ type Options struct {
 	// because the value becomes the caller id in the audit chain (see checkIdentityHeader).
 	TrustedUserHeader string
 
+	// TrustedGroupsHeader names the header carrying the caller's IdP groups, as the same
+	// fronting gateway asserts them. Empty disables group-carried identity.
+	//
+	// This is what makes the SSO tier reachable over HTTP. The gateway resolver decides roles
+	// from a group→role table and refuses an identity whose groups map to nothing — so without
+	// a way to carry groups, that resolver can resolve NOBODY through this server, and every
+	// request fails at identity before any policy decision is taken (which means the door logs
+	// nothing, and an operator goes looking for a policy bug that does not exist).
+	//
+	// It carries GROUPS, never ROLES. The distinction is the whole control: a caller asserting
+	// its own roles would be asserting its own authority, whereas a group is a claim the
+	// resolver still has to interpret using MantleKeep's own configuration.
+	//
+	// SECURITY: trusted on exactly the same terms as [Options.TrustedUserHeader] — only set it
+	// when something in front authenticates and strips any client-supplied copy. Like that
+	// option it must name an identity header; New refuses Authorization, Cookie and the like,
+	// because the value reaches the decision record in an append-only chain where it cannot be
+	// redacted afterwards.
+	//
+	// Values are comma-separated, the form every common gateway emits.
+	TrustedGroupsHeader string
+
 	// DelegatedSubjectHeader names the header by which an authenticated SERVICE says
 	// which person it is acting for — the business-to-business case, where a service
 	// account authenticates but a human is the one whose action this really is.
@@ -102,6 +124,9 @@ func New(options Options) (*Server, error) {
 	}
 	// An identity header must name an identity, not a secret — see checkIdentityHeader.
 	if err := checkIdentityHeader("TrustedUserHeader", options.TrustedUserHeader); err != nil {
+		return nil, err
+	}
+	if err := checkIdentityHeader("TrustedGroupsHeader", options.TrustedGroupsHeader); err != nil {
 		return nil, err
 	}
 	if err := checkIdentityHeader("DelegatedSubjectHeader", options.DelegatedSubjectHeader); err != nil {

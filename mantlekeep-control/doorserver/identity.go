@@ -144,13 +144,42 @@ func (s *Server) isDelegator(callerID string) bool {
 
 // resolveUser turns an asserted user id into a Subject with effective roles. The
 // resolver is the authority on roles — a caller never asserts its own.
+//
+// The gateway's asserted GROUPS travel with the id when [Options.TrustedGroupsHeader] is set.
+// They are a claim the resolver still interprets against MantleKeep's own group→role table, not
+// an authority the caller supplies: a subject may say which groups it is in, and never what those
+// groups are worth. Without them the SSO-tier resolver can resolve nobody, because it decides
+// roles from groups alone.
 func (s *Server) resolveUser(request *http.Request, userID string) (mantlekeep.Subject, bool) {
 	subject, err := s.door.Identity.Resolve(
-		request.Context(), mantlekeep.ExternalIdentity{ID: userID})
+		request.Context(), mantlekeep.ExternalIdentity{ID: userID, Groups: s.assertedGroups(request)})
 	if err != nil {
 		return mantlekeep.Subject{}, false
 	}
 	return subject, true
+}
+
+// assertedGroups reads the groups the fronting gateway asserted, if a header is configured.
+//
+// Comma-separated, which is what every common gateway emits. Blank entries are dropped rather
+// than passed on: an empty group name matches nothing in a group→role table, and carrying one
+// would put an empty string into the subject's recorded ADGroups, where it reads as a group that
+// exists and is unmapped.
+func (s *Server) assertedGroups(request *http.Request) []string {
+	if s.options.TrustedGroupsHeader == "" {
+		return nil
+	}
+	raw := request.Header.Get(s.options.TrustedGroupsHeader)
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var groups []string
+	for _, part := range strings.Split(raw, ",") {
+		if name := strings.TrimSpace(part); name != "" {
+			groups = append(groups, name)
+		}
+	}
+	return groups
 }
 
 // handleDevLogin mints a session for a named user WITHOUT any credential check. It is

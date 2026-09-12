@@ -16,6 +16,42 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [Unreleased]
+
+### Fixed — the SSO tier could not resolve anybody over HTTP
+
+`doorserver` had no way to carry a caller's IdP groups. `resolveUser` called
+`Identity.Resolve` with `ExternalIdentity{ID: userID}` and nothing else, and the submit path then
+replaces the intent's subject with that result — so a group could not reach the resolver by any
+route, header or body.
+
+The gateway resolver (the SSO tier, `MANTLEKEEP_AUTH=proxy`) decides roles from a group→role
+table and refuses an identity whose groups map to nothing. With no groups to map, it refused
+**every** caller. Worse than a denial: the refusal happens at IDENTITY, before any policy
+evaluation, so **the door records nothing at all** — an operator sees a 403 and goes looking for
+a policy bug that does not exist.
+
+Found by running the deployment shape end to end rather than by reading: a real gateway-resolver
+door, a real estate in front of it, and every request failing with no decision logged.
+
+### Added
+
+- **`Options.TrustedGroupsHeader`** — names the header carrying the groups the fronting gateway
+  asserts, comma-separated. Empty (the default) keeps the previous behaviour exactly, so this is
+  additive for anyone already running the door.
+
+  It carries **groups, never roles**, and that distinction is the control: a caller asserting its
+  own roles would be asserting its own authority, while a group stays a claim the resolver
+  interprets against MantleKeep's own configuration. The resolver remains the authority on what a
+  group is worth.
+
+  Validated by `checkIdentityHeader`, like the other identity headers: `Authorization`, `Cookie`
+  and the rest are refused at construction, because the value reaches the decision record in an
+  append-only chain where it cannot be redacted afterwards.
+
+  Trust it on the same terms as `TrustedUserHeader` — only set it when something in front
+  authenticates and strips any client-supplied copy.
+
 ## [v0.4.1] — 2026-09-08
 
 A correctness and hardening release. No API change: the diff from v0.4.0 removes zero exported
