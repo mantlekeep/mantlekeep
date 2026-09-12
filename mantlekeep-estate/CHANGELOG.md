@@ -19,7 +19,7 @@ bare version numbers — one version described everything then.
 
 ### Added — a floor may PREFER clusters for a named app, in order
 
-`AppRule.Clusters` is the platform's ordered preference — plan A, then plan B — applied by the new
+`AppRule.Prefer` is the platform's ordered preference — plan A, then plan B — applied by the new
 `Placer.PlaceWith(claim, current, prefer)`. `Place` is unchanged and now calls it with no
 preference, so existing behaviour is identical.
 
@@ -54,7 +54,12 @@ declares environment, purpose and residency, and the platform chooses. `Placemen
 the team's own document, so a preference field there would let a team choose its own placement,
 which is the thing the design removed. Keys are team-qualified like the gate rules.
 
-Additive. A floor with no `clusters` on a rule behaves exactly as before.
+The field is named `prefer`, not `clusters`. A list under the second name reads equally as
+"deploy to all of these", and the two are opposite instructions — one selects a single cluster,
+the other fans out. Multi-target deployment will be its own field, so neither can be mistaken for
+the other by somebody reading a document at 3am.
+
+Additive. A floor with no `prefer` on a rule behaves exactly as before.
 
 ### Added — a named app may be gated harder than its tier
 

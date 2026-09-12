@@ -91,8 +91,8 @@ type nodePoolLimits struct {
 
 // appRule is the authored form of [estate.AppRule].
 type appRule struct {
-	Gate     estate.Gate `json:"gate,omitempty"`
-	Clusters []string    `json:"clusters,omitempty"`
+	Gate   estate.Gate `json:"gate,omitempty"`
+	Prefer []string    `json:"prefer,omitempty"`
 }
 
 // toFloor converts the authored document into the floor the engine applies.
@@ -114,7 +114,7 @@ func (f floorDocument) toFloor() estate.Floor {
 	if len(f.Apps) > 0 {
 		floor.Apps = make(map[string]estate.AppRule, len(f.Apps))
 		for name, rule := range f.Apps {
-			floor.Apps[name] = estate.AppRule{Gate: rule.Gate, Clusters: rule.Clusters}
+			floor.Apps[name] = estate.AppRule{Gate: rule.Gate, Prefer: rule.Prefer}
 		}
 	}
 	// Merged onto the defaults, not replacing them: naming one environment must not un-rule the
