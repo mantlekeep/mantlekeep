@@ -88,6 +88,9 @@ func Parse(content []byte) (Config, error) {
 	if err := validateGates(floor); err != nil {
 		return Config{}, err
 	}
+	if err := validateApps(floor); err != nil {
+		return Config{}, err
+	}
 	if err := validateEnvTiers(floor); err != nil {
 		return Config{}, err
 	}
