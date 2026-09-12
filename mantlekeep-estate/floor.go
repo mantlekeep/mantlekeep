@@ -41,6 +41,26 @@ type Floor struct {
 	// says which gate outranks which is code. That is the seam: config chooses the policy, it
 	// cannot reach the guarantee.
 	Gates map[Tier]Gate `json:"gates"`
+	// Signatures is how many DISTINCT people each gate costs — the required SET, described
+	// declaratively rather than coded per asset.
+	//
+	// Keyed by GATE and not by tier, because the gate is already the resolved answer to "how
+	// much human attention does this change cost": it is computed once per change from the
+	// tier AND any rule naming the app ([Floor.GateForApp]), so a count keyed here inherits
+	// the app-level raise for free and cannot disagree with the gate a change was resolved
+	// under.
+	//
+	// RAISE ONLY, and enforced by construction rather than by a validator:
+	// [Floor.SignaturesFor] returns the GREATER of this and the built-in default, so a
+	// document can demand more signatures and can never demand fewer. That is the same seam as
+	// [Floor.Gates] — config chooses the policy, it cannot reach the guarantee — and it holds
+	// for a Floor built in code, which never passes through config validation at all.
+	//
+	// Absent means the built-in default, which is ONE everywhere. A default of two for
+	// production would be a defensible policy and an indefensible upgrade: every deployment
+	// already running would suddenly hold changes waiting for a second signature nobody had
+	// been told to give.
+	Signatures map[Gate]int `json:"signatures,omitempty"`
 	// Apps raises the gate for NAMED applications, above whatever their tier costs.
 	//
 	// Tier describes blast radius, and for most things that is the whole story — which is why
@@ -162,6 +182,40 @@ func DefaultGates() map[Tier]Gate {
 		TierShared: GateOwningTeam,
 		TierProd:   GatePlatform,
 	}
+}
+
+// DefaultSignatures is the built-in number of DISTINCT signatures each gate costs, and the
+// FLOOR beneath any configured one: a deployment may require more, never fewer.
+//
+// One, for every gate that needs a person at all. This is the count the estate has always
+// enforced, so a deployment upgrading into multi-approver support keeps behaving exactly as it
+// did until somebody writes a number in config.
+//
+// GateNone is listed as zero rather than omitted. A gate that needs no person needs no
+// signature, and saying so is different from leaving a reader to infer it from a missing key.
+func DefaultSignatures() map[Gate]int {
+	return map[Gate]int{
+		GateNone:       0,
+		GateOwningTeam: 1,
+		GatePlatform:   1,
+	}
+}
+
+// SignaturesFor is how many DISTINCT people must sign a change at this gate: the built-in
+// default, RAISED by config and never lowered by it.
+//
+// An unrecognised gate resolves to one, not zero. An unknown gate is not assumed permissive —
+// the same reading [Gate.Strength] gives it — and a change that reached this function is a
+// change something already decided needs a person.
+func (f Floor) SignaturesFor(gate Gate) int {
+	required, known := DefaultSignatures()[gate]
+	if !known {
+		required = 1
+	}
+	if configured, ok := f.Signatures[gate]; ok && configured > required {
+		required = configured
+	}
+	return required
 }
 
 // DefaultEnvTiers is the built-in minimum consequence per environment, and the floor beneath any
