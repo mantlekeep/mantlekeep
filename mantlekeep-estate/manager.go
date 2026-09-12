@@ -39,7 +39,7 @@ type Manager struct {
 	// effect: [Manager.Footprint] refuses when it is absent rather than answering ungoverned.
 	// See [Manager.ReadFootprintsFrom].
 	footprints FootprintReader
-	ownership Ownership
+	ownership  Ownership
 	// approvals holds changes awaiting a person. Optional: without it a gated change is still
 	// refused, correctly — it simply gives nobody anywhere to stand, which is a gate in name
 	// only.
