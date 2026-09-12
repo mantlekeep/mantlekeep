@@ -1,0 +1,60 @@
+--- /tmp/adm_pristine/manager.go	2026-09-12 23:44:53
++++ manager.go	2026-09-12 23:44:53
+@@ -40,6 +40,11 @@
+ 	// See [Manager.ReadFootprintsFrom].
+ 	footprints FootprintReader
+ 	ownership Ownership
++	// admissions answers whether an app may exist in the environment a change lands in — a
++	// different question from the gate, and asked before it. Optional at WIRING time only: a
++	// manager with no store governs exactly as it did before this existed, and a manager WITH
++	// one refuses every app it cannot confirm. See [AdmitFrom].
++	admissions Admissions
+ 	// approvals holds changes awaiting a person. Optional: without it a gated change is still
+ 	// refused, correctly — it simply gives nobody anywhere to stand, which is a gate in name
+ 	// only.
+@@ -118,6 +123,21 @@
+ 	return m
+ }
+ 
++// AdmitFrom makes the manager refuse any app that has not been onboarded to the environment its
++// change lands in.
++//
++// Optional at wiring time and NOT at decision time. Without a store nothing is consulted and
++// Apply behaves exactly as it did before this existed, because making a released module refuse
++// every app until a new collaborator is supplied is an outage delivered as a minor version. With
++// a store, every unconfirmed app is refused — including when the store cannot be reached.
++//
++// A deployment that wires none must say so out loud at boot, the way it does for
++// [MemoryApprovals]: an operator must never discover which controls are running from behaviour.
++func (m *Manager) AdmitFrom(admissions Admissions) *Manager {
++	m.admissions = admissions
++	return m
++}
++
+ // TransformChangesWith makes every change pass through a deployment's own rewrite before it is
+ // submitted to the door, so what a person approves is what will actually be applied.
+ //
+@@ -265,6 +285,23 @@
+ 		// happened is worse than a refusal, because the record says it was fine.
+ 		return Result{Change: change,
+ 			Failed: fmt.Sprintf("no adapter is registered for asset %q", change.Asset)}
++	}
++
++	// Admission BEFORE the door, because they answer different questions and this one is
++	// cheaper to be wrong about: the gate asks whether a person must sign this change, and this
++	// asks whether the app may be in this environment at all. Asked first so a change to an
++	// environment nobody onboarded the app to never becomes an approval request — there would
++	// be nothing for a person to approve, and an approver handed one would reasonably assume
++	// somebody had already decided the app belongs there.
++	if m.admissions != nil {
++		if env, governed := admissionEnvironmentOf(change); governed {
++			if err := RequireAdmission(ctx, m.admissions, team, change.Name, env); err != nil {
++				// A REFUSAL, not a failure: a decision was made and it was no. There is no
++				// approval to point at, which is how a caller tells "wait for someone" from
++				// "this will never be allowed here".
++				return Result{Change: change, Refused: err.Error()}
++			}
++		}
+ 	}
+ 
+ 	token, err := m.door.Submit(ctx, m.intentFor(who, team, change, floorRevision))
