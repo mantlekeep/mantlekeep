@@ -65,6 +65,32 @@ rather than answering ungoverned. `serve` wires it; a composition root that buil
 must add it. Failing closed is deliberate for a control whose absence is invisible — an
 ungoverned read looks exactly like a working one.
 
+### Added — the gateway's asserted groups now reach the door
+
+`api.GroupsHeader` (`X-Caller-Groups`, matching the door's own `TrustedGroupsHeader` default) is
+read onto `Subject.ADGroups`, and `doorclient` forwards it to the door.
+
+Without it, a door on the SSO tier could resolve **nobody** through this service. That door decides
+roles from a group→role table and refuses an identity whose groups map to nothing; `HeaderCallers`
+returned `Subject{ID: name}` and dropped the groups, so nothing could ever map. The refusal landed
+at IDENTITY, before any policy evaluation, so **the door recorded nothing** — an operator saw a
+403 and went looking for a policy bug that did not exist.
+
+Groups are not roles, and that is why forwarding them is safe: a caller may say which groups it is
+in, and may never say what those groups are worth. The door remains the only thing that decides
+what a group means, and `Roles` are still never taken from a request — asserted by a test that
+offers `X-Caller-Roles: L0-SuperAdmin` and requires it to be ignored.
+
+Requires a `mantlekeep-control` that supports `TrustedGroupsHeader`. Against an older door the
+header is simply ignored, so this is additive in both directions.
+
+Verified by running the bank's deployment shape end to end — proxy auth, AD groups, no dev
+directory. Before: 404 with no door decision logged. After:
+
+```
+door decision outcome=allow action=estate.read subject=reader-rachel via=mantlekeep-estate
+```
+
 ## [v0.3.1] — 2026-09-08
 
 ### Fixed — a consumer resolved an older mantlekeep-control than this module is tested against
