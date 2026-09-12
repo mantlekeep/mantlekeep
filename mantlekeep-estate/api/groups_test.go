@@ -21,6 +21,11 @@ import (
 // worth. That is the whole reason forwarding them is safe, and the reason Roles are still never
 // forwarded.
 
+// resolveFailed is the one message for a caller that would not resolve. Named because the same
+// sentence is asserted in every case here, and four copies of a format string are four places to
+// edit when the wording changes.
+const resolveFailed = "Caller: %v"
+
 func TestTheCallerCarriesTheGatewaysGroups(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/api/estate/payments", nil)
 	request.Header.Set(api.UserHeader, "reader-rachel")
@@ -28,7 +33,7 @@ func TestTheCallerCarriesTheGatewaysGroups(t *testing.T) {
 
 	subject, err := api.HeaderCallers{}.Caller(request)
 	if err != nil {
-		t.Fatalf("Caller: %v", err)
+		t.Fatalf(resolveFailed, err)
 	}
 	if len(subject.ADGroups) != 2 {
 		t.Fatalf("the gateway asserted 2 groups and %d survived: a door that resolves roles "+
@@ -51,7 +56,7 @@ func TestBlankGroupEntriesAreDropped(t *testing.T) {
 
 	subject, err := api.HeaderCallers{}.Caller(request)
 	if err != nil {
-		t.Fatalf("Caller: %v", err)
+		t.Fatalf(resolveFailed, err)
 	}
 	if len(subject.ADGroups) != 1 || subject.ADGroups[0] != "directory-payments-readers" {
 		t.Errorf("expected exactly one trimmed group, got %q", subject.ADGroups)
@@ -65,7 +70,7 @@ func TestACallerWithNoGroupsHeaderIsStillACaller(t *testing.T) {
 
 	subject, err := api.HeaderCallers{}.Caller(request)
 	if err != nil {
-		t.Fatalf("Caller: %v", err)
+		t.Fatalf(resolveFailed, err)
 	}
 	if subject.ID != "dev-alice" {
 		t.Errorf("id = %q", subject.ID)
@@ -89,7 +94,7 @@ func TestRolesAreNeverTakenFromTheRequest(t *testing.T) {
 
 	subject, err := api.HeaderCallers{}.Caller(request)
 	if err != nil {
-		t.Fatalf("Caller: %v", err)
+		t.Fatalf(resolveFailed, err)
 	}
 	if len(subject.Roles) != 0 {
 		t.Errorf("a role reached the subject from the request: %q", subject.Roles)
