@@ -22,7 +22,7 @@ const requireApprovalWhen = "require_approval_when"
 // finding is downstream of it: with no grants, every action is refused at the role step, so no
 // floor, gate or seal below it is ever asked.
 func someRoleIsGrantedSomeAction(t *testing.T, held *grants.Grants) {
-	if granted := grantedActions(held); len(granted) == 0 {
+	if len(grantedActions(held)) == 0 {
 		t.Fatalf("role_actions in %s grants nothing (%d role(s) listed, 0 actions between "+
 			"them). MantleKeep ships this document EMPTY on purpose, so an unconfigured "+
 			"deployment denies every action at \"a role permits the action\" and only the "+
