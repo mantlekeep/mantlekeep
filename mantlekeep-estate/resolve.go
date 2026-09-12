@@ -200,7 +200,8 @@ func resolveApps(m Manifest, floor Floor, placer *Placer,
 		if err != nil {
 			return nil, err
 		}
-		decision, err := placeApp(app, placer, placed[app.Name])
+		qualified := m.Team + "/" + app.Name
+		decision, err := placeApp(app, placer, placed[app.Name], floor.ClustersForApp(qualified))
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +211,7 @@ func resolveApps(m Manifest, floor Floor, placer *Placer,
 			// The tier's gate, RAISED by any floor rule naming this app. Keyed team-qualified,
 			// because app names repeat across an organisation and a bare name would gate every
 			// team's.
-			Gate:    floor.GateForApp(tier, m.Team+"/"+app.Name),
+			Gate:    floor.GateForApp(tier, qualified),
 			Cluster: decision.Cluster, Limits: limits, Image: app.Image,
 			Runtime: string(app.Runtime),
 			Slot:    Slot{Cluster: decision.Cluster, Namespace: m.Owns, Name: deployment},
@@ -259,7 +260,7 @@ func appFloor(m Manifest, floor Floor, app App) (Tier, any, error) {
 
 // placeApp asks the fleet where this app belongs, and checks the answer honoured the
 // environment the tier was raised against.
-func placeApp(app App, placer *Placer, sticky string) (PlacementDecision, error) {
+func placeApp(app App, placer *Placer, sticky string, prefer []string) (PlacementDecision, error) {
 	// A slot, even for a manifest-declared app. Without one these compare by name and collide
 	// the moment the same app runs in two namespaces — the side-by-side changeover case.
 	if placer == nil {
@@ -267,7 +268,7 @@ func placeApp(app App, placer *Placer, sticky string) (PlacementDecision, error)
 			"resolve: app %q needs a cluster and no fleet was supplied — use ResolveWith; "+
 				"inventing a placement would put data somewhere nobody ruled on", app.Name)
 	}
-	decision, err := placer.Place(app.Placement, sticky)
+	decision, err := placer.PlaceWith(app.Placement, sticky, prefer)
 	if err != nil {
 		return PlacementDecision{}, fmt.Errorf("resolve: app %q: %w", app.Name, err)
 	}

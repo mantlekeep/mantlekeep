@@ -254,6 +254,19 @@ type AppRule struct {
 	// about gating, which is different from saying "none": a key with no gate must never read as
 	// an exemption.
 	Gate Gate `json:"gate,omitempty"`
+	// Clusters is the platform's ordered preference for where this app runs — plan A, then plan
+	// B. Empty means no preference, and placement behaves exactly as it always did.
+	//
+	// A PREFERENCE, never a pin that overrides. [Placer.PlaceWith] applies it to clusters that
+	// are already legal, so naming one can never place data in the wrong jurisdiction or into a
+	// cluster nobody can see, and it sits below stickiness so editing this list does not migrate
+	// a running app. When none of them can take the work, placement falls through to the
+	// capacity choice and says so in the decision's reason.
+	//
+	// It lives on the FLOOR and not on a manifest because the team never names a cluster: it
+	// declares environment, purpose and residency, and the platform chooses. A team that could
+	// name its own cluster would be choosing its own placement.
+	Clusters []string `json:"clusters,omitempty"`
 }
 
 // GateForApp is the gate for one application: its tier's, raised by any rule naming it.
@@ -265,6 +278,12 @@ type AppRule struct {
 // An unrecognised gate is ignored rather than honoured, for the reason validateGates gives for
 // refusing one: an unknown gate is not assumed permissive. Strength() ranks it zero, so it loses
 // the comparison and the tier's own gate stands.
+// ClustersForApp is the platform's ordered cluster preference for one app, or nil when no rule
+// names it. The name is TEAM-QUALIFIED, as [Floor.Apps] describes.
+func (f Floor) ClustersForApp(name string) []string {
+	return f.Apps[name].Clusters
+}
+
 func (f Floor) GateForApp(tier Tier, name string) Gate {
 	fromTier := f.GateFor(tier)
 	rule, named := f.Apps[name]

@@ -30,7 +30,7 @@ func withApps(t *testing.T, apps string) string {
 func TestAnAppRuleIsLoaded(t *testing.T) {
 	config, err := Parse([]byte(withApps(t, `{ "payments/settlement-engine": { "gate": "platform" } }`)))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litGatesTestParse, err)
 	}
 	rule, ok := config.Floor.Apps["payments/settlement-engine"]
 	if !ok {
@@ -73,7 +73,7 @@ func TestAnUnknownGateInAnAppRuleIsRefusedAtLoad(t *testing.T) {
 func TestAFloorWithNoAppsTableLoads(t *testing.T) {
 	config, err := Parse([]byte(validDocument))
 	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf(litGatesTestParse, err)
 	}
 	if len(config.Floor.Apps) != 0 {
 		t.Errorf("an absent apps table must produce no rules; got %d", len(config.Floor.Apps))
@@ -91,5 +91,33 @@ func TestAnAppRuleWithNoGateLoads(t *testing.T) {
 	}
 	if got := config.Floor.GateForApp(estate.TierProd, "payments/checkout"); got != estate.GatePlatform {
 		t.Errorf("it must leave the tier's gate alone; got %q", got)
+	}
+}
+
+// A cluster preference survives loading, in the order it was written.
+//
+// Order is the meaning here — the list IS plan A then plan B — so a loader that sorted or
+// deduplicated would change what the operator said.
+func TestAnAppClusterPreferenceIsLoadedInOrder(t *testing.T) {
+	config, err := Parse([]byte(withApps(t,
+		`{ "payments/settlement-engine": { "clusters": ["uk-app-2", "uk-app-1"] } }`)))
+	if err != nil {
+		t.Fatalf(litGatesTestParse, err)
+	}
+	got := config.Floor.ClustersForApp("payments/settlement-engine")
+	if len(got) != 2 || got[0] != "uk-app-2" || got[1] != "uk-app-1" {
+		t.Errorf("the preference must load in the authored order; got %q", got)
+	}
+}
+
+// A rule may name clusters without naming a gate, and that is not an exemption from gating.
+func TestAClusterOnlyRuleDoesNotTouchTheGate(t *testing.T) {
+	config, err := Parse([]byte(withApps(t,
+		`{ "payments/checkout": { "clusters": ["uk-app-1"] } }`)))
+	if err != nil {
+		t.Fatalf(litGatesTestParse, err)
+	}
+	if got := config.Floor.GateForApp(estate.TierProd, "payments/checkout"); got != estate.GatePlatform {
+		t.Errorf("naming clusters must leave the tier's gate alone; got %q", got)
 	}
 }

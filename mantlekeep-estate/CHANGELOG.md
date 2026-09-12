@@ -17,6 +17,45 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Added — a floor may PREFER clusters for a named app, in order
+
+`AppRule.Clusters` is the platform's ordered preference — plan A, then plan B — applied by the new
+`Placer.PlaceWith(claim, current, prefer)`. `Place` is unchanged and now calls it with no
+preference, so existing behaviour is identical.
+
+`Place` is three ordered steps and says why: *"legality, then stickiness, then capacity. The order
+IS the guarantee."* A preference is inserted between stickiness and capacity, which leaves both
+guarantees above it intact:
+
+- **Legality still filters first and alone.** The preference is applied to clusters that are
+  ALREADY legal, so naming one can never place data in the wrong jurisdiction, nor into a cluster
+  the platform cannot see. A pin that could reach past residency would be the most direct route
+  out of the rule residency exists to be.
+- **Stickiness still comes next.** An app already running somewhere legal stays there, so editing
+  this list does not migrate live workloads on the next reconcile pass. Moving a placed app
+  remains a new governed decision.
+
+Below those, a preference beats capacity — that is the point of expressing one. A preferred
+cluster below the capacity floor is skipped, because the whole reason for plan B is that plan A
+can be full.
+
+**A fallback is never silent.** When no preferred cluster can take the work, placement falls
+through to the capacity choice and the decision's reason says so:
+
+```
+no preferred cluster (uk-app-1, uk-app-2) could take this workload — emptiest of 3 legal clusters
+```
+
+That reason travels with the change and reaches the chain, so a platform team that named a cluster
+and did not get it can read why rather than discovering it from a dashboard.
+
+It lives on the FLOOR and not on a manifest deliberately: the team never names a cluster — it
+declares environment, purpose and residency, and the platform chooses. `Placement` is parsed from
+the team's own document, so a preference field there would let a team choose its own placement,
+which is the thing the design removed. Keys are team-qualified like the gate rules.
+
+Additive. A floor with no `clusters` on a rule behaves exactly as before.
+
 ### Added — a named app may be gated harder than its tier
 
 `Floor.Apps` raises the gate for individual applications, keyed **team-qualified**
