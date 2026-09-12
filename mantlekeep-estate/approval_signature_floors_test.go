@@ -154,34 +154,7 @@ func TestConcurrentDistinctSignersFillExactlyTheRequiredSlotsAndApplyOnce(t *tes
 	id := openGatedChange(t, manager)
 	submissionsAtRequest := len(door.submitted)
 
-	var (
-		start   = make(chan struct{})
-		wait    sync.WaitGroup
-		mu      sync.Mutex
-		signed  []string
-		applied int
-	)
-	for approver := 0; approver < approvers; approver++ {
-		wait.Add(1)
-		go func(n int) {
-			defer wait.Done()
-			<-start // released together, so the window is as narrow as the code allows
-			who := fmt.Sprintf("approver-%d", n)
-			result, err := manager.Approve(context.Background(),
-				mantlekeep.Subject{ID: who}, id)
-			if err != nil {
-				return
-			}
-			mu.Lock()
-			signed = append(signed, who)
-			if result.Applied() {
-				applied++
-			}
-			mu.Unlock()
-		}(approver)
-	}
-	close(start)
-	wait.Wait()
+	signed, applied := signAllAtOnce(manager, id, approvers)
 
 	if len(signed) != required {
 		t.Fatalf("%d of %d distinct approvers were accepted, want exactly %d — more means a "+
@@ -210,18 +183,7 @@ func TestConcurrentDistinctSignersFillExactlyTheRequiredSlotsAndApplyOnce(t *tes
 		t.Fatalf("state = %q with every slot filled — %s", recorded.State,
 			recorded.StillNeeded())
 	}
-	seen := map[string]bool{}
-	for _, who := range recorded.Signatories() {
-		if seen[who] {
-			t.Fatalf("%q appears twice in %v — one person filled two slots under concurrency",
-				who, recorded.Signatories())
-		}
-		seen[who] = true
-	}
-	if len(seen) != required {
-		t.Fatalf("the record holds %d distinct signatures (%v), want %d", len(seen),
-			recorded.Signatories(), required)
-	}
+	assertDistinctSignatories(t, recorded, required)
 
 	// N+1 is impossible rather than unlikely: the record left the pending state on the
 	// completing signature, so a late arrival finds nothing to sign.
@@ -269,5 +231,59 @@ func TestADeclineEndsAPartiallySignedSetAndKeepsTheSignatures(t *testing.T) {
 	}
 	if len(port.tokens) != 0 {
 		t.Fatal("a declined change reached the adapter")
+	}
+}
+
+// signAllAtOnce releases every approver at the same instant against the same change, and reports
+// which of them the manager ACCEPTED and how many were told the change had been applied.
+//
+// Approvers who are refused are dropped rather than recorded: past the required number a refusal
+// is the correct answer, so the interesting number is how many got in, not how many tried.
+func signAllAtOnce(manager *Manager, id string, approvers int) (signed []string, applied int) {
+	var (
+		start = make(chan struct{})
+		wait  sync.WaitGroup
+		mu    sync.Mutex
+	)
+	for approver := 0; approver < approvers; approver++ {
+		wait.Add(1)
+		go func(n int) {
+			defer wait.Done()
+			<-start // released together, so the window is as narrow as the code allows
+			who := fmt.Sprintf("approver-%d", n)
+			result, err := manager.Approve(context.Background(),
+				mantlekeep.Subject{ID: who}, id)
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			signed = append(signed, who)
+			if result.Applied() {
+				applied++
+			}
+		}(approver)
+	}
+	close(start)
+	wait.Wait()
+	return signed, applied
+}
+
+// assertDistinctSignatories fails if the record holds a name twice, or holds a number of names
+// other than the number of slots. Both are how a set silently stops being a set: one person
+// filling two slots satisfies the count without satisfying the rule.
+func assertDistinctSignatories(t *testing.T, recorded Approval, required int) {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, who := range recorded.Signatories() {
+		if seen[who] {
+			t.Fatalf("%q appears twice in %v — one person filled two slots under concurrency",
+				who, recorded.Signatories())
+		}
+		seen[who] = true
+	}
+	if len(seen) != required {
+		t.Fatalf("the record holds %d distinct signatures (%v), want %d", len(seen),
+			recorded.Signatories(), required)
 	}
 }
