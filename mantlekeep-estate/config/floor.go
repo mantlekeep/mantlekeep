@@ -47,6 +47,10 @@ type floorDocument struct {
 	// bytes, because a declared one can be forgotten on an edit, and a floor claiming a
 	// revision it is not is worse than no revision at all.
 	Gates map[estate.Tier]estate.Gate `json:"gates,omitempty"`
+	// Apps raises the gate for NAMED applications, keyed team-qualified ("payments/checkout").
+	// Optional, and like Gates it may only RAISE — [validateApps] refuses a rule weaker than the
+	// tier it would apply under, so a rule here can never become an exemption from approval.
+	Apps map[string]appRule `json:"apps,omitempty"`
 	// EnvTiers is optional: absent means the built-in minimums. Present, it may only RAISE an
 	// environment's minimum consequence — [validateEnvTiers] refuses a weaker one.
 	EnvTiers map[string]estate.Tier `json:"envTiers,omitempty"`
@@ -85,6 +89,11 @@ type nodePoolLimits struct {
 	AllowedInstanceTypes []string `json:"allowedInstanceTypes"`
 }
 
+// appRule is the authored form of [estate.AppRule].
+type appRule struct {
+	Gate estate.Gate `json:"gate,omitempty"`
+}
+
 // toFloor converts the authored document into the floor the engine applies.
 func (f floorDocument) toFloor() estate.Floor {
 	floor := estate.Floor{
@@ -98,6 +107,14 @@ func (f floorDocument) toFloor() estate.Floor {
 	// that names one tier must not silently drop the gates on the two it did not mention.
 	for tier, gate := range f.Gates {
 		floor.Gates[tier] = gate
+	}
+	// No defaults to merge onto: an absent apps table means no app is singled out, which is the
+	// correct and complete answer.
+	if len(f.Apps) > 0 {
+		floor.Apps = make(map[string]estate.AppRule, len(f.Apps))
+		for name, rule := range f.Apps {
+			floor.Apps[name] = estate.AppRule{Gate: rule.Gate}
+		}
 	}
 	// Merged onto the defaults, not replacing them: naming one environment must not un-rule the
 	// others, and an unruled environment is refused at resolve.

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 )
@@ -186,6 +187,44 @@ func positive(asset string, tier estate.Tier, field string, value int64) error {
 // that ten teams depend on is not the playground the default assumes. Lowering prod from
 // platform to none is the case it exists to stop, and it is refused even though every limit
 // in the same file may be perfectly sound.
+// validateApps refuses an app rule that would WEAKEN the gate its tier already carries.
+//
+// Resolution ignores such a rule anyway ([estate.Floor.GateForApp] takes the stronger of the two),
+// so this is not what makes the guarantee — it is what makes the MISTAKE visible. A rule that is
+// silently ignored is worse than one that is refused: an operator writes "gate": "none" against an
+// app, the file loads, the boot log names it, and they believe they have exempted something. They
+// have not, and they will find out from an approval queue rather than from this message.
+//
+// Checked against EVERY tier, because a floor does not say which tier an app will resolve under —
+// the manifest and the environment decide that, later. A rule weaker than any tier it could apply
+// under is refused.
+func validateApps(floor estate.Floor) error {
+	for name, rule := range floor.Apps {
+		if rule.Gate == "" {
+			// A rule that names no gate says nothing about gating. Legitimate: the shape exists
+			// so a later field can be added without every deployment rewriting its document.
+			continue
+		}
+		if rule.Gate.Strength() == 0 {
+			return fmt.Errorf("config: floor.apps[%q].gate is %q, which is not a gate this build "+
+				"knows — an unrecognised gate is refused rather than assumed permissive", name, rule.Gate)
+		}
+		if !strings.Contains(name, "/") {
+			return fmt.Errorf("config: floor.apps key %q is not team-qualified — write "+
+				"\"team/app\", or this rule would reach every team's app of that name", name)
+		}
+		for _, tier := range tiers {
+			if floorGate := floor.GateFor(tier); rule.Gate.Strength() < floorGate.Strength() {
+				return fmt.Errorf("config: floor.apps[%q].gate is %q, weaker than the %q gate "+
+					"tier %q already carries — an app rule may RAISE the attention a change costs "+
+					"and can never lower it, or naming an app would be the way out of approval",
+					name, rule.Gate, floorGate, tier)
+			}
+		}
+	}
+	return nil
+}
+
 func validateGates(floor estate.Floor) error {
 	defaults := estate.DefaultGates()
 	for _, tier := range tiers {

@@ -41,6 +41,25 @@ type Floor struct {
 	// says which gate outranks which is code. That is the seam: config chooses the policy, it
 	// cannot reach the guarantee.
 	Gates map[Tier]Gate `json:"gates"`
+	// Apps raises the gate for NAMED applications, above whatever their tier costs.
+	//
+	// Tier describes blast radius, and for most things that is the whole story — which is why
+	// [Floor.GateFor] is deliberately the only place tier becomes a gate. But an individual
+	// application can carry consequence its tier does not describe: a payments engine in a shared
+	// environment, or a system a regulator has named. The platform needs to say "this one always
+	// waits for a person" without moving every app in that tier.
+	//
+	// RAISE ONLY. A rule here may make an app cost MORE attention and can never make it cost
+	// less — the same seam as [Floor.Gates], enforced twice: at config load by validateApps, and
+	// again in [Floor.GateForApp], because a Floor built in code never passes the validator. A
+	// whitelist that EXEMPTED an app from approval would be the single most attractive line in
+	// this file to anyone wanting their change waved through, and a bypassed guardrail governs
+	// nothing.
+	//
+	// Keys are TEAM-QUALIFIED — "payments/checkout" — because app names are not unique across an
+	// organisation. A bare name would gate every team's app of that name: a rule nobody wrote,
+	// reaching a team nobody told.
+	Apps map[string]AppRule `json:"apps,omitempty"`
 	// Revision identifies WHICH floor decided, and is derived from the config content — never
 	// declared. Stamped onto every intent, so a grant recorded a year ago can still be read
 	// against the rules that were actually in force. Without it a hot-reloaded floor makes
@@ -224,4 +243,36 @@ func (f Floor) GateFor(tier Tier) Gate {
 		return gate
 	}
 	return DefaultGates()[tier]
+}
+
+// AppRule is what a floor says about ONE named application, beyond what its tier says.
+//
+// A struct rather than a bare Gate so a later rule — a cluster preference, an extra approver —
+// is an added field rather than a changed document shape for every deployment already running one.
+type AppRule struct {
+	// Gate is the minimum human attention this app costs. Empty means the rule says nothing
+	// about gating, which is different from saying "none": a key with no gate must never read as
+	// an exemption.
+	Gate Gate `json:"gate,omitempty"`
+}
+
+// GateForApp is the gate for one application: its tier's, raised by any rule naming it.
+//
+// name is TEAM-QUALIFIED ("payments/checkout"). Resolution is deliberately one-directional — the
+// answer is max(tier, rule), never the rule alone — so this function cannot lower a gate no matter
+// what a document says. That matters because the document can be edited while the server runs.
+//
+// An unrecognised gate is ignored rather than honoured, for the reason validateGates gives for
+// refusing one: an unknown gate is not assumed permissive. Strength() ranks it zero, so it loses
+// the comparison and the tier's own gate stands.
+func (f Floor) GateForApp(tier Tier, name string) Gate {
+	fromTier := f.GateFor(tier)
+	rule, named := f.Apps[name]
+	if !named || rule.Gate == "" {
+		return fromTier
+	}
+	if rule.Gate.Strength() <= fromTier.Strength() {
+		return fromTier
+	}
+	return rule.Gate
 }

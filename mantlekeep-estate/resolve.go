@@ -207,7 +207,11 @@ func resolveApps(m Manifest, floor Floor, placer *Placer,
 		deployment := m.Owns + "-" + app.Name
 		changes = append(changes, DesiredItem{
 			Asset: "app", Kind: "deployment", Name: deployment, Tier: tier,
-			Gate: floor.GateFor(tier), Cluster: decision.Cluster, Limits: limits, Image: app.Image,
+			// The tier's gate, RAISED by any floor rule naming this app. Keyed team-qualified,
+			// because app names repeat across an organisation and a bare name would gate every
+			// team's.
+			Gate:    floor.GateForApp(tier, m.Team+"/"+app.Name),
+			Cluster: decision.Cluster, Limits: limits, Image: app.Image,
 			Runtime: string(app.Runtime),
 			Slot:    Slot{Cluster: decision.Cluster, Namespace: m.Owns, Name: deployment},
 			// Where an app runs is now a PLATFORM choice, so it travels with the change and

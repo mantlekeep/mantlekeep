@@ -17,6 +17,42 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Added — a named app may be gated harder than its tier
+
+`Floor.Apps` raises the gate for individual applications, keyed **team-qualified**
+(`"payments/settlement-engine"`), with `Floor.GateForApp(tier, name)` resolving it.
+
+`GateFor` is deliberate about tier being the only input — *"a prod Kafka topic and a prod database
+cost the same attention because the blast radius, not the technology, is what is being governed."*
+That is right about assets and silent about apps. An individual application can carry consequence
+its tier does not describe — a payments engine in a shared environment, a system a regulator has
+named — and a platform team needs to say "this one always waits for a person" without moving every
+app in that tier.
+
+**RAISE ONLY.** A rule may make an app cost more attention and can never make it cost less. The
+same seam as `Floor.Gates`: *config chooses the policy and may raise a gate, but it cannot lower
+the floor.* A rule that EXEMPTED an app from approval would be the most attractive line in the
+document to anyone wanting a change waved through, and a bypassed guardrail governs nothing.
+
+Enforced **twice**, deliberately:
+
+- `GateForApp` returns the stronger of the tier's gate and the rule's, so a weaker rule cannot
+  lower anything no matter what a document says — and the document is editable while the server
+  runs.
+- `validateApps` REFUSES a weaker rule at load, because a silently-ignored rule is worse than a
+  refused one: an operator writes `"gate": "none"`, the file loads, and they believe they have
+  exempted something. They would find out from an approval queue rather than from an error.
+
+Keys must be team-qualified and a bare name is refused, because app names repeat across an
+organisation — two teams both have a `checkout`, and an unqualified rule would reach a team nobody
+told. An unrecognised gate is refused at load and ignored at resolution, never assumed permissive.
+
+A rule naming no gate is legitimate and changes nothing: `AppRule` is a struct so a later field —
+a cluster preference, an extra approver — is an added field rather than a changed document for
+every deployment already running one.
+
+Additive. A floor with no `apps` table behaves exactly as before.
+
 ### Security — any authenticated caller could read any team's estate
 
 `GET /api/estate/{team}` resolved the caller and then **discarded it**, using the team from the URL
