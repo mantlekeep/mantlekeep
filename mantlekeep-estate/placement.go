@@ -109,6 +109,34 @@ type PlacementDecision struct {
 // pressure elsewhere can push data into the wrong jurisdiction; stickiness comes next, so a
 // running app is never moved by a number; capacity only breaks the remaining tie.
 func (p *Placer) Place(claim Placement, current string) (PlacementDecision, error) {
+	return p.PlaceWith(claim, current, nil)
+}
+
+// PlaceWith is [Placer.Place] with an ordered list of clusters the PLATFORM prefers for this
+// workload — plan A, then plan B.
+//
+// # Where the preference sits, and why
+//
+// It is inserted between stickiness and capacity, which leaves the two guarantees above it
+// untouched:
+//
+//   - LEGALITY still filters first and alone. A preference is applied to clusters that are
+//     ALREADY legal, so naming a cluster can never place data in the wrong jurisdiction, nor
+//     into one the platform cannot see. A pin that could reach past residency would be the most
+//     direct route out of the rule residency exists to be.
+//   - STICKINESS still comes next. An app already running somewhere legal stays there, so
+//     editing a preference does not migrate live workloads on the next reconcile pass. Moving a
+//     placed app remains a new governed decision.
+//
+// Below those, a preference beats capacity: that is the point of expressing one. When no
+// preferred cluster can take the work — full, illegal, or unknown — placement falls through to
+// the capacity choice and SAYS SO in the decision's reason. A silent fallback would leave a
+// platform team believing an app is somewhere it is not.
+//
+// prefer is the platform's, never the team's: it is a parameter here rather than a field on
+// [Placement], because Placement is parsed from the team's own manifest and a team that could
+// name its preferred cluster would be choosing its own placement.
+func (p *Placer) PlaceWith(claim Placement, current string, prefer []string) (PlacementDecision, error) {
 	if claim.Env == "" {
 		return PlacementDecision{}, fmt.Errorf("placement: a claim must name an environment")
 	}
@@ -127,6 +155,14 @@ func (p *Placer) Place(claim Placement, current string) (PlacementDecision, erro
 		return stayed, nil
 	}
 
+	// The platform's preference, among clusters already legal. Tried in order, so the list reads
+	// as plan A then plan B.
+	if chosen, ok := p.firstPreferred(legal, prefer); ok {
+		return PlacementDecision{Cluster: chosen.Name, Env: chosen.Env,
+			Reason:     "preferred by the platform for this workload",
+			Considered: considered}, nil
+	}
+
 	best, found := p.emptiest(legal)
 	if !found {
 		return PlacementDecision{}, fmt.Errorf(
@@ -134,8 +170,38 @@ func (p *Placer) Place(claim Placement, current string) (PlacementDecision, erro
 				"placing there would create pods that never schedule",
 			claim.Env, claim.Residency, p.minFree*100)
 	}
+	reason := p.reasonFor(best, current)
+	if len(prefer) > 0 {
+		// Never silent. A platform team that named a cluster and did not get it must be able to
+		// read why from the decision itself, which is what reaches the chain.
+		reason = fmt.Sprintf("no preferred cluster (%s) could take this workload — %s",
+			strings.Join(prefer, ", "), reason)
+	}
 	return PlacementDecision{Cluster: best.Name, Env: best.Env,
-		Reason: p.reasonFor(best, current), Considered: considered}, nil
+		Reason: reason, Considered: considered}, nil
+}
+
+// firstPreferred returns the first named cluster that is both legal and able to take the work.
+//
+// Order is the caller's, not ours: the list IS the preference, so it is walked rather than
+// scored. A name that is not legal is skipped in silence here — legality was decided above, and
+// re-reporting it per name would bury the one line that matters.
+func (p *Placer) firstPreferred(legal []Cluster, prefer []string) (Cluster, bool) {
+	for _, name := range prefer {
+		for _, cluster := range legal {
+			if cluster.Name != name {
+				continue
+			}
+			// The same capacity floor the tiebreak applies. A preferred cluster at its limit is
+			// not a candidate: pods that never schedule are worse than a second choice, and the
+			// whole point of plan B is that plan A can be full.
+			if free, known := p.capacity[cluster.Name]; known && free < p.minFree {
+				break
+			}
+			return cluster, true
+		}
+	}
+	return Cluster{}, false
 }
 
 // legalClusters filters on the claim alone. Nothing about capacity is consulted here, which
