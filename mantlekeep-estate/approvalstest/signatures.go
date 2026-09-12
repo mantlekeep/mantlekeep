@@ -132,15 +132,7 @@ func lastSignatureDecides(t *testing.T, newStore Factory) {
 	if err := store.Open(ctx, needing("AP-COMPLETE", "payments", 3)); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	for _, approver := range []string{"lead-bob", "arch-carol"} {
-		after, err := signer.Sign(ctx, "AP-COMPLETE", signedBy(approver))
-		if err != nil {
-			t.Fatalf("signature from %s: %v", approver, err)
-		}
-		if after.State != estate.ApprovalPending {
-			t.Fatalf("the set completed at %d of 3 signatures", len(after.Signatories()))
-		}
-	}
+	signUpTo(t, signer, "AP-COMPLETE", "lead-bob", "arch-carol")
 
 	decided, err := signer.Sign(ctx, "AP-COMPLETE", signedBy("sec-dave"))
 	if err != nil {
@@ -161,17 +153,7 @@ func lastSignatureDecides(t *testing.T, newStore Factory) {
 	if got := decided.Signatories(); len(got) != 3 {
 		t.Fatalf("signatories = %v, want all three — the whole set is the record of who agreed", got)
 	}
-	// Every signature keeps its own reference, so the chain can cite why each person signed
-	// rather than only that somebody did.
-	for _, signature := range decided.Signatures {
-		if signature.Reference == "" {
-			t.Errorf("the signature from %q lost its reference — a chain entry naming a person "+
-				"and nothing else says somebody agreed, not what they agreed to", signature.By)
-		}
-		if signature.At.IsZero() {
-			t.Errorf("the signature from %q has no time", signature.By)
-		}
-	}
+	assertEverySignatureIsAttributable(t, decided)
 	// And it leaves the queue, or approvers keep seeing work that is done.
 	if waiting, _ := store.Pending(ctx, "payments"); len(waiting) != 0 {
 		t.Errorf("a completed change stayed in the queue: %d waiting", len(waiting))
@@ -219,5 +201,39 @@ func oldSingleSignatureRecordReadsBack(t *testing.T, newStore Factory) {
 	}
 	if needed := found.StillNeeded(); !strings.Contains(needed, "nothing") {
 		t.Errorf("StillNeeded() = %q on a fully approved record", needed)
+	}
+}
+
+// signUpTo collects the named signatures and fails if any of them COMPLETES the set — the
+// callers use it to reach a known partial state, so an early completion there would make every
+// assertion after it meaningless rather than failing.
+func signUpTo(t *testing.T, signer estate.Signer, id string, approvers ...string) {
+	t.Helper()
+	ctx := context.Background()
+	for _, approver := range approvers {
+		after, err := signer.Sign(ctx, id, signedBy(approver))
+		if err != nil {
+			t.Fatalf("signature from %s: %v", approver, err)
+		}
+		if after.State != estate.ApprovalPending {
+			t.Fatalf("the set completed at %d signatures, before %s was meant to complete it",
+				len(after.Signatories()), approver)
+		}
+	}
+}
+
+// assertEverySignatureIsAttributable fails if any signature in the set lost its reference or its
+// time. Both are what makes a signature evidence rather than a tally: a chain entry naming a
+// person and nothing else says somebody agreed, not what they agreed to.
+func assertEverySignatureIsAttributable(t *testing.T, decided estate.Approval) {
+	t.Helper()
+	for _, signature := range decided.Signatures {
+		if signature.Reference == "" {
+			t.Errorf("the signature from %q lost its reference — a chain entry naming a person "+
+				"and nothing else says somebody agreed, not what they agreed to", signature.By)
+		}
+		if signature.At.IsZero() {
+			t.Errorf("the signature from %q has no time", signature.By)
+		}
 	}
 }

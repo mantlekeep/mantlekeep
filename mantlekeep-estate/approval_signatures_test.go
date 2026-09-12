@@ -114,22 +114,7 @@ func TestOneOfTwoSignaturesLeavesTheChangeWaitingAndSaysWhoIsNeeded(t *testing.T
 	}
 
 	// And a READER can see the partial state, whose signature it holds, and why they signed.
-	// Read from the QUEUE, because that is where an approver looks — a partially signed change
-	// that had left the queue would be invisible to the person who has to finish it.
-	waiting, err := store.Pending(context.Background(), "payments")
-	if err != nil {
-		t.Fatalf("listing the queue: %v", err)
-	}
-	var partial *Approval
-	for index := range waiting {
-		if waiting[index].ID == id {
-			partial = &waiting[index]
-		}
-	}
-	if partial == nil {
-		t.Fatalf("the partially signed change left the queue: %d waiting, none of them %s",
-			len(waiting), id)
-	}
+	partial := waitingInQueue(t, store, "payments", id)
 	if got := partial.Signatories(); len(got) != 1 || got[0] != "lead-bob" {
 		t.Fatalf("signatories = %v — silence here is what makes people ask in chat instead of "+
 			"looking", got)
@@ -138,6 +123,26 @@ func TestOneOfTwoSignaturesLeavesTheChangeWaitingAndSaysWhoIsNeeded(t *testing.T
 		t.Errorf("the cited reference was lost (%q) — the chain can then say who signed but "+
 			"not on what basis", partial.Signatures[0].Reference)
 	}
+}
+
+// waitingInQueue returns the named change as an APPROVER would find it, and fails if the queue
+// does not hold it. Read from the queue rather than by ID on purpose: a partially signed change
+// that had left the queue would be invisible to the person who still has to finish it, which is
+// a correct record nobody can act on.
+func waitingInQueue(t *testing.T, store Approvals, team, id string) Approval {
+	t.Helper()
+	waiting, err := store.Pending(context.Background(), team)
+	if err != nil {
+		t.Fatalf("listing the queue: %v", err)
+	}
+	for _, candidate := range waiting {
+		if candidate.ID == id {
+			return candidate
+		}
+	}
+	t.Fatalf("the partially signed change left the queue: %d waiting, none of them %s",
+		len(waiting), id)
+	return Approval{}
 }
 
 // Completion on the LAST signature: the change applies exactly once, submitted as the person
