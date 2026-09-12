@@ -15,6 +15,56 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [Unreleased]
+
+### Security — any authenticated caller could read any team's estate
+
+`GET /api/estate/{team}` resolved the caller and then **discarded it**, using the team from the URL
+unchecked. The handler authenticated (*are you someone?*) and never authorised (*may you see this
+team?*), so any value in `X-Caller` returned any team's footprint.
+
+What that disclosed was not only a manifest. The response carries the `drifts` array, where
+`"kind":"absent","detail":"approved but absent"` names precisely which of a team's approved
+resources **do not currently exist** — the gaps between what was signed off and what is running.
+That is reconnaissance, not merely disclosure.
+
+Demonstrated against the real handler over real HTTP before the fix: a caller owning `payments`
+read `treasury` and received its Kafka topic names, its tier, and every absent resource in it. The
+`api` package had no tests at all, which is how it shipped.
+
+Reads now go through the manager, which submits an intent to the door — the same door, on the same
+chain, as every write. The handler's own comment had stated the reasoning for not doing so: *"No
+intent is submitted, because nothing happens as a result of a read and there is no decision to
+record."* That holds for mutation and fails for disclosure; nothing *happens* on a read, something
+is *revealed*.
+
+A refusal answers **404, not 403**, with the same sentence as a team that does not exist. A 403
+confirms there is something to be refused, and for an endpoint whose whole risk is disclosure the
+existence of another team's estate is part of what is withheld.
+
+The team is not compared against an attribute of the subject, because `mantlekeep.Subject`
+deliberately carries no team — a caller that could assert its own scope could assert its way past
+any gate. Who may read which team is a policy question, so the door is asked.
+
+### Added
+
+- `Manager.Footprint(ctx, actor, team)` — the governed read.
+- `Manager.ReadFootprintsFrom(reader)` — supplies the read side to delegate to once a read is
+  allowed. `Service` satisfies `FootprintReader`.
+- `estate.read` — its own action, so a policy can grant reading without granting writing.
+- `ErrReadRefused`, `ErrNoFootprintReader`.
+
+### Deployment — action required
+
+**`estate.read` must be granted, or every read is refused.** Like `estate.apply`, the door answers
+`no role permits action estate.read` until a policy grants it. Grant it to the roles that may read
+an estate, alongside `estate.apply`.
+
+A `Manager` built without `ReadFootprintsFrom` refuses every read with `ErrNoFootprintReader`
+rather than answering ungoverned. `serve` wires it; a composition root that builds its own manager
+must add it. Failing closed is deliberate for a control whose absence is invisible — an
+ungoverned read looks exactly like a working one.
+
 ## [v0.3.1] — 2026-09-08
 
 ### Fixed — a consumer resolved an older mantlekeep-control than this module is tested against

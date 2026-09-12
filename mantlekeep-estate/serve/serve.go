@@ -124,6 +124,9 @@ func Run(options Options) error {
 		FloorFrom(live.Floor).
 		GovernFields(settings.Ownership).
 		RememberManifestsIn(store).
+		// The read side, so a read can be governed before it resolves. Without this every read
+		// is refused — the fail-closed direction for a control whose absence is invisible.
+		ReadFootprintsFrom(service).
 		AwaitApprovalIn(approvals).
 		PlaceOnLive(livePlacer.Load)
 
