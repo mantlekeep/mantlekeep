@@ -104,7 +104,7 @@ func (m *Manager) transformChange(ctx context.Context, team string,
 // inside applyOne would transform that replay a second time, so the split is not tidiness: it
 // is the only-once guarantee, held by structure rather than by remembering.
 func (m *Manager) transformThenApply(ctx context.Context, who acting, team string,
-	change DesiredItem, floorRevision string) Result {
+	change DesiredItem, floor Floor) Result {
 
 	transformed, err := m.transformChange(ctx, team, change)
 	if err != nil {
@@ -116,5 +116,5 @@ func (m *Manager) transformThenApply(ctx context.Context, who acting, team strin
 		return Result{Change: change,
 			Failed: fmt.Sprintf("the change was not submitted: %v", err)}
 	}
-	return m.applyOne(ctx, who, team, transformed, floorRevision)
+	return m.applyOne(ctx, who, team, transformed, floor)
 }

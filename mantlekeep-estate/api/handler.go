@@ -223,22 +223,41 @@ func (h *Handler) pendingApprovals(writer http.ResponseWriter, request *http.Req
 	writeJSON(writer, http.StatusOK, map[string]any{"pending": waiting})
 }
 
-// approve applies a change a person has signed off.
+// approve adds this caller's signature to a change, and applies it once the required set of
+// distinct signatures is complete.
 //
 // No role travels in this request, deliberately. The estate submits AS the approver and the door
 // resolves their roles from the directory — a caller that could assert its own roles could
 // assert its way past any gate.
+//
+// An optional body carries the ticket or record the approver cites. Optional in both senses: a
+// missing body is fine (an approver acting on a conversation is still accountable), and so is a
+// body that will not parse into this shape — the signature is the governed act, and refusing it
+// over a malformed field would send a person looking for the route that does not ask.
 func (h *Handler) approve(writer http.ResponseWriter, request *http.Request) {
 	caller, err := h.callers.Caller(request)
 	if err != nil {
 		writeError(writer, http.StatusUnauthorized, err.Error())
 		return
 	}
-	result, approveErr := h.manager.Approve(request.Context(), caller, request.PathValue("id"))
+	var body struct {
+		Reference string `json:"reference"`
+	}
+	if decodeErr := json.NewDecoder(request.Body).Decode(&body); decodeErr != nil &&
+		!errors.Is(decodeErr, io.EOF) {
+		writeError(writer, http.StatusBadRequest, "approve: "+decodeErr.Error())
+		return
+	}
+	result, approveErr := h.manager.ApproveCiting(request.Context(), caller,
+		request.PathValue("id"), body.Reference)
 	if approveErr != nil {
 		writeError(writer, statusForApproval(approveErr), approveErr.Error())
 		return
 	}
+	// 200 either way, and the body says which happened. A collected-but-incomplete signature is
+	// not an error: the approver did what was asked of them, and Result.Outstanding names how
+	// many more signatures are needed and from whom. A 202 would read as "we will get to it",
+	// which is the opposite of "somebody else must now act".
 	writeJSON(writer, http.StatusOK, map[string]any{"result": result})
 }
 
@@ -275,8 +294,19 @@ func statusForApproval(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, estate.ErrApprovalNotPending):
 		return http.StatusConflict
-	case errors.Is(err, estate.ErrSelfApproval), errors.Is(err, estate.ErrFloorMoved):
+	// The floors on a required SET of signatures: the requester, a repeat signer, an
+	// automation. Forbidden rather than conflict, because no retry and no later state makes
+	// any of them allowed — they are not about this request arriving at a bad moment.
+	case errors.Is(err, estate.ErrSelfApproval), errors.Is(err, estate.ErrFloorMoved),
+		errors.Is(err, estate.ErrDuplicateSignature), errors.Is(err, estate.ErrAIApproval):
 		return http.StatusForbidden
+	// A store that cannot collect a set atomically is this DEPLOYMENT being misconfigured, not
+	// the caller being wrong: the floor asks for more signatures than the configured store can
+	// hold. 501 says "this server cannot do what it was asked", which is exactly true and sends
+	// an operator to the configuration rather than the approver back to the queue.
+	case errors.Is(err, estate.ErrStoreCannotCollectSignatures),
+		errors.Is(err, estate.ErrSignaturesOutstanding):
+		return http.StatusNotImplemented
 	default:
 		return http.StatusBadGateway
 	}
