@@ -67,6 +67,23 @@ type Options struct {
 	// Passed IN like every adapter, for the same reason: this module must not learn what any
 	// deployment's rules are.
 	Transform estate.ChangeTransformer
+
+	// Approvals is where gated changes wait for a person. Nil keeps the in-memory store, which is
+	// what every deployment had before this field existed.
+	//
+	// # Why this needs to be a choice
+	//
+	// The in-memory store loses every pending approval on restart, and loses it SILENTLY: the
+	// person who was asked to sign finds nothing and assumes they missed it. A queue that eats
+	// work is a queue people stop using, and a gate nobody uses is ceremony.
+	//
+	// It is also the one store whose contract needs compare-and-set — two approvers may decide in
+	// the same moment and exactly one must win — so a deployment that wants durability cannot get
+	// there by wrapping this one. It has to supply its own.
+	//
+	// Passed IN like every adapter, for the same reason: this module must not learn what anyone's
+	// database is.
+	Approvals estate.Approvals
 }
 
 func Run(options Options) error {
@@ -128,7 +145,7 @@ func Run(options Options) error {
 	// Where gated changes wait for a person. In memory for now, and the warning below says so:
 	// a restart forgets every pending change, and somebody who was asked to sign one off will
 	// find it gone.
-	approvals := estate.NewMemoryApprovals()
+	approvals := approvalsFor(options)
 
 	// Adapters are chosen by the BINARY, passed in rather than imported here — which is what
 	// keeps client-go and database drivers out of this module's dependency graph. An asset with
@@ -351,4 +368,21 @@ func managerFor(options Options, door mantlekeep.Submitter, settings config.Conf
 		AwaitApprovalIn(approvals).
 		PlaceOnLive(placer).
 		TransformChangesWith(options.Transform)
+}
+
+// approvalsFor chooses where gated changes wait.
+//
+// Extracted from [Run] for the same reason [managerFor] was: the failure worth catching is an
+// option that exists, is documented, and is never read — and nothing inside Run is assertable. A
+// deployment would then believe its approvals are durable while a restart still loses them.
+func approvalsFor(options Options) estate.Approvals {
+	if options.Approvals != nil {
+		return options.Approvals
+	}
+	// Said out loud rather than left in a comment: a restart forgets every pending change, and
+	// somebody who was asked to sign one off will find it gone.
+	slog.Warn("approvals are held IN MEMORY — a restart will lose every pending approval, and " +
+		"the person who was asked to sign will find it gone. Supply serve.Options.Approvals " +
+		"with a durable store before this governs anything that matters.")
+	return estate.NewMemoryApprovals()
 }

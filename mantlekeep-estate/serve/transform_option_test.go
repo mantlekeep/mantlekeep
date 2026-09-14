@@ -48,9 +48,9 @@ func TestATransformSuppliedInOptionsReachesTheManager(t *testing.T) {
 	})
 
 	outcome, err := manager.Apply(context.Background(),
-		mantlekeep.Subject{ID: "dev-alice"}, appManifest())
+		mantlekeep.Subject{ID: requester}, appManifest())
 	if err != nil {
-		t.Fatalf("apply: %v", err)
+		t.Fatalf(wrapApply, err)
 	}
 	if len(port.applied) != 0 {
 		t.Fatalf("the transform refused the change and it reached the adapter anyway: %+v.\n"+
@@ -69,11 +69,33 @@ func TestANilTransformChangesNothing(t *testing.T) {
 	manager := managerForTest(Options{Ports: []estate.Port{port}})
 
 	if _, err := manager.Apply(context.Background(),
-		mantlekeep.Subject{ID: "dev-alice"}, appManifest()); err != nil {
-		t.Fatalf("apply: %v", err)
+		mantlekeep.Subject{ID: requester}, appManifest()); err != nil {
+		t.Fatalf(wrapApply, err)
 	}
 	if len(port.applied) != 1 {
 		t.Fatalf("a manager with no transform applied %d changes, want 1", len(port.applied))
+	}
+}
+
+// The requester every fixture here declares as. Named once: three call sites spelling the same
+// person is three places a rename half-applies.
+const requester = "dev-alice"
+
+// wrapApply is the one error message these tests share, so the literal lives in one place.
+const wrapApply = "apply: %v"
+
+// gateReason is the door's own words, used by more than one fixture here.
+const gateReason = "a production change needs a second person"
+
+// gatingDoor refuses with a PENDING refusal — the shape the door uses to say "a person is needed"
+// as opposed to "no".
+type gatingDoor struct{}
+
+func (gatingDoor) Submit(context.Context, mantlekeep.Intent) (mantlekeep.ExecutionToken, error) {
+	return mantlekeep.ExecutionToken{}, &mantlekeep.Refused{
+		Action:            mantlekeep.ActionRequireApproval,
+		Reason:            gateReason,
+		RequiredApprovers: []mantlekeep.Role{mantlekeep.RoleArchitect},
 	}
 }
 
@@ -81,13 +103,16 @@ func TestANilTransformChangesNothing(t *testing.T) {
 // Run reads from disk replaced by a fixture. Calling managerFor rather than rebuilding the chain
 // is the point: a chain assembled twice can differ in the one place nobody is looking.
 func managerForTest(options Options) *estate.Manager {
+	return managerForTestWithDoor(allowAll{}, options)
+}
+
+func managerForTestWithDoor(door mantlekeep.Submitter, options Options) *estate.Manager {
 	floor := testFloor()
 	settings := config.Config{Floor: floor}
 	store := estate.NewMemoryManifests()
 	service := estate.NewService(floor, store, options.Ports...)
 	placer := testPlacer()
-	return managerFor(options, allowAll{}, settings, service, store,
-		estate.NewMemoryApprovals(),
+	return managerFor(options, door, settings, service, store, approvalsFor(options),
 		func() estate.Floor { return floor },
 		func() *estate.Placer { return placer })
 }
@@ -111,5 +136,52 @@ func appManifest() estate.Manifest {
 			Name: "ledger", Runtime: "enterprise", Image: "registry.local/payments/ledger",
 			Placement: estate.Placement{Env: "sit", Purpose: "app", Residency: "region-a"},
 		}},
+	}
+}
+
+// --- the approvals store ------------------------------------------------------------------------
+
+// countingApprovals records whether the deployment's own store was used at all.
+type countingApprovals struct {
+	estate.Approvals
+	opened int
+}
+
+func (c *countingApprovals) Open(ctx context.Context, approval estate.Approval) error {
+	c.opened++
+	return c.Approvals.Open(ctx, approval)
+}
+
+// A store supplied in Options must actually be the one gated changes wait in. The failure guarded
+// against is the quiet one: a field that exists, is documented, and is never read — after which a
+// deployment believes its approvals are durable and a restart still loses them.
+func TestAnApprovalsStoreSuppliedInOptionsIsTheOneUsed(t *testing.T) {
+	store := &countingApprovals{Approvals: estate.NewMemoryApprovals()}
+	// A door that GATES. Forcing the gate on the change is not enough: the change waits only
+	// because the DOOR says so, which is the whole point of the estate computing a gate and the
+	// door ruling on it.
+	manager := managerForTestWithDoor(gatingDoor{}, Options{
+		Ports:     []estate.Port{&seenPort{}},
+		Approvals: store,
+	})
+
+	if _, err := manager.Apply(context.Background(),
+		mantlekeep.Subject{ID: requester}, appManifest()); err != nil {
+		t.Fatalf(wrapApply, err)
+	}
+	if store.opened == 0 {
+		t.Fatal("the gated change was not written to the store this deployment supplied — " +
+			"Options.Approvals is set and the manager never received it, so a restart loses " +
+			"every pending approval while the deployment believes otherwise")
+	}
+}
+
+// Nil keeps the previous behaviour exactly. An upgrade that refused to start because a new field
+// was unset would be an outage delivered as a patch release.
+func TestANilApprovalsStoreStillWorks(t *testing.T) {
+	manager := managerForTest(Options{Ports: []estate.Port{&seenPort{}}})
+	if _, err := manager.Apply(context.Background(),
+		mantlekeep.Subject{ID: requester}, appManifest()); err != nil {
+		t.Fatalf("apply with no approvals store supplied: %v", err)
 	}
 }
