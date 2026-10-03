@@ -18,6 +18,8 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+## [v0.5.0] — 2026-10-04
+
 ### Added — an embedded door can govern real people
 
 `doorkit.NewDoorWithIdentity` and `doorkit.NewInMemoryDoorWithIdentity` take the deployment's
