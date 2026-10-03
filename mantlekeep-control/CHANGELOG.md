@@ -18,6 +18,16 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Added — an embedded door can govern real people
+
+`doorkit.NewDoorWithIdentity` and `doorkit.NewInMemoryDoorWithIdentity` take the deployment's
+`IdentityResolver`. The door resolves every caller's roles from its own directory, and the existing
+constructors fix that directory as the six-name mock, so a door embedded in a product refused every
+real person as an unknown subject. Pass `app.BuildIdentity()` to map verified identity-provider
+groups to roles from configuration — e.g. `MANTLEKEEP_AUTH=proxy`,
+`MANTLEKEEP_GROUP_ROLES="platform-root=L0-SuperAdmin"`. A nil resolver is refused, never defaulted.
+Additive: `NewDoorWithAudit` and `NewInMemoryDoor` are unchanged and still use the mock.
+
 ### Changed — no identifier shadows a Go builtin
 
 Three locals renamed so none hides a predeclared name (Sonar go:S978): `comparable` → `parsed` in

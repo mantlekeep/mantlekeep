@@ -37,7 +37,7 @@ type Failsafe interface {
 // the failsafe control.
 type Door struct {
 	Submitter mantlekeep.Submitter        // the door — POST intents here
-	Identity  mantlekeep.IdentityResolver // the (mock) identity resolver, for dev/test
+	Identity  mantlekeep.IdentityResolver // who the door resolves callers against: the mock, or the deployment's
 	Audit     mantlekeep.AuditLogger      // the durable, hash-chained audit log
 	Failsafe  Failsafe                    // the read-only failsafe control
 }
@@ -47,11 +47,22 @@ type Door struct {
 // RunAs authorization — it is folded in as the RBAC's dynamic action layer, the same way
 // the real server wires the product registry into the door.
 func NewInMemoryDoor(auditPath string, dyn ...policy.ActionAuthorizer) (*Door, error) {
+	return NewInMemoryDoorWithIdentity(auditPath, identity.NewMock(), dyn...)
+}
+
+// NewInMemoryDoorWithIdentity is [NewInMemoryDoor] with the deployment's own identity resolver
+// instead of the mock. See [NewDoorWithIdentity] for why the resolver has to come in here.
+func NewInMemoryDoorWithIdentity(auditPath string, ids mantlekeep.IdentityResolver,
+	dyn ...policy.ActionAuthorizer) (*Door, error) {
+
+	if ids == nil {
+		return nil, errNoIdentity
+	}
 	aud, err := audit.Open(auditPath)
 	if err != nil {
 		return nil, err
 	}
-	return NewDoorWithAudit(aud, dyn...)
+	return NewDoorWithIdentity(aud, ids, dyn...)
 }
 
 // NewDoorWithAudit assembles a door over an audit chain the DEPLOYMENT supplies.
@@ -79,6 +90,39 @@ func NewInMemoryDoor(auditPath string, dyn ...policy.ActionAuthorizer) (*Door, e
 // returns tokens, and still looks healthy — while producing no evidence that anything was governed.
 // That failure is silent and total, so it fails here instead.
 func NewDoorWithAudit(chain mantlekeep.AuditLogger, dyn ...policy.ActionAuthorizer) (*Door, error) {
+	return NewDoorWithIdentity(chain, identity.NewMock(), dyn...)
+}
+
+// errNoIdentity refuses a door with no identity resolver, for the same reason a door with no chain
+// is refused: it would look healthy and refuse every caller as unknown, with nothing saying why.
+var errNoIdentity = errors.New("doorkit: no identity resolver — every intent would be refused " +
+	"as an unknown subject. Pass the deployment's resolver (app.BuildIdentity reads it from " +
+	"MANTLEKEEP_AUTH and MANTLEKEEP_GROUP_ROLES), or use NewDoorWithAudit for the mock")
+
+// NewDoorWithIdentity assembles a door over a chain AND an identity resolver the deployment
+// supplies.
+//
+// # Why this exists
+//
+// The door resolves every intent's roles SERVER-SIDE, from its own directory: a caller's claimed
+// roles are never read (internal/sdk). That is what stops role forgery — and it means the
+// directory decides who anybody is. [NewDoorWithAudit] builds that directory as the six-name
+// MOCK, so a door embedded in a real deployment resolves its real users against demo names and
+// answers "unknown subject" to all of them.
+//
+// A product that embeds the door (one process, no door to dial) therefore had no way to govern a
+// real person. This takes the resolver from the deployment — typically [app.BuildIdentity], which
+// maps verified identity-provider groups to roles from configuration — and leaves every other
+// part of the assembly unchanged.
+//
+// A nil resolver is refused rather than defaulted to the mock: a deployment that meant to pass its
+// own and passed nil would otherwise govern against demo names and believe it was governing.
+func NewDoorWithIdentity(chain mantlekeep.AuditLogger, ids mantlekeep.IdentityResolver,
+	dyn ...policy.ActionAuthorizer) (*Door, error) {
+
+	if ids == nil {
+		return nil, errNoIdentity
+	}
 	if chain == nil {
 		return nil, errors.New("doorkit: no audit chain — a door that records nothing would " +
 			"decide, issue tokens and look healthy while proving nothing was ever governed")
@@ -88,7 +132,6 @@ func NewDoorWithAudit(chain mantlekeep.AuditLogger, dyn ...policy.ActionAuthoriz
 		rbac = rbac.WithDynamic(dyn[0])
 	}
 	fs := policy.NewFailsafe(rbac)
-	ids := identity.NewMock()
 	return &Door{
 		Submitter: sdk.New(ids, fs, chain),
 		Identity:  ids,
