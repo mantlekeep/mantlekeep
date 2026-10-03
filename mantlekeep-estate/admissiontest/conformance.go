@@ -29,14 +29,21 @@ const (
 	wrapReading   = "reading back: %v"
 )
 
+// The apps the cases admit. Named once so a case that means "the same app" cannot drift to a
+// different spelling and pass because it is testing a second app nobody admitted.
+const (
+	appCheckout = "payments-checkout"
+	appSpike    = "payments-spike"
+)
+
 // Factory builds a fresh, empty store. Called once per sub-test so cases cannot leak into each
 // other — a suite whose cases share state passes for reasons nobody can name.
 type Factory func(t *testing.T) estate.Admissions
 
-// Run executes the whole suite against one implementation.
 // Named because the same sentence is asserted in several cases below.
 const litRevoking = "revoking: %v"
 
+// Run executes the whole suite against one implementation.
 func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	t.Run("an admitted app reads back as admitted", func(t *testing.T) { readsBack(t, newStore) })
@@ -74,10 +81,10 @@ func readsBack(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	if err := store.Admit(ctx, admitted("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Admit(ctx, admitted("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(wrapAdmitting, err)
 	}
-	record, err := store.Get(ctx, "payments", "payments-checkout", "uat")
+	record, err := store.Get(ctx, "payments", appCheckout, "uat")
 	if err != nil {
 		t.Fatalf(wrapReading, err)
 	}
@@ -126,7 +133,7 @@ func onlyOneAdmitWins(t *testing.T, newStore Factory) {
 		go func(n int) {
 			defer wait.Done()
 			<-start // released together, so the window is as narrow as the store allows
-			record := admitted("payments", "payments-checkout", "uat")
+			record := admitted("payments", appCheckout, "uat")
 			record.Reference = fmt.Sprintf("CHG-RACE-%d", n)
 			if store.Admit(ctx, record) == nil {
 				mu.Lock()
@@ -152,15 +159,15 @@ func noSilentReadmission(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	if err := store.Admit(ctx, admitted("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Admit(ctx, admitted("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(wrapAdmitting, err)
 	}
-	second := admitted("payments", "payments-checkout", "uat")
+	second := admitted("payments", appCheckout, "uat")
 	second.Reference = "CHG-UAT-0002"
 	if err := store.Admit(ctx, second); !errors.Is(err, estate.ErrAlreadyAdmitted) {
 		t.Fatalf("re-admitting a live admission must fail with ErrAlreadyAdmitted, got %v", err)
 	}
-	record, err := store.Get(ctx, "payments", "payments-checkout", "uat")
+	record, err := store.Get(ctx, "payments", appCheckout, "uat")
 	if err != nil {
 		t.Fatalf(wrapReading, err)
 	}
@@ -178,7 +185,7 @@ func nothingToRevoke(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	err := store.Revoke(ctx, revoked("payments", "payments-checkout", "uat"))
+	err := store.Revoke(ctx, revoked("payments", appCheckout, "uat"))
 	if err == nil {
 		t.Fatal("revoking an app that was never admitted reported success")
 	}
@@ -189,18 +196,18 @@ func nothingToRevoke(t *testing.T, newStore Factory) {
 	// And the same once a record exists but is already revoked — the second revocation would
 	// otherwise overwrite the first one's reason, so the sentence a deployer reads would not
 	// belong to the decision that actually removed their app.
-	if err := store.Admit(ctx, admitted("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Admit(ctx, admitted("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(wrapAdmitting, err)
 	}
-	if err := store.Revoke(ctx, revoked("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Revoke(ctx, revoked("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf("the first revocation must be accepted: %v", err)
 	}
-	again := revoked("payments", "payments-checkout", "uat")
+	again := revoked("payments", appCheckout, "uat")
 	again.Reason = "tidying up the inventory"
 	if err := store.Revoke(ctx, again); !errors.Is(err, estate.ErrNothingToRevoke) {
 		t.Fatalf("a second revocation must be refused with ErrNothingToRevoke, got %v", err)
 	}
-	record, err := store.Get(ctx, "payments", "payments-checkout", "uat")
+	record, err := store.Get(ctx, "payments", appCheckout, "uat")
 	if err != nil {
 		t.Fatalf(wrapReading, err)
 	}
@@ -219,14 +226,14 @@ func revokedSaysWhy(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	if err := store.Admit(ctx, admitted("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Admit(ctx, admitted("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(wrapAdmitting, err)
 	}
-	if err := store.Revoke(ctx, revoked("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Revoke(ctx, revoked("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(litRevoking, err)
 	}
 
-	record, err := store.Get(ctx, "payments", "payments-checkout", "uat")
+	record, err := store.Get(ctx, "payments", appCheckout, "uat")
 	if err != nil {
 		t.Fatalf("a revoked admission must still be readable, not deleted: %v", err)
 	}
@@ -249,20 +256,20 @@ func reAdmissionIsAllowed(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	if err := store.Admit(ctx, admitted("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Admit(ctx, admitted("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(wrapAdmitting, err)
 	}
-	if err := store.Revoke(ctx, revoked("payments", "payments-checkout", "uat")); err != nil {
+	if err := store.Revoke(ctx, revoked("payments", appCheckout, "uat")); err != nil {
 		t.Fatalf(litRevoking, err)
 	}
-	back := admitted("payments", "payments-checkout", "uat")
+	back := admitted("payments", appCheckout, "uat")
 	back.Reference = "CHG-UAT-7788"
 	back.Reason = "brought back for the migration cutover"
 	if err := store.Admit(ctx, back); err != nil {
 		t.Fatalf("re-onboarding a revoked app must be accepted: %v", err)
 	}
 
-	record, err := store.Get(ctx, "payments", "payments-checkout", "uat")
+	record, err := store.Get(ctx, "payments", appCheckout, "uat")
 	if err != nil {
 		t.Fatalf(wrapReading, err)
 	}
@@ -280,13 +287,13 @@ func expiryIsHonoured(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	lapsing := admitted("payments", "payments-spike", "uat")
+	lapsing := admitted("payments", appSpike, "uat")
 	lapsing.ExpiresAt = time.Now().UTC().Add(-time.Minute) // already past
 	if err := store.Admit(ctx, lapsing); err != nil {
 		t.Fatalf(wrapAdmitting, err)
 	}
 
-	record, err := store.Get(ctx, "payments", "payments-spike", "uat")
+	record, err := store.Get(ctx, "payments", appSpike, "uat")
 	if err != nil {
 		t.Fatalf(wrapReading, err)
 	}
@@ -303,7 +310,7 @@ func expiryIsHonoured(t *testing.T, newStore Factory) {
 		t.Fatalf("listing: %v", err)
 	}
 	for _, entry := range live {
-		if entry.App == "payments-spike" {
+		if entry.App == appSpike {
 			t.Fatal("a lapsed admission is still listed as admitted")
 		}
 	}
@@ -323,13 +330,13 @@ func envIsOpaque(t *testing.T, newStore Factory) {
 	environments := []string{"sit", "dev", "uat", "prod", "uat", "UAT", "pre-prod-2",
 		"canary-tokyo", "regulator-sandbox", "客戶驗收"}
 	for _, env := range environments {
-		record := admitted("payments", "payments-checkout", env)
+		record := admitted("payments", appCheckout, env)
 		if err := store.Admit(ctx, record); err != nil && !errors.Is(err, estate.ErrAlreadyAdmitted) {
 			t.Fatalf("admitting to env %q: %v", env, err)
 		}
 	}
 	for _, env := range environments {
-		record, err := store.Get(ctx, "payments", "payments-checkout", env)
+		record, err := store.Get(ctx, "payments", appCheckout, env)
 		if err != nil {
 			t.Fatalf("env %q must be storable verbatim: %v", env, err)
 		}
@@ -341,10 +348,10 @@ func envIsOpaque(t *testing.T, newStore Factory) {
 	// Case is NOT folded: "uat" and "UAT" are two environments, because only the deployment
 	// knows whether they are the same place, and guessing wrong admits an app somewhere nobody
 	// ruled on.
-	if err := store.Revoke(ctx, revoked("payments", "payments-checkout", "UAT")); err != nil {
+	if err := store.Revoke(ctx, revoked("payments", appCheckout, "UAT")); err != nil {
 		t.Fatalf("revoking from UAT: %v", err)
 	}
-	lower, err := store.Get(ctx, "payments", "payments-checkout", "uat")
+	lower, err := store.Get(ctx, "payments", appCheckout, "uat")
 	if err != nil {
 		t.Fatalf(wrapReading, err)
 	}
@@ -356,7 +363,7 @@ func envIsOpaque(t *testing.T, newStore Factory) {
 	// Admission to one environment is not admission to another. This is the whole control: the
 	// app is real, the team is real, the caller is the same caller, and the environment is the
 	// only thing that differs.
-	if _, err := store.Get(ctx, "payments", "payments-checkout", "prod-dr"); !errors.Is(err, estate.ErrAdmissionNotFound) {
+	if _, err := store.Get(ctx, "payments", appCheckout, "prod-dr"); !errors.Is(err, estate.ErrAdmissionNotFound) {
 		t.Fatalf("an environment nobody onboarded this app to must have no record, got %v", err)
 	}
 }
@@ -380,7 +387,7 @@ func attributionIsRequired(t *testing.T, newStore Factory) {
 		{"no environment", func(a estate.Admission) estate.Admission { a.Env = ""; return a }},
 		{"no app", func(a estate.Admission) estate.Admission { a.App = ""; return a }},
 	} {
-		record := broken.mangle(admitted("payments", "payments-checkout", "uat"))
+		record := broken.mangle(admitted("payments", appCheckout, "uat"))
 		if err := store.Admit(ctx, record); !errors.Is(err, estate.ErrAdmissionUnattributable) {
 			t.Errorf("an admission with %s must be refused as unattributable, got %v",
 				broken.what, err)
@@ -393,7 +400,7 @@ func listsOneEnv(t *testing.T, newStore Factory) {
 	ctx := context.Background()
 
 	for _, spec := range []struct{ team, app, env string }{
-		{"payments", "payments-checkout", "uat"},
+		{"payments", appCheckout, "uat"},
 		{"payments", "payments-ledger", "uat"},
 		{"treasury", "treasury-reporting", "canary-tokyo"},
 	} {
