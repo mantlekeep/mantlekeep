@@ -73,3 +73,26 @@ func TestSubmitSendsTheBearerNotTheCallerHeader(t *testing.T) {
 		t.Fatalf("Authorization = %q, %s = %q", auth, estateWebUserHeader, caller)
 	}
 }
+
+// Every answer maps to the exit a pipeline reads — above all, a 200 carrying a failed change.
+func TestTheExitCodeSaysWhatHappened(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		status int
+		body   string
+		want   int
+	}{
+		{"applied", 200, `{"applied":[{}],"refused":[],"failed":[]}`, 0},
+		{"not admitted comes back as failed", 200, `{"applied":[],"refused":[],"failed":[{"failed":"not admitted"}]}`, 4},
+		{"refused inside a 200", 200, `{"applied":[{}],"refused":[{"refused":"deny: x"}],"failed":[]}`, 4},
+		{"waiting for a person", 409, `{}`, 2},
+		{"refused by the door", 403, `{}`, 3},
+	} {
+		if got, err := exitFor(c.status, []byte(c.body)); err != nil || got != c.want {
+			t.Errorf("%s: exit %d (%v), want %d", c.name, got, err, c.want)
+		}
+	}
+	if code, err := exitFor(500, nil); err == nil || code != 1 {
+		t.Errorf("a 500 must be an error with exit 1, got %d %v", code, err)
+	}
+}

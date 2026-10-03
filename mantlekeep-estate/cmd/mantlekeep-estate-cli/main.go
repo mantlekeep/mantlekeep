@@ -48,7 +48,8 @@ Identity for a real estate, from the environment (a pipeline's credential store)
   MANTLEKEEP_OIDC_TOKEN_URL           fetch one with client credentials:
   MANTLEKEEP_OIDC_CLIENT_ID / _SECRET
 
-Exit codes: 0 applied · 1 error · 2 waiting for approval · 3 refused by the door
+Exit codes: 0 applied · 1 error · 2 waiting for approval · 3 refused by the door ·
+            4 not every change applied (e.g. the app is not admitted)
 
 A file of "-" reads standard input, so this works in a pipe.
 `
@@ -252,23 +253,45 @@ func submit(path, estateURL, team, user string) error {
 	}
 	fmt.Println(string(body))
 
-	return outcome(response.StatusCode)
-}
-
-// outcome turns the estate's answer into the exit a pipeline reads: 2 waiting for a person,
-// 3 refused by the door, an error for anything else that failed.
-func outcome(status int) error {
-	switch {
-	case status == http.StatusConflict:
-		fmt.Fprintln(os.Stderr, "pending: a person must approve this before it applies")
-		os.Exit(2)
-	case status == http.StatusForbidden:
-		fmt.Fprintln(os.Stderr, "refused: the door does not permit this change")
-		os.Exit(3)
-	case status >= 400:
-		return fmt.Errorf("the estate refused this change (HTTP %d)", status)
+	code, err := exitFor(response.StatusCode, body)
+	if err != nil {
+		return err
+	}
+	if code != 0 {
+		fmt.Fprintln(os.Stderr, exitMessages[code])
+		os.Exit(code)
 	}
 	return nil
+}
+
+// exitFor turns the estate's answer into the exit a pipeline reads: 0 applied, 2 waiting for a
+// person, 3 refused by the door, 4 not every change applied. An error is exit 1.
+func exitFor(status int, body []byte) (int, error) {
+	switch {
+	case status == http.StatusConflict:
+		return 2, nil
+	case status == http.StatusForbidden:
+		return 3, nil
+	case status >= 400:
+		return 1, fmt.Errorf("the estate refused this change (HTTP %d)", status)
+	}
+	// A 200 can still carry changes that did not apply — an app not admitted to the environment
+	// comes back under "failed". A pipeline must never read that as success.
+	var applied struct {
+		Refused []json.RawMessage `json:"refused"`
+		Failed  []json.RawMessage `json:"failed"`
+	}
+	if json.Unmarshal(body, &applied) == nil && len(applied.Refused)+len(applied.Failed) > 0 {
+		return 4, nil
+	}
+	return 0, nil
+}
+
+// exitMessages say why, on stderr, beside the code.
+var exitMessages = map[int]string{
+	2: "pending: a person must approve this before it applies",
+	3: "refused: the door does not permit this change",
+	4: "not applied: a change was refused or failed (for example, not admitted) — see the response above",
 }
 
 // estateWebUserHeader mirrors the service's caller header. Named here rather than imported
