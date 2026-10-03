@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -40,7 +41,14 @@ const usage = `mantlekeep-estate-cli — check an estate manifest before a servi
 Flags:
   -estate  URL of the estate service (submit only)
   -team    team the manifest belongs to (submit only; defaults to the manifest's own)
-  -user    caller identity, sent as the gateway would set it (submit only)
+  -user    caller identity for a LOOPBACK development estate only (submit only)
+
+Identity for a real estate, from the environment (a pipeline's credential store):
+  MANTLEKEEP_TOKEN                    an access token, or
+  MANTLEKEEP_OIDC_TOKEN_URL           fetch one with client credentials:
+  MANTLEKEEP_OIDC_CLIENT_ID / _SECRET
+
+Exit codes: 0 applied · 1 error · 2 waiting for approval · 3 refused by the door
 
 A file of "-" reads standard input, so this works in a pipe.
 `
@@ -191,9 +199,13 @@ func submit(path, estateURL, team, user string) error {
 	if estateURL == "" {
 		return fmt.Errorf("submit needs -estate <url>")
 	}
-	if user == "" {
-		return fmt.Errorf("submit needs -user <id>: the estate records WHO asked, and this " +
-			"CLI will not send a change with nobody's name on it")
+	token, err := bearerToken(context.Background())
+	if err != nil {
+		return err
+	}
+	if token == "" && user == "" {
+		return fmt.Errorf("submit needs an identity: %s, or %s with a client id and secret, "+
+			"or -user <id> for a loopback development estate", tokenEnv, tokenURLEnv)
 	}
 	manifest, asJSON, err := readManifest(path)
 	if err != nil {
@@ -219,7 +231,11 @@ func submit(path, estateURL, team, user string) error {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set(estateWebUserHeader, user)
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	} else {
+		request.Header.Set(estateWebUserHeader, user)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	// #nosec G704 -- same operator-supplied address, already checked by estateEndpoint.
@@ -243,6 +259,9 @@ func submit(path, estateURL, team, user string) error {
 	case response.StatusCode == http.StatusConflict:
 		fmt.Fprintln(os.Stderr, "pending: a person must approve this before it applies")
 		os.Exit(2)
+	case response.StatusCode == http.StatusForbidden:
+		fmt.Fprintln(os.Stderr, "refused: the door does not permit this change")
+		os.Exit(3)
 	case response.StatusCode >= 400:
 		return fmt.Errorf("the estate refused this change (HTTP %d)", response.StatusCode)
 	}
