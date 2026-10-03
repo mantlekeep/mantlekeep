@@ -33,10 +33,10 @@ func openKeepsADecidedApproval(t *testing.T, newStore Factory) {
 	store := newStore(t)
 	ctx := context.Background()
 
-	if err := store.Open(ctx, pending("AP-DECIDED", "payments")); err != nil {
+	if err := store.Open(ctx, pending(approvalDecided, "payments")); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	approved := pending("AP-DECIDED", "payments")
+	approved := pending(approvalDecided, "payments")
 	approved.State = estate.ApprovalApproved
 	approved.ApprovedBy = approverBob
 	if err := store.Decide(ctx, approved); err != nil {
@@ -44,11 +44,11 @@ func openKeepsADecidedApproval(t *testing.T, newStore Factory) {
 	}
 
 	// The same id opened again, as the approver — what a colliding id produces.
-	reopened := pending("AP-DECIDED", "payments")
+	reopened := pending(approvalDecided, "payments")
 	reopened.Requester = approverBob
 	_ = store.Open(ctx, reopened) // refused or not, the decided record must survive
 
-	after, err := store.Get(ctx, "AP-DECIDED")
+	after, err := store.Get(ctx, approvalDecided)
 	if err != nil {
 		t.Fatalf("reading back: %v", err)
 	}
