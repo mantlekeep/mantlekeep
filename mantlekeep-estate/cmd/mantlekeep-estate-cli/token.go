@@ -61,7 +61,7 @@ func clientCredentials(ctx context.Context, tokenURL, clientID, secret string) (
 		AccessToken string `json:"access_token"`
 		Error       string `json:"error"`
 	}
-	if err := json.NewDecoder(response.Body).Decode(&answer); err != nil || response.StatusCode != http.StatusOK {
+	if json.NewDecoder(response.Body).Decode(&answer) != nil || response.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("the token endpoint refused the client (HTTP %d %s)", response.StatusCode, answer.Error)
 	}
 	if answer.AccessToken == "" {

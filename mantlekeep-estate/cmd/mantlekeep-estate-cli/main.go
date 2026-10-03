@@ -252,18 +252,21 @@ func submit(path, estateURL, team, user string) error {
 	}
 	fmt.Println(string(body))
 
-	// The three outcomes are DIFFERENT and the exit code says which. A pending approval is
-	// not a failure — scripting this must be able to tell "waiting for a person" apart from
-	// "refused", or a pipeline will treat an approval as an outage.
+	return outcome(response.StatusCode)
+}
+
+// outcome turns the estate's answer into the exit a pipeline reads: 2 waiting for a person,
+// 3 refused by the door, an error for anything else that failed.
+func outcome(status int) error {
 	switch {
-	case response.StatusCode == http.StatusConflict:
+	case status == http.StatusConflict:
 		fmt.Fprintln(os.Stderr, "pending: a person must approve this before it applies")
 		os.Exit(2)
-	case response.StatusCode == http.StatusForbidden:
+	case status == http.StatusForbidden:
 		fmt.Fprintln(os.Stderr, "refused: the door does not permit this change")
 		os.Exit(3)
-	case response.StatusCode >= 400:
-		return fmt.Errorf("the estate refused this change (HTTP %d)", response.StatusCode)
+	case status >= 400:
+		return fmt.Errorf("the estate refused this change (HTTP %d)", status)
 	}
 	return nil
 }
