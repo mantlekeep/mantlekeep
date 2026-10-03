@@ -17,6 +17,11 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Changed — requires mantlekeep-control v0.5.0
+
+The sibling pin moves from v0.4.1 to the newest released control. Nothing here uses the new
+`doorkit` constructors; the pin follows the release rule that a sibling names the newest tag.
+
 ### Added — the server takes a ChangeTransformer and a durable Approvals store
 
 `serve.Options.Transform` and `serve.Options.Approvals`. `serve.Run` builds its own manager, so a

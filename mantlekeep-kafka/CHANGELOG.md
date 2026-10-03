@@ -15,6 +15,13 @@ versioning: [SemVer](https://semver.org).
 Releases before the modules were split are in the [repository CHANGELOG](../CHANGELOG.md) under
 bare version numbers — one version described everything then.
 
+## [Unreleased]
+
+### Changed — requires mantlekeep-control v0.5.0
+
+The sibling pin moves from v0.4.1 to the newest released control. Nothing here uses the new
+`doorkit` constructors; the pin follows the release rule that a sibling names the newest tag.
+
 ## [v0.1.1] — 2026-09-08
 
 No API change. Cut so a repository-wide scan of this module is clean: v0.1.0 carried findings that

@@ -19,6 +19,13 @@ Versions here are this MODULE's own: it is tagged `mantlekeep-policy-postgres/vX
 independently. Format: [Keep a Changelog](https://keepachangelog.com); versioning:
 [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed — requires mantlekeep-control v0.5.0
+
+The sibling pin moves from v0.4.1 to the newest released control. Nothing here uses the new
+`doorkit` constructors; the pin follows the release rule that a sibling names the newest tag.
+
 ## [v0.1.0] — 2026-09-08
 
 The first release. It implements the two ports the core defines, so a deployment can hold its
