@@ -36,9 +36,9 @@ type Mounting struct {
 // and a deployment can name it without importing the engine package.
 type FootprintReader = estate.FootprintReader
 
-// routeRegistrar is the engine's own HTTP surface, narrowed to the one method [mount] calls. An
+// router is the engine's own HTTP surface, narrowed to the one method [mount] calls. An
 // interface so a test can observe the ORDER of registration without standing up a manager.
-type routeRegistrar interface {
+type router interface {
 	Routes(mux *http.ServeMux)
 }
 
@@ -56,7 +56,7 @@ type mountParts struct {
 // FIRST, so a deployment cannot quietly replace one of its routes — ServeMux panics on a
 // duplicate pattern, and that panic happens at boot, where an operator sees it, rather than as a
 // governed endpoint that silently stopped being the governed one.
-func mount(mux *http.ServeMux, engine routeRegistrar, built mountParts, routes func(Mounting)) {
+func mount(mux *http.ServeMux, engine router, built mountParts, routes func(Mounting)) {
 	engine.Routes(mux)
 	if routes == nil {
 		return
