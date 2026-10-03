@@ -28,7 +28,7 @@ var scanLanguages = map[string]string{
 	".ts":   "//",
 }
 
-func reportTextualDuplicates(roots []string, min, times int) bool {
+func reportTextualDuplicates(roots []string, minLength, times int) bool {
 	found := false
 	for _, root := range roots {
 		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -43,7 +43,7 @@ func reportTextualDuplicates(roots []string, min, times int) bool {
 			if !ok {
 				return nil
 			}
-			if reportTextualIn(path, comment, min, times) {
+			if reportTextualIn(path, comment, minLength, times) {
 				found = true
 			}
 			return nil
@@ -52,12 +52,12 @@ func reportTextualDuplicates(roots []string, min, times int) bool {
 	return found
 }
 
-func reportTextualIn(path, comment string, min, times int) bool {
+func reportTextualIn(path, comment string, minLength, times int) bool {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	counts, firstLine := countTextualLiterals(string(content), comment, min)
+	counts, firstLine := countTextualLiterals(string(content), comment, minLength)
 
 	over := make([]string, 0, len(counts))
 	for lit, n := range counts {
@@ -77,12 +77,12 @@ func reportTextualIn(path, comment string, min, times int) bool {
 }
 
 // countTextualLiterals tallies the message-shaped literals in a file's text.
-func countTextualLiterals(content, comment string, min int) (map[string]int, map[string]int) {
+func countTextualLiterals(content, comment string, minLength int) (map[string]int, map[string]int) {
 	counts := map[string]int{}
 	firstLine := map[string]int{}
 	for i, line := range strings.Split(content, "\n") {
 		for _, lit := range literalsIn(line, comment) {
-			if len(lit) < min || !strings.ContainsAny(lit, " %") {
+			if len(lit) < minLength || !strings.ContainsAny(lit, " %") {
 				continue
 			}
 			counts[lit]++
