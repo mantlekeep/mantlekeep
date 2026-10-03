@@ -44,7 +44,19 @@ type Client struct {
 	// a trusted delegator. It is never the human: the door authenticates an application, and
 	// that application says who it acts for.
 	serviceAccount string
-	http           *http.Client
+	// callerHeader names the header the door reads to learn WHO IS CALLING — its
+	// Options.TrustedUserHeader, under whatever name that deployment chose.
+	//
+	// Empty means no caller header is sent, and the service account travels only as
+	// `Authorization: Bearer` — which doorserver's authenticatedCaller never reads, so a door
+	// that identifies callers by header refuses every write as unauthenticated.
+	//
+	// It is NOT the same header as X-On-Behalf-Of. That one says who the estate acts FOR; this
+	// one says who the estate IS. The door keeps both — caller{subject: user, via: account} —
+	// and pointing the door's trusted header at X-On-Behalf-Of collapses them, which makes a
+	// governed write succeed while erasing the delegation from the record.
+	callerHeader string
+	http         *http.Client
 }
 
 var _ mantlekeep.Submitter = (*Client)(nil)
@@ -58,6 +70,58 @@ func New(baseURL, serviceAccount string) *Client {
 		// A bounded timeout, because a door that hangs must not hang every apply behind it.
 		http: &http.Client{Timeout: 15 * time.Second},
 	}
+}
+
+// Option configures a Client at construction. See [NewWithOptions].
+type Option func(*Client)
+
+// WithCallerHeader names the header this client presents its service account in.
+//
+// Set it to the same header name the door was given as Options.TrustedUserHeader.
+func WithCallerHeader(name string) Option {
+	return func(client *Client) { client.callerHeader = strings.TrimSpace(name) }
+}
+
+// NewWithOptions builds a client and reports a configuration it refuses to run with, rather
+// than starting and failing on the first governed write.
+func NewWithOptions(baseURL, serviceAccount string, options ...Option) (*Client, error) {
+	client := New(baseURL, serviceAccount)
+	for _, option := range options {
+		option(client)
+	}
+	if err := checkCallerHeader(client.callerHeader); err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+// credentialHeaderNames are headers whose value is a SECRET, never an identity.
+//
+// Naming one of these means the door reads a bearer token or cookie AS the caller's user id,
+// and writes it to the hash-chained audit record — append-only, so it can never be redacted
+// without breaking the chain. These are the names doorserver refuses as an identity header
+// (plus x-access-token), refused here as well so the mistake is caught at whichever end it is
+// made. Compared lower-cased, because HTTP header names are case-insensitive.
+var credentialHeaderNames = []string{
+	"authorization", "proxy-authorization", "cookie", "set-cookie",
+	"x-api-key", "api-key", "x-auth-token", "x-access-token",
+}
+
+// checkCallerHeader refuses a caller header that names a credential. Empty is always fine.
+func checkCallerHeader(name string) error {
+	if name == "" {
+		return nil
+	}
+	lowered := strings.ToLower(name)
+	for _, credential := range credentialHeaderNames {
+		if lowered == credential {
+			return fmt.Errorf(
+				"doorclient: WithCallerHeader(%q) names a CREDENTIAL header, not an identity — "+
+					"its value would be recorded as the caller on an append-only chain and "+
+					"could never be redacted", name)
+		}
+	}
+	return nil
 }
 
 // governRequest is the door's published request shape.
@@ -160,6 +224,9 @@ func (c *Client) Submit(ctx context.Context, intent mantlekeep.Intent) (mantleke
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+c.serviceAccount)
+	if c.callerHeader != "" {
+		request.Header.Set(c.callerHeader, c.serviceAccount)
+	}
 	if intent.Subject.ID != "" {
 		request.Header.Set(onBehalfOfHeader, intent.Subject.ID)
 	}
