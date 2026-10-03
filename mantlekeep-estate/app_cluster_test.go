@@ -218,7 +218,7 @@ func TestAnAppClusterPreferenceReachesTheResolvedPlacement(t *testing.T) {
 
 	floor := DefaultFloor()
 	floor.Apps = map[string]AppRule{
-		"payments/settlement-engine": {Clusters: []string{"uk-app-1"}},
+		"payments/settlement-engine": {Prefer: []string{"uk-app-1"}},
 	}
 	preferred, err := ResolveWith(manifest, floor, placer, nil)
 	if err != nil {
@@ -244,7 +244,7 @@ func TestAClusterPreferenceIsTeamQualifiedToo(t *testing.T) {
 	})
 	floor := DefaultFloor()
 	floor.Apps = map[string]AppRule{
-		"payments/settlement-engine": {Clusters: []string{"uk-app-1"}},
+		"payments/settlement-engine": {Prefer: []string{"uk-app-1"}},
 	}
 
 	desired, err := ResolveWith(manifest, floor, placer, nil)

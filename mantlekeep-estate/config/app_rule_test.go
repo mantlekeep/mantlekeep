@@ -100,11 +100,11 @@ func TestAnAppRuleWithNoGateLoads(t *testing.T) {
 // deduplicated would change what the operator said.
 func TestAnAppClusterPreferenceIsLoadedInOrder(t *testing.T) {
 	config, err := Parse([]byte(withApps(t,
-		`{ "payments/settlement-engine": { "clusters": ["uk-app-2", "uk-app-1"] } }`)))
+		`{ "payments/settlement-engine": { "prefer": ["uk-app-2", "uk-app-1"] } }`)))
 	if err != nil {
 		t.Fatalf(litGatesTestParse, err)
 	}
-	got := config.Floor.ClustersForApp("payments/settlement-engine")
+	got := config.Floor.PreferredClustersFor("payments/settlement-engine")
 	if len(got) != 2 || got[0] != "uk-app-2" || got[1] != "uk-app-1" {
 		t.Errorf("the preference must load in the authored order; got %q", got)
 	}
@@ -113,7 +113,7 @@ func TestAnAppClusterPreferenceIsLoadedInOrder(t *testing.T) {
 // A rule may name clusters without naming a gate, and that is not an exemption from gating.
 func TestAClusterOnlyRuleDoesNotTouchTheGate(t *testing.T) {
 	config, err := Parse([]byte(withApps(t,
-		`{ "payments/checkout": { "clusters": ["uk-app-1"] } }`)))
+		`{ "payments/checkout": { "prefer": ["uk-app-1"] } }`)))
 	if err != nil {
 		t.Fatalf(litGatesTestParse, err)
 	}

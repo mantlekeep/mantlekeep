@@ -201,7 +201,7 @@ func resolveApps(m Manifest, floor Floor, placer *Placer,
 			return nil, err
 		}
 		qualified := m.Team + "/" + app.Name
-		decision, err := placeApp(app, placer, placed[app.Name], floor.ClustersForApp(qualified))
+		decision, err := placeApp(app, placer, placed[app.Name], floor.PreferredClustersFor(qualified))
 		if err != nil {
 			return nil, err
 		}
