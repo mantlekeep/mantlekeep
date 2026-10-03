@@ -84,6 +84,31 @@ type Options struct {
 	// Passed IN like every adapter, for the same reason: this module must not learn what anyone's
 	// database is.
 	Approvals estate.Approvals
+
+	// Routes mounts a deployment's OWN endpoints on the listener this package serves. Nil mounts
+	// nothing, which is what every deployment had before this field existed.
+	//
+	// This package builds the mux and the server, so a deployment that writes a handler had
+	// nowhere to put it — the choices were a second listener, or re-implementing Run. Passed IN
+	// like every adapter, so this module never learns what a deployment's endpoints are. See
+	// [Mounting] for what it is handed.
+	Routes func(Mounting)
+
+	// Door is where this estate submits governed changes. Nil dials -door over HTTP, which is the
+	// previous behaviour exactly.
+	//
+	// A non-nil Submitter is used INSTEAD, and no door URL is read: the estate embeds the
+	// governance core in its own process. That is the composition an environment with ONE
+	// submitting service wants — one service to deploy, one credential, and no hop between the
+	// estate and the door for a network policy to break or an attacker to sit on.
+	//
+	// What must not be lost is the DELEGATION. Over HTTP the door records the person AND the
+	// service account acting for them, because the estate presented both. In process there is no
+	// header to read, so an embedded Submitter MUST record the delegation itself, or every change
+	// appears to have been made by the person directly and the estate disappears from the record.
+	//
+	// A door is still REQUIRED. Nil does not mean ungoverned; it means dialled.
+	Door mantlekeep.Submitter
 }
 
 func Run(options Options) error {
@@ -140,7 +165,9 @@ func Run(options Options) error {
 	var livePlacer atomic.Pointer[estate.Placer]
 	livePlacer.Store(placer)
 
-	door := doorclient.New(*doorURL, *account)
+	door := doorFor(options, func() mantlekeep.Submitter {
+		return doorclient.New(*doorURL, *account)
+	})
 	store := estate.NewMemoryManifests()
 	// Where gated changes wait for a person. In memory for now, and the warning below says so:
 	// a restart forgets every pending change, and somebody who was asked to sign one off will
@@ -185,7 +212,8 @@ func Run(options Options) error {
 	}
 
 	mux := http.NewServeMux()
-	api.New(manager, service, callers).Routes(mux)
+	mount(mux, api.New(manager, service, callers),
+		mountParts{door: door, callers: callers, footprints: service}, options.Routes)
 
 	server := &http.Server{
 		Addr:              *addr,
@@ -194,7 +222,7 @@ func Run(options Options) error {
 	}
 
 	slog.Info("mantlekeep-estate listening",
-		"addr", *addr, "door", *doorURL, "adapters", names, "config", *configPath,
+		"addr", *addr, "door", doorLabel(options, *doorURL), "adapters", names, "config", *configPath,
 		"clusters", len(clusters))
 	if len(unreadKSM) > 0 {
 		// Worth saying out loud. Placement still works, but it is ranking blind on these, and
