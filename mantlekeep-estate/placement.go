@@ -25,6 +25,15 @@ type Cluster struct {
 	Env       string    `json:"env"`      // dev | sit | prod
 	Purpose   string    `json:"purpose"`  // app | core | …
 	Residency Residency `json:"residency"`
+	// Labels are whatever dimensions THIS deployment organises by — region, tenancy, data
+	// classification, business unit. Env, Purpose and Region above are three names this package
+	// happened to pick, and they fit an estate organised by environment; a framework that insists
+	// on one vocabulary has decided something that belongs to the deployment.
+	//
+	// The named fields are still read through [Cluster.labelled], so an existing fleet document
+	// keeps working and a claim may use either form. Residency is deliberately NOT a label — see
+	// [Placement.Requires].
+	Labels map[string]string `json:"labels,omitempty"`
 	// Reachable is false when the platform could not read this cluster. An unreachable cluster
 	// is UNKNOWN, never empty: placing into one we cannot see would be placing blind.
 	Reachable bool `json:"reachable"`
@@ -38,6 +47,18 @@ type Placement struct {
 	Env       string    `json:"env"`
 	Purpose   string    `json:"purpose,omitempty"`
 	Residency Residency `json:"residency,omitempty"`
+	// Requires are the labels a cluster must carry, ALL of them, to be legal for this claim:
+	// {"env":"sit","purpose":"app"} in one deployment, {"region":"eu","tenancy":"payments"} in
+	// another. The placer matches; it does not know what the keys mean.
+	//
+	// # Why Residency is NOT one of these
+	//
+	// It is not a dimension, it is a GUARANTEE. As Requires["residency"] it would be
+	// indistinguishable from Requires["team"] — and the first "relax the constraints if nothing
+	// matches" fallback anybody writes would move data out of the jurisdiction it was confined
+	// to. Keeping it its own field makes that mistake impossible to write rather than merely
+	// discouraged.
+	Requires map[string]string `json:"requires,omitempty"`
 }
 
 // Capacity is how much room a cluster has, as reported by the metrics source.
@@ -137,15 +158,19 @@ func (p *Placer) Place(claim Placement, current string) (PlacementDecision, erro
 // [Placement], because Placement is parsed from the team's own manifest and a team that could
 // name its preferred cluster would be choosing its own placement.
 func (p *Placer) PlaceWith(claim Placement, current string, prefer []string) (PlacementDecision, error) {
-	if claim.Env == "" {
-		return PlacementDecision{}, fmt.Errorf("placement: a claim must name an environment")
+	// Either form will do, but a claim must say SOMETHING about where it belongs: an empty claim
+	// would match the whole fleet, and "anywhere" is not a placement anybody ruled on.
+	if claim.Env == "" && len(claim.Requires) == 0 {
+		return PlacementDecision{}, fmt.Errorf("placement: a claim must say where it belongs — " +
+			`name an environment, or set requires (e.g. requires: {"region":"eu","tenancy":"payments"})`)
 	}
 
 	legal := p.legalClusters(claim)
 	if len(legal) == 0 {
 		return PlacementDecision{}, fmt.Errorf(
-			"placement: no cluster satisfies env=%q purpose=%q residency=%q — refusing rather "+
-				"than placing somewhere that does not", claim.Env, claim.Purpose, claim.Residency)
+			"placement: no cluster satisfies env=%q purpose=%q requires=%v residency=%q — "+
+				"refusing rather than placing somewhere that does not",
+			claim.Env, claim.Purpose, claim.Requires, claim.Residency)
 	}
 	considered := namesOf(legal)
 
@@ -166,9 +191,9 @@ func (p *Placer) PlaceWith(claim Placement, current string, prefer []string) (Pl
 	best, found := p.emptiest(legal)
 	if !found {
 		return PlacementDecision{}, fmt.Errorf(
-			"placement: every cluster satisfying env=%q residency=%q is below %.0f%% free — "+
-				"placing there would create pods that never schedule",
-			claim.Env, claim.Residency, p.minFree*100)
+			"placement: every cluster satisfying env=%q requires=%v residency=%q is below "+
+				"%.0f%% free — placing there would create pods that never schedule",
+			claim.Env, claim.Requires, claim.Residency, p.minFree*100)
 	}
 	reason := p.reasonFor(best, current)
 	if len(prefer) > 0 {
@@ -214,6 +239,38 @@ func (p *Placer) legalClusters(claim Placement) []Cluster {
 		}
 	}
 	return legal
+}
+
+// labelled reads a dimension by name, whichever form the fleet document used. An explicit label
+// wins; otherwise the named field of the same meaning is read; otherwise the cluster does not
+// carry that dimension and the answer is empty.
+//
+// The named fields are folded in HERE rather than at load, so a Cluster built by hand behaves
+// identically to one parsed from a document.
+//
+// The cluster's NAME is deliberately not a dimension. Requires is parsed from the team's own
+// manifest, and requires:{"name":"uk-app-1"} would let a team choose its own cluster — the one
+// thing placement exists to take away from it.
+func (c Cluster) labelled(key string) string {
+	if value, ok := c.Labels[key]; ok {
+		return value
+	}
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "env", "environment":
+		return c.Env
+	case "purpose":
+		return c.Purpose
+	case "region":
+		return c.Region
+	case "provider":
+		return c.Provider
+	case "residency":
+		// Readable, so a diagnostic can print it — but never sufficient: legalFor checks
+		// Residency through its own field as well, so requires:{"residency":…} cannot reach a
+		// cluster the claim's real residency does not.
+		return string(c.Residency)
+	}
+	return ""
 }
 
 // namesOf lists what was considered, sorted, so the recorded reason is the same on every run.
@@ -279,8 +336,18 @@ func (p *Placer) reasonFor(best Cluster, current string) string {
 
 // legalFor reports whether a cluster satisfies the claim. Residency is the hard one.
 func (p *Placer) legalFor(claim Placement, cluster Cluster) bool {
-	if !strings.EqualFold(cluster.Env, claim.Env) {
+	// The NAMED dimensions, kept so existing documents are unchanged.
+	if claim.Env != "" && !strings.EqualFold(cluster.Env, claim.Env) {
 		return false
+	}
+	// The GENERIC dimensions. Every required label must match, and a cluster that does not carry
+	// the key at all FAILS: absent is not a wildcard, or a constraint becomes a suggestion. An
+	// empty required value matches nothing for the same reason — otherwise requires:{"region":""}
+	// would select every cluster that never said which region it is in.
+	for key, want := range claim.Requires {
+		if want == "" || !strings.EqualFold(cluster.labelled(key), want) {
+			return false
+		}
 	}
 	if claim.Purpose != "" && !strings.EqualFold(cluster.Purpose, claim.Purpose) {
 		return false
