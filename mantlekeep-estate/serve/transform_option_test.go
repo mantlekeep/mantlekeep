@@ -112,9 +112,12 @@ func managerForTestWithDoor(door mantlekeep.Submitter, options Options) *estate.
 	store := estate.NewMemoryManifests()
 	service := estate.NewService(floor, store, options.Ports...)
 	placer := testPlacer()
-	return managerFor(options, door, settings, service, store, approvalsFor(options),
-		func() estate.Floor { return floor },
-		func() *estate.Placer { return placer })
+	return managerFor(options, managerParts{
+		door: door, settings: settings, service: service, store: store,
+		approvals: approvalsFor(options),
+		floor:     func() estate.Floor { return floor },
+		placer:    func() *estate.Placer { return placer },
+	})
 }
 
 func testFloor() estate.Floor {

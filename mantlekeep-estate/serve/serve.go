@@ -158,8 +158,10 @@ func Run(options Options) error {
 	}
 
 	service := estate.NewService(settings.Floor, store, ports...).FloorFrom(live.Floor).PlaceOnLive(livePlacer.Load)
-	manager := managerFor(options, door, settings, service, store, approvals,
-		live.Floor, livePlacer.Load)
+	manager := managerFor(options, managerParts{
+		door: door, settings: settings, service: service, store: store, approvals: approvals,
+		floor: live.Floor, placer: livePlacer.Load,
+	})
 
 	// SIGHUP re-reads the floor. Operationally the cases are ordinary and urgent — a quota is
 	// wrong at 3am, a shared DEV env turns out to need a gate — and making each of them cost a
@@ -354,20 +356,33 @@ func reloadFleet(path string, build func([]estate.Cluster) (*estate.Placer, []st
 // inside it is assertable — and the failure worth catching here is the quiet kind: an option that
 // exists, is documented, and is never read. A field nobody wired looks exactly like a field nobody
 // set, and both pass review.
-func managerFor(options Options, door mantlekeep.Submitter, settings config.Config,
-	service *estate.Service, store estate.ManifestStore, approvals estate.Approvals,
-	floor func() estate.Floor, placer func() *estate.Placer) *estate.Manager {
-
-	return estate.NewManager(door, settings.Floor, options.Ports...).
-		FloorFrom(floor).
-		GovernFields(settings.Ownership).
-		RememberManifestsIn(store).
+func managerFor(options Options, built managerParts) *estate.Manager {
+	return estate.NewManager(built.door, built.settings.Floor, options.Ports...).
+		FloorFrom(built.floor).
+		GovernFields(built.settings.Ownership).
+		RememberManifestsIn(built.store).
 		// The read side, so a read can be governed before it resolves. Without this every read
 		// is refused — the fail-closed direction for a control whose absence is invisible.
-		ReadFootprintsFrom(service).
-		AwaitApprovalIn(approvals).
-		PlaceOnLive(placer).
+		ReadFootprintsFrom(built.service).
+		AwaitApprovalIn(built.approvals).
+		PlaceOnLive(built.placer).
 		TransformChangesWith(options.Transform)
+}
+
+// managerParts is what [Run] has already built by the time it builds the manager: the pieces
+// that come from flags, files and the live reloaders rather than from [Options].
+//
+// One value rather than seven parameters, because seven positional parameters of which two are
+// bare func types is a call site where swapping floor and placer still compiles. Named fields
+// make each one say what it is at the call site.
+type managerParts struct {
+	door      mantlekeep.Submitter
+	settings  config.Config
+	service   *estate.Service
+	store     estate.ManifestStore
+	approvals estate.Approvals
+	floor     func() estate.Floor
+	placer    func() *estate.Placer
 }
 
 // approvalsFor chooses where gated changes wait.
