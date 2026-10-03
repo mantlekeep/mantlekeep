@@ -79,11 +79,11 @@ func TestWithProvidersAccumulatesAcrossProvidersAndCalls(t *testing.T) {
 // Nil providers are skipped rather than panicking — a deployable may wire an adapter
 // conditionally and pass nil when it is not built in.
 func TestWithProvidersSkipsNilProviders(t *testing.T) {
-	real := fakeProvider{
+	builtIn := fakeProvider{
 		name: "sdlc", actions: []string{"sdlc.build"},
 		grants: map[mantlekeep.Role][]string{mantlekeep.RoleConsumer: {"sdlc.build"}},
 	}
-	r := NewRBAC().WithProviders(nil, real, nil)
+	r := NewRBAC().WithProviders(nil, builtIn, nil)
 
 	if len(r.providers) != 1 {
 		t.Fatalf("registered %d providers, want 1 (nils skipped)", len(r.providers))

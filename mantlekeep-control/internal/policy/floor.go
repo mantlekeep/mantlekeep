@@ -113,8 +113,8 @@ func denyUnlessEntryIsWithinItsCap(rule grants.FloorRule, resource string, raw a
 	if !isString {
 		return rule.Message + " (non-string quantity for " + resource + ")"
 	}
-	withinCap, comparable := quantityLessOrEqual(want, limit)
-	if !comparable {
+	withinCap, parsed := quantityLessOrEqual(want, limit)
+	if !parsed {
 		return rule.Message + " (unparseable quantity for " + resource + ")"
 	}
 	if !withinCap {

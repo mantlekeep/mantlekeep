@@ -18,6 +18,12 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Changed — no identifier shadows a Go builtin
+
+Three locals renamed so none hides a predeclared name (Sonar go:S978): `comparable` → `parsed` in
+the floor's quantity check, `cap` → `capability` in `MANTLEKEEP_BIND_` parsing, and `real` →
+`builtIn` in a test. Internal only — no exported name or behaviour changed.
+
 ### Fixed — the SSO tier could not resolve anybody over HTTP
 
 `doorserver` had no way to carry a caller's IdP groups. `resolveUser` called

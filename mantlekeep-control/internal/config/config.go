@@ -91,15 +91,15 @@ func parse(pairs []string) Config {
 			c.Selections[strings.ToLower(strings.TrimPrefix(k, "MANTLEKEEP_SELECT_"))] = v
 		case strings.HasPrefix(k, "MANTLEKEEP_BIND_"):
 			// <CAP>_<ROLE>: capability is the first segment, role the remainder.
-			cap, role, ok := strings.Cut(strings.TrimPrefix(k, "MANTLEKEEP_BIND_"), "_")
+			capability, role, ok := strings.Cut(strings.TrimPrefix(k, "MANTLEKEEP_BIND_"), "_")
 			if !ok {
 				continue
 			}
-			cap, role = strings.ToLower(cap), strings.ToLower(role)
-			if c.Bindings[cap] == nil {
-				c.Bindings[cap] = map[string]string{}
+			capability, role = strings.ToLower(capability), strings.ToLower(role)
+			if c.Bindings[capability] == nil {
+				c.Bindings[capability] = map[string]string{}
 			}
-			c.Bindings[cap][role] = v
+			c.Bindings[capability][role] = v
 		case strings.HasPrefix(k, "MANTLEKEEP_DRIVER_"):
 			c.Drivers[strings.ToLower(strings.TrimPrefix(k, "MANTLEKEEP_DRIVER_"))] = v
 		}
