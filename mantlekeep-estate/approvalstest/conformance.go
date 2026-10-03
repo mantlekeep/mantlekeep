@@ -44,6 +44,9 @@ func Run(t *testing.T, newStore Factory) {
 	t.Run("only ONE decision wins under concurrency", func(t *testing.T) { onlyOneWins(t, newStore) })
 	t.Run("a decided approval cannot be decided again", func(t *testing.T) { noSecondDecision(t, newStore) })
 	t.Run("pending lists what is waiting", func(t *testing.T) { listsPending(t, newStore) })
+	t.Run("an id cannot be opened twice", func(t *testing.T) { openRefusesATakenID(t, newStore) })
+	t.Run("opening a taken id keeps the decided approval",
+		func(t *testing.T) { openKeepsADecidedApproval(t, newStore) })
 
 	// A required SET of distinct signatures. Everything below needs [estate.Signer].
 	t.Run("a partial set stays pending and says who is still needed",

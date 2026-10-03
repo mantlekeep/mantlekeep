@@ -16,4 +16,5 @@ const (
 	approvalShortcut = "AP-SHORTCUT"
 	approvalPartial  = "AP-PARTIAL"
 	approvalComplete = "AP-COMPLETE"
+	approvalDecided  = "AP-DECIDED"
 )

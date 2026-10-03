@@ -2,6 +2,7 @@ package estate
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"time"
@@ -121,6 +122,10 @@ var (
 	ErrFloorMoved = errors.New(
 		"estate: the floor has changed since this was requested — the limits that would now " +
 			"apply are not the ones that were approved, so this must be requested again")
+	// ErrApprovalExists — a store was asked to open an approval under an id it already holds.
+	// That is a colliding id, not a duplicate request, and it must never replace the record
+	// already there: a decided approval reopened as pending loses who approved it.
+	ErrApprovalExists = errors.New("estate: an approval with this id already exists")
 )
 
 // Approvals stores changes awaiting a person.
@@ -128,7 +133,8 @@ var (
 // A port rather than a table: an approval outlives a process by definition — that is what makes
 // it an approval rather than a prompt — so where it lives is a deployment's choice.
 type Approvals interface {
-	// Open records a new pending approval.
+	// Open records a new pending approval. It must refuse an id it already holds, wrapping
+	// [ErrApprovalExists], rather than replace the approval stored under it.
 	Open(ctx context.Context, approval Approval) error
 	// Get returns one approval, or ErrApprovalNotFound.
 	Get(ctx context.Context, id string) (Approval, error)
@@ -165,6 +171,16 @@ type Signer interface {
 }
 
 // approvalID names a pending change so a human can quote it and a caller can poll it.
+//
+// The timestamp alone is not unique. It is unique only if two approvals for one change are never
+// created within a single clock tick, and on a host with a coarse wall clock two calls
+// microseconds apart return the same instant. Approving a gated change does exactly that: the
+// change is submitted to the door again as the approver, the door can require approval again,
+// and a second request for the same team and change is opened at once. So the id carries a
+// random suffix as well — random rather than a counter, because a counter is per-process and
+// several estate replicas can share one store.
 func approvalID(team, name string, at time.Time) string {
-	return fmt.Sprintf("APR-%s-%s-%d", team, name, at.UnixNano())
+	// rand.Text is 26 base32 characters of crypto/rand with no error to handle; 12 of them are
+	// 60 bits, ample for ids that already differ by team, name and nanosecond.
+	return fmt.Sprintf("APR-%s-%s-%d-%s", team, name, at.UnixNano(), rand.Text()[:12])
 }
