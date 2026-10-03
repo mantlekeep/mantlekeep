@@ -77,10 +77,10 @@ func partialSetStaysPending(t *testing.T, newStore Factory) {
 	signer := signerOrSkip(t, store)
 	ctx := context.Background()
 
-	if err := store.Open(ctx, needing("AP-PARTIAL", "payments", 2)); err != nil {
+	if err := store.Open(ctx, needing(approvalPartial, "payments", 2)); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	after, err := signer.Sign(ctx, "AP-PARTIAL", signedBy("lead-bob"))
+	after, err := signer.Sign(ctx, approvalPartial, signedBy(approverBob))
 	if err != nil {
 		t.Fatalf("the first of two signatures must be accepted: %v", err)
 	}
@@ -96,11 +96,11 @@ func partialSetStaysPending(t *testing.T, newStore Factory) {
 
 	// Read back through the STORE, not from the value Sign returned: a reader looking at the
 	// queue must see the partial state, or nobody but the signer knows it exists.
-	found, err := store.Get(ctx, "AP-PARTIAL")
+	found, err := store.Get(ctx, approvalPartial)
 	if err != nil {
 		t.Fatalf(litReadingBack, err)
 	}
-	if got := found.Signatories(); len(got) != 1 || got[0] != "lead-bob" {
+	if got := found.Signatories(); len(got) != 1 || got[0] != approverBob {
 		t.Fatalf("signatories = %v, want the one person who signed — a partial set nobody can "+
 			"read is indistinguishable from no progress at all", got)
 	}
@@ -109,7 +109,7 @@ func partialSetStaysPending(t *testing.T, newStore Factory) {
 	}
 	// The words a person acts on. It must name how many more AND who may give them.
 	needed := found.StillNeeded()
-	for _, mustSay := range []string{"1 more signature", "L1-Architect", "lead-bob"} {
+	for _, mustSay := range []string{"1 more signature", "L1-Architect", approverBob} {
 		if !strings.Contains(needed, mustSay) {
 			t.Errorf("StillNeeded() = %q, which does not mention %q — a wait that cannot say "+
 				"who unblocks it is a dead end wearing the shape of a process", needed, mustSay)
@@ -129,12 +129,12 @@ func lastSignatureDecides(t *testing.T, newStore Factory) {
 	signer := signerOrSkip(t, store)
 	ctx := context.Background()
 
-	if err := store.Open(ctx, needing("AP-COMPLETE", "payments", 3)); err != nil {
+	if err := store.Open(ctx, needing(approvalComplete, "payments", 3)); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	signUpTo(t, signer, "AP-COMPLETE", "lead-bob", "arch-carol")
+	signUpTo(t, signer, approvalComplete, approverBob, "arch-carol")
 
-	decided, err := signer.Sign(ctx, "AP-COMPLETE", signedBy("sec-dave"))
+	decided, err := signer.Sign(ctx, approvalComplete, signedBy("sec-dave"))
 	if err != nil {
 		t.Fatalf("the completing signature: %v", err)
 	}
@@ -173,7 +173,7 @@ func oldSingleSignatureRecordReadsBack(t *testing.T, newStore Factory) {
 	// Exactly the shape the previous version wrote: no RequiredSignatures, no Signatures.
 	legacy := pending("AP-LEGACY", "payments")
 	legacy.State = estate.ApprovalApproved
-	legacy.ApprovedBy = "lead-bob"
+	legacy.ApprovedBy = approverBob
 	legacy.DecidedAt = time.Now().UTC()
 	if err := store.Open(ctx, legacy); err != nil {
 		t.Fatalf(wrapOpening, err)
@@ -188,14 +188,14 @@ func oldSingleSignatureRecordReadsBack(t *testing.T, newStore Factory) {
 			"literally turns every historical approval into one that needed nobody",
 			found.SignaturesRequired())
 	}
-	if got := found.Signatories(); len(got) != 1 || got[0] != "lead-bob" {
+	if got := found.Signatories(); len(got) != 1 || got[0] != approverBob {
 		t.Fatalf("signatories = %v, want the person in ApprovedBy — counting only the list "+
 			"makes every approval ever granted read back as unsigned", got)
 	}
 	if found.SignaturesOutstanding() != 0 {
 		t.Errorf("outstanding = %d on a record that was approved", found.SignaturesOutstanding())
 	}
-	if !found.HasSignatureFrom("lead-bob") {
+	if !found.HasSignatureFrom(approverBob) {
 		t.Error("the historical signer does not register as having signed, so they could be " +
 			"asked to sign again and the set would then hold one person twice")
 	}

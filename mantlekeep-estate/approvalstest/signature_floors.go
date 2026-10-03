@@ -25,18 +25,18 @@ func noSignerTwice(t *testing.T, newStore Factory) {
 	signer := signerOrSkip(t, store)
 	ctx := context.Background()
 
-	if err := store.Open(ctx, needing("AP-TWICE", "payments", 2)); err != nil {
+	if err := store.Open(ctx, needing(approvalTwice, "payments", 2)); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	if _, err := signer.Sign(ctx, "AP-TWICE", signedBy("lead-bob")); err != nil {
+	if _, err := signer.Sign(ctx, approvalTwice, signedBy(approverBob)); err != nil {
 		t.Fatalf("first signature: %v", err)
 	}
-	_, err := signer.Sign(ctx, "AP-TWICE", signedBy("lead-bob"))
+	_, err := signer.Sign(ctx, approvalTwice, signedBy(approverBob))
 	if !errors.Is(err, estate.ErrDuplicateSignature) {
 		t.Fatalf("one person filled two slots of a two-person set; err = %v — a required set "+
 			"that accepts a repeat is counting clicks, not people", err)
 	}
-	found, _ := store.Get(ctx, "AP-TWICE")
+	found, _ := store.Get(ctx, approvalTwice)
 	if len(found.Signatories()) != 1 || found.State != estate.ApprovalPending {
 		t.Fatalf("record holds %v in state %q — the refused repeat must leave the request "+
 			"waiting for somebody else", found.Signatories(), found.State)
@@ -52,16 +52,16 @@ func noRequesterSignature(t *testing.T, newStore Factory) {
 	signer := signerOrSkip(t, store)
 	ctx := context.Background()
 
-	waiting := needing("AP-SELF", "payments", 2)
+	waiting := needing(approvalSelf, "payments", 2)
 	if err := store.Open(ctx, waiting); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	_, err := signer.Sign(ctx, "AP-SELF", signedBy(waiting.Requester))
+	_, err := signer.Sign(ctx, approvalSelf, signedBy(waiting.Requester))
 	if !errors.Is(err, estate.ErrSelfApproval) {
 		t.Fatalf("the requester signed their own change; err = %v — separation of duties is "+
 			"not a policy a deployment can relax", err)
 	}
-	found, _ := store.Get(ctx, "AP-SELF")
+	found, _ := store.Get(ctx, approvalSelf)
 	if len(found.Signatories()) != 0 {
 		t.Fatalf("the requester's signature was recorded anyway: %v", found.Signatories())
 	}
@@ -84,7 +84,7 @@ func exactlyTheRequiredNumberWin(t *testing.T, newStore Factory) {
 		approvers = 16
 		required  = 3
 	)
-	if err := store.Open(ctx, needing("AP-SET-RACE", "payments", required)); err != nil {
+	if err := store.Open(ctx, needing(approvalSetRace, "payments", required)); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
 
@@ -100,7 +100,7 @@ func exactlyTheRequiredNumberWin(t *testing.T, newStore Factory) {
 			defer wait.Done()
 			<-start // released together, so the window is as narrow as the store allows
 			who := fmt.Sprintf("approver-%d", n)
-			if _, err := signer.Sign(ctx, "AP-SET-RACE", signedBy(who)); err == nil {
+			if _, err := signer.Sign(ctx, approvalSetRace, signedBy(who)); err == nil {
 				mu.Lock()
 				accepted = append(accepted, who)
 				mu.Unlock()
@@ -115,7 +115,7 @@ func exactlyTheRequiredNumberWin(t *testing.T, newStore Factory) {
 			"slot was filled twice, fewer means a signature was read, written and lost",
 			len(accepted), approvers, required)
 	}
-	found, err := store.Get(ctx, "AP-SET-RACE")
+	found, err := store.Get(ctx, approvalSetRace)
 	if err != nil {
 		t.Fatalf("reading back: %v", err)
 	}
@@ -139,7 +139,7 @@ func exactlyTheRequiredNumberWin(t *testing.T, newStore Factory) {
 
 	// And one more signature is impossible, not merely unlikely: the record left the pending
 	// state on the completing signature.
-	if _, err := signer.Sign(ctx, "AP-SET-RACE", signedBy("approver-late")); !errors.Is(err,
+	if _, err := signer.Sign(ctx, approvalSetRace, signedBy("approver-late")); !errors.Is(err,
 		estate.ErrApprovalNotPending) {
 		t.Fatalf("a signature was accepted after the set completed; err = %v — that is the "+
 			"N+1st signature on a change already applied under N", err)
@@ -155,28 +155,28 @@ func noApprovalWithSignaturesOutstanding(t *testing.T, newStore Factory) {
 	signerOrSkip(t, store)
 	ctx := context.Background()
 
-	if err := store.Open(ctx, needing("AP-SHORTCUT", "payments", 2)); err != nil {
+	if err := store.Open(ctx, needing(approvalShortcut, "payments", 2)); err != nil {
 		t.Fatalf(wrapOpening, err)
 	}
-	shortcut := needing("AP-SHORTCUT", "payments", 2)
+	shortcut := needing(approvalShortcut, "payments", 2)
 	shortcut.State = estate.ApprovalApproved
-	shortcut.ApprovedBy = "lead-bob"
-	shortcut.Signatures = []estate.Signature{signedBy("lead-bob")}
+	shortcut.ApprovedBy = approverBob
+	shortcut.Signatures = []estate.Signature{signedBy(approverBob)}
 	if err := store.Decide(ctx, shortcut); !errors.Is(err, estate.ErrSignaturesOutstanding) {
 		t.Fatalf("a record was approved with 1 of 2 signatures; err = %v", err)
 	}
 
 	// A DECLINE is not guarded, and must not be: refusing a change is a decision one person is
 	// entitled to make however many people were required to agree.
-	declined := needing("AP-SHORTCUT", "payments", 2)
+	declined := needing(approvalShortcut, "payments", 2)
 	declined.State = estate.ApprovalDeclined
-	declined.DeclinedBy = "lead-bob"
+	declined.DeclinedBy = approverBob
 	declined.DeclinedReason = "the rollback plan does not cover the schema change"
-	declined.Signatures = []estate.Signature{signedBy("lead-bob")}
+	declined.Signatures = []estate.Signature{signedBy(approverBob)}
 	if err := store.Decide(ctx, declined); err != nil {
 		t.Fatalf("a decline on a partially signed change must be accepted: %v", err)
 	}
-	found, _ := store.Get(ctx, "AP-SHORTCUT")
+	found, _ := store.Get(ctx, approvalShortcut)
 	if len(found.Signatories()) != 1 {
 		t.Errorf("the decline dropped the signature already collected (%v) — a change one "+
 			"person signed and another refused must read as both", found.Signatories())

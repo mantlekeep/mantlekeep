@@ -129,7 +129,7 @@ func noSecondDecision(t *testing.T, newStore Factory) {
 	}
 	approved := pending("AP-2", "payments")
 	approved.State = estate.ApprovalApproved
-	approved.ApprovedBy = "lead-bob"
+	approved.ApprovedBy = approverBob
 	if err := store.Decide(ctx, approved); err != nil {
 		t.Fatalf("the first decision must be accepted: %v", err)
 	}
@@ -176,7 +176,7 @@ func listsPending(t *testing.T, newStore Factory) {
 	// A decided one leaves the queue, or an approver keeps seeing work that is done.
 	approved := pending("AP-A", "payments")
 	approved.State = estate.ApprovalApproved
-	approved.ApprovedBy = "lead-bob"
+	approved.ApprovedBy = approverBob
 	if err := store.Decide(ctx, approved); err != nil {
 		t.Fatalf("deciding: %v", err)
 	}
