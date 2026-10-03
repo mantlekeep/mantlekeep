@@ -47,8 +47,9 @@ fi
 # make the gate demand that every sibling pin a prerelease. A release gate compares against
 # releases.
 latest_released_tag() {
-    git tag -l "$1/v*" \
-        | sed "s|^$1/||" \
+    tag_module=$1
+    git tag -l "$tag_module/v*" \
+        | sed "s|^$tag_module/||" \
         | grep -vE '-' \
         | sort -V \
         | tail -1
@@ -61,12 +62,15 @@ latest_released_tag() {
 # same mistake as regex over source: it matches something, and what it matches is not what you
 # asked for. The toolchain emits JSON; read it as JSON.
 mod_json() {
-    (cd "$1" && GOWORK=off go mod edit -json)
+    json_dir=$1
+    (cd "$json_dir" && GOWORK=off go mod edit -json)
 }
 
 # declared_pin prints the version a module requires for one sibling, or nothing.
 declared_pin() {
-    mod_json "$1" | python3 -c '
+    pin_dir=$1
+    pin_sibling=$2
+    mod_json "$pin_dir" | python3 -c '
 import json, sys
 want = sys.argv[1] + sys.argv[2]
 document = json.load(sys.stdin)
@@ -74,12 +78,13 @@ for entry in document.get("Require") or []:
     if entry["Path"] == want:
         print(entry["Version"])
         break
-' "$module_prefix" "$2"
+' "$module_prefix" "$pin_sibling"
 }
 
 # sibling_requires prints every SIBLING module this module requires -- never itself.
 sibling_requires() {
-    mod_json "$1" | python3 -c '
+    requires_dir=$1
+    mod_json "$requires_dir" | python3 -c '
 import json, sys
 prefix = sys.argv[1]
 document = json.load(sys.stdin)
@@ -93,7 +98,8 @@ for entry in document.get("Require") or []:
 
 # sibling_replaces prints every sibling module this module replaces, in either syntax.
 sibling_replaces() {
-    mod_json "$1" | python3 -c '
+    replaces_dir=$1
+    mod_json "$replaces_dir" | python3 -c '
 import json, sys
 prefix = sys.argv[1]
 document = json.load(sys.stdin)

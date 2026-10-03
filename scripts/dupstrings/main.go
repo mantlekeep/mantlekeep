@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	min := flag.Int("min", 8, "shortest literal to consider")
+	minLength := flag.Int("min", 8, "shortest literal to consider")
 	times := flag.Int("times", 3, "how many repeats before it is reported")
 	tests := flag.Bool("tests", true, "include _test.go files, as Sonar does")
 	limit := flag.Int("limit", 15, "cognitive complexity ceiling")
@@ -29,14 +29,14 @@ func main() {
 	if len(roots) == 0 {
 		roots = []string{"."}
 	}
-	found := reportDuplicateLiterals(roots, *min, *times, *tests)
+	found := reportDuplicateLiterals(roots, *minLength, *times, *tests)
 	if reportIfDecls(roots, *tests) {
 		found = true
 	}
 	if reportComplexity(roots, *limit, *tests) {
 		found = true
 	}
-	if reportTextualDuplicates(roots, *min, *times) {
+	if reportTextualDuplicates(roots, *minLength, *times) {
 		found = true
 	}
 	if reportEmptyBodies(roots) {
@@ -52,7 +52,7 @@ func main() {
 // The walk lives here rather than in main so main reads as the three rules it runs. Every rule
 // has the same shape — walk, parse, report — and main should show that rather than open with one
 // of them written out in full.
-func reportDuplicateLiterals(roots []string, min, times int, includeTests bool) bool {
+func reportDuplicateLiterals(roots []string, minLength, times int, includeTests bool) bool {
 	found := false
 	for _, root := range roots {
 		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -62,7 +62,7 @@ func reportDuplicateLiterals(roots []string, min, times int, includeTests bool) 
 			if !includeTests && strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			if reportFile(path, min, times) {
+			if reportFile(path, minLength, times) {
 				found = true
 			}
 			return nil
@@ -72,13 +72,13 @@ func reportDuplicateLiterals(roots []string, min, times int, includeTests bool) 
 }
 
 // reportFile prints every over-repeated literal in one file, and says whether it found any.
-func reportFile(path string, min, times int) bool {
+func reportFile(path string, minLength, times int) bool {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
 		return false // unparseable is a compiler's problem, not this tool's
 	}
-	counts, first := countLiterals(fset, file, min)
+	counts, first := countLiterals(fset, file, minLength)
 
 	over := make([]string, 0, len(counts))
 	for value, n := range counts {
@@ -102,7 +102,7 @@ func reportFile(path string, min, times int) bool {
 // A struct tag is DATA and belongs at every use; so is anything with no space and no format verb,
 // which is a key or an identifier rather than a message. Counting those would make this report
 // things nobody should change, and a checker that cries wolf gets switched off.
-func countLiterals(fset *token.FileSet, file *ast.File, min int) (map[string]int, map[string]token.Position) {
+func countLiterals(fset *token.FileSet, file *ast.File, minLength int) (map[string]int, map[string]token.Position) {
 	counts := map[string]int{}
 	first := map[string]token.Position{}
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -111,7 +111,7 @@ func countLiterals(fset *token.FileSet, file *ast.File, min int) (map[string]int
 			return true
 		}
 		value, err := strconv.Unquote(lit.Value)
-		if err != nil || len(value) < min {
+		if err != nil || len(value) < minLength {
 			return true
 		}
 		if !strings.ContainsAny(value, " %") || strings.Contains(value, ",omitempty") {
