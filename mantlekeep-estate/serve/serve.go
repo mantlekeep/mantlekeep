@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
 	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/api"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/config"
@@ -46,6 +47,43 @@ type Options struct {
 	// none: an organisation scanning what it downloads should not find an RSA finding in an
 	// estate it took for governance.
 	Callers api.CallerResolver
+
+	// Transform rewrites a change before it is governed, and may refuse it outright.
+	//
+	// Nil means no transform, which is what every deployment got before this field existed.
+	//
+	// # Why this is an option rather than something this package builds
+	//
+	// [estate.ChangeTransformer] is the only seam that runs on the Apply path AND the Reconcile
+	// path, before anything is submitted, and that a caller cannot skip. That makes it the place
+	// a deployment puts a check it needs to be un-routable-around — an admission rule, an
+	// expansion of a shorthand, a gate raised for one named app.
+	//
+	// Without this field a deployment had to choose between the server (and no transform) or a
+	// transform (and re-implementing the floor reload, the live placer, the manifest store and
+	// the read API). Neither is a choice anybody should have to make, and the one they made was
+	// to go without the check.
+	//
+	// Passed IN like every adapter, for the same reason: this module must not learn what any
+	// deployment's rules are.
+	Transform estate.ChangeTransformer
+
+	// Approvals is where gated changes wait for a person. Nil keeps the in-memory store, which is
+	// what every deployment had before this field existed.
+	//
+	// # Why this needs to be a choice
+	//
+	// The in-memory store loses every pending approval on restart, and loses it SILENTLY: the
+	// person who was asked to sign finds nothing and assumes they missed it. A queue that eats
+	// work is a queue people stop using, and a gate nobody uses is ceremony.
+	//
+	// It is also the one store whose contract needs compare-and-set — two approvers may decide in
+	// the same moment and exactly one must win — so a deployment that wants durability cannot get
+	// there by wrapping this one. It has to supply its own.
+	//
+	// Passed IN like every adapter, for the same reason: this module must not learn what anyone's
+	// database is.
+	Approvals estate.Approvals
 }
 
 func Run(options Options) error {
@@ -107,7 +145,7 @@ func Run(options Options) error {
 	// Where gated changes wait for a person. In memory for now, and the warning below says so:
 	// a restart forgets every pending change, and somebody who was asked to sign one off will
 	// find it gone.
-	approvals := estate.NewMemoryApprovals()
+	approvals := approvalsFor(options)
 
 	// Adapters are chosen by the BINARY, passed in rather than imported here — which is what
 	// keeps client-go and database drivers out of this module's dependency graph. An asset with
@@ -120,15 +158,10 @@ func Run(options Options) error {
 	}
 
 	service := estate.NewService(settings.Floor, store, ports...).FloorFrom(live.Floor).PlaceOnLive(livePlacer.Load)
-	manager := estate.NewManager(door, settings.Floor, ports...).
-		FloorFrom(live.Floor).
-		GovernFields(settings.Ownership).
-		RememberManifestsIn(store).
-		// The read side, so a read can be governed before it resolves. Without this every read
-		// is refused — the fail-closed direction for a control whose absence is invisible.
-		ReadFootprintsFrom(service).
-		AwaitApprovalIn(approvals).
-		PlaceOnLive(livePlacer.Load)
+	manager := managerFor(options, managerParts{
+		door: door, settings: settings, service: service, store: store, approvals: approvals,
+		floor: live.Floor, placer: livePlacer.Load,
+	})
 
 	// SIGHUP re-reads the floor. Operationally the cases are ordinary and urgent — a quota is
 	// wrong at 3am, a shared DEV env turns out to need a gate — and making each of them cost a
@@ -315,4 +348,56 @@ func reloadFleet(path string, build func([]estate.Cluster) (*estate.Placer, []st
 	next, _ := build(refreshed)
 	livePlacer.Store(next)
 	slog.Info("fleet reloaded", "clusters", len(refreshed))
+}
+
+// managerFor builds the one manager this server governs through.
+//
+// Extracted from [Run] so it can be TESTED. Run parses flags, opens files and blocks, so nothing
+// inside it is assertable — and the failure worth catching here is the quiet kind: an option that
+// exists, is documented, and is never read. A field nobody wired looks exactly like a field nobody
+// set, and both pass review.
+func managerFor(options Options, built managerParts) *estate.Manager {
+	return estate.NewManager(built.door, built.settings.Floor, options.Ports...).
+		FloorFrom(built.floor).
+		GovernFields(built.settings.Ownership).
+		RememberManifestsIn(built.store).
+		// The read side, so a read can be governed before it resolves. Without this every read
+		// is refused — the fail-closed direction for a control whose absence is invisible.
+		ReadFootprintsFrom(built.service).
+		AwaitApprovalIn(built.approvals).
+		PlaceOnLive(built.placer).
+		TransformChangesWith(options.Transform)
+}
+
+// managerParts is what [Run] has already built by the time it builds the manager: the pieces
+// that come from flags, files and the live reloaders rather than from [Options].
+//
+// One value rather than seven parameters, because seven positional parameters of which two are
+// bare func types is a call site where swapping floor and placer still compiles. Named fields
+// make each one say what it is at the call site.
+type managerParts struct {
+	door      mantlekeep.Submitter
+	settings  config.Config
+	service   *estate.Service
+	store     estate.ManifestStore
+	approvals estate.Approvals
+	floor     func() estate.Floor
+	placer    func() *estate.Placer
+}
+
+// approvalsFor chooses where gated changes wait.
+//
+// Extracted from [Run] for the same reason [managerFor] was: the failure worth catching is an
+// option that exists, is documented, and is never read — and nothing inside Run is assertable. A
+// deployment would then believe its approvals are durable while a restart still loses them.
+func approvalsFor(options Options) estate.Approvals {
+	if options.Approvals != nil {
+		return options.Approvals
+	}
+	// Said out loud rather than left in a comment: a restart forgets every pending change, and
+	// somebody who was asked to sign one off will find it gone.
+	slog.Warn("approvals are held IN MEMORY — a restart will lose every pending approval, and " +
+		"the person who was asked to sign will find it gone. Supply serve.Options.Approvals " +
+		"with a durable store before this governs anything that matters.")
+	return estate.NewMemoryApprovals()
 }
