@@ -84,6 +84,15 @@ type Options struct {
 	// Passed IN like every adapter, for the same reason: this module must not learn what anyone's
 	// database is.
 	Approvals estate.Approvals
+
+	// Routes mounts a deployment's OWN endpoints on the listener this package serves. Nil mounts
+	// nothing, which is what every deployment had before this field existed.
+	//
+	// This package builds the mux and the server, so a deployment that writes a handler had
+	// nowhere to put it — the choices were a second listener, or re-implementing Run. Passed IN
+	// like every adapter, so this module never learns what a deployment's endpoints are. See
+	// [Mounting] for what it is handed.
+	Routes func(Mounting)
 }
 
 func Run(options Options) error {
@@ -185,7 +194,8 @@ func Run(options Options) error {
 	}
 
 	mux := http.NewServeMux()
-	api.New(manager, service, callers).Routes(mux)
+	mount(mux, api.New(manager, service, callers), mountParts{door: door, callers: callers},
+		options.Routes)
 
 	server := &http.Server{
 		Addr:              *addr,
