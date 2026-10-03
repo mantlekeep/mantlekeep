@@ -194,8 +194,8 @@ func Run(options Options) error {
 	}
 
 	mux := http.NewServeMux()
-	mount(mux, api.New(manager, service, callers), mountParts{door: door, callers: callers},
-		options.Routes)
+	mount(mux, api.New(manager, service, callers),
+		mountParts{door: door, callers: callers, footprints: service}, options.Routes)
 
 	server := &http.Server{
 		Addr:              *addr,

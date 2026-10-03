@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/api"
 )
 
@@ -59,6 +60,27 @@ func TestADeploymentsRoutesMountAfterTheEnginesWithTheSameParts(t *testing.T) {
 	if handed.Callers != callers {
 		t.Errorf("the deployment was handed resolver %v, want the engine's own %v",
 			handed.Callers, callers)
+	}
+}
+
+// The read side a deployment is handed must be the engine's own service — the one that observes
+// the clusters — not merely something that answers. A nil reader would compile, mount, and fail
+// on the first request; a different one would serve a reality the engine never looked at.
+func TestTheMountingCarriesTheEnginesFootprintReader(t *testing.T) {
+	floor := testFloor()
+	service := estate.NewService(floor, estate.NewMemoryManifests())
+
+	var handed FootprintReader
+	mount(http.NewServeMux(), &recordingEngine{}, mountParts{footprints: service},
+		func(mounting Mounting) { handed = mounting.Footprints })
+
+	if handed == nil {
+		t.Fatal("the deployment was handed no footprint reader — it can tell the estate to " +
+			"apply and cannot serve what happened")
+	}
+	if got, ok := handed.(*estate.Service); !ok || got != service {
+		t.Fatalf("the deployment was handed %T %p, want the engine's own service %p",
+			handed, handed, service)
 	}
 }
 

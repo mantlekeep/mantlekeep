@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	mantlekeep "github.com/mantlekeep/mantlekeep/mantlekeep-control"
+	estate "github.com/mantlekeep/mantlekeep/mantlekeep-estate"
 	"github.com/mantlekeep/mantlekeep/mantlekeep-estate/api"
 )
 
@@ -20,7 +21,20 @@ type Mounting struct {
 	Door mantlekeep.Submitter
 	// Callers is the same resolver this package answers "who is calling" with.
 	Callers api.CallerResolver
+	// Footprints reads REALITY for a team: what was approved, what is actually running, and where
+	// the two differ — stamped with when it looked.
+	//
+	// The engine computes this already; it simply never handed it to a deployment, so a
+	// deployment could tell the estate to apply and could not serve what happened. It is
+	// UNGOVERNED: a deployment that exposes it MUST rule on the read at the door first, as
+	// [estate.Manager.Footprint] does.
+	Footprints FootprintReader
 }
+
+// FootprintReader is the engine's read path for reality, the same port [estate.Manager] reads
+// through. An alias rather than a second interface, so there is one definition of the read side
+// and a deployment can name it without importing the engine package.
+type FootprintReader = estate.FootprintReader
 
 // routeRegistrar is the engine's own HTTP surface, narrowed to the one method [mount] calls. An
 // interface so a test can observe the ORDER of registration without standing up a manager.
@@ -31,8 +45,9 @@ type routeRegistrar interface {
 // mountParts is what [Run] has already built that a deployment's endpoints must share rather
 // than rebuild. Named fields for the same reason as [managerParts].
 type mountParts struct {
-	door    mantlekeep.Submitter
-	callers api.CallerResolver
+	door       mantlekeep.Submitter
+	callers    api.CallerResolver
+	footprints estate.FootprintReader
 }
 
 // mount registers the engine's routes and then the deployment's own, on the one mux.
@@ -46,5 +61,7 @@ func mount(mux *http.ServeMux, engine routeRegistrar, built mountParts, routes f
 	if routes == nil {
 		return
 	}
-	routes(Mounting{Mux: mux, Door: built.door, Callers: built.callers})
+	routes(Mounting{
+		Mux: mux, Door: built.door, Callers: built.callers, Footprints: built.footprints,
+	})
 }
