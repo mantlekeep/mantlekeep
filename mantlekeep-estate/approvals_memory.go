@@ -38,6 +38,14 @@ func (m *MemoryApprovals) Open(_ context.Context, approval Approval) error {
 	// Signatures copied on the way IN. The caller still holds the slice it passed; storing it
 	// directly would let the caller append to the stored record afterwards, outside this lock.
 	approval.Signatures = cloneSignatures(approval.Signatures)
+	// An id that is already here is NOT a new request. Overwriting it would be silent and total:
+	// a decided approval becomes pending again, under the id somebody already signed, with the
+	// re-submitter recorded as the requester. The next approval of that id is then refused as a
+	// SELF-approval — the two-party rule firing against the one person who did nothing wrong,
+	// while the record of who actually approved is gone.
+	if _, taken := m.by[approval.ID]; taken {
+		return fmt.Errorf("%w: %s", ErrApprovalExists, approval.ID)
+	}
 	m.by[approval.ID] = approval
 	return nil
 }
