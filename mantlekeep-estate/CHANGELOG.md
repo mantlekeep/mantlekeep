@@ -17,6 +17,30 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Added — the server takes a ChangeTransformer and a durable Approvals store
+
+`serve.Options.Transform` and `serve.Options.Approvals`. `serve.Run` builds its own manager, so a
+deployment's transform (admission, per-app gates) and its Postgres approvals store had nowhere to
+go — a check built, tested and wired into the product's own manager ran nowhere. Both are passed
+in like every adapter. Nil is the previous behaviour exactly; a nil `Approvals` now WARNs at boot
+that a restart loses every pending approval.
+
+### Added — an admission port: may this app exist in this environment
+
+`Admissions` answers one question independently of who is asking — an app not onboarded to an
+environment cannot be deployed there by anyone. `AdmitApp` asks the door first, so onboarding is a
+chain record. Environments are opaque strings, never an enum; nothing folds case. A conformance
+suite (`admissiontest`) ships with the port.
+
+### Added — a change may require a SET of distinct signatures
+
+`Signature{By, At, Reference}`, `Approval.RequiredSignatures` and `Approval.Signatures`, with
+`Floor.Signatures` keyed by gate and raise-only; the default is 1 everywhere, so an upgrade changes
+nothing until somebody writes a number. A set, never a sequence. The door sees only the completing
+signature, so the estate enforces the floors itself: the requester cannot sign, nobody signs twice,
+and an AI never fills a slot. `ApprovedBy` keeps its meaning as the completing signature, so stored
+records still read as signed. Conformance cases ship in `approvalstest`.
+
 ### Added — a floor may PREFER clusters for a named app, in order
 
 `AppRule.Prefer` is the platform's ordered preference — plan A, then plan B — applied by the new
