@@ -17,6 +17,38 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+## [v0.4.0] — 2026-10-04
+
+### Added — the CLI authenticates with a bearer token; a refusal has its own exit code
+
+`mantlekeep-estate-cli submit` sends `Authorization: Bearer` from `MANTLEKEEP_TOKEN`, or fetches a token
+with OAuth client credentials (`MANTLEKEEP_OIDC_TOKEN_URL`, `_CLIENT_ID`, `_CLIENT_SECRET`, environment
+only). `-user` remains for a loopback development estate. Exit codes: 0 applied, 1 error, 2 waiting for
+approval, 3 refused by the door, 4 not every change applied — a 200 that carries a failed or refused
+change (for example an app not admitted) never exits 0.
+
+### Added — serve: a deployment mounts its own routes, reads footprints, and may embed the door
+
+`serve.Options.Routes` mounts a deployment's endpoints after the engine's, with the same mux, door and
+caller resolver; `Mounting.Footprints` hands over the engine's read path; `serve.Options.Door` supplies an
+in-process door instead of dialling one (the banner then says `door=in-process`).
+
+### Added — doorclient presents the service account in the door's caller header
+
+`doorclient.NewWithOptions` and `WithCallerHeader`: a door that identifies callers by header now sees
+the estate's service account. A credential header name is refused at construction. `New` is unchanged.
+
+### Added — place by any labels a deployment organises by
+
+A claim may carry `Requires` labels instead of only an environment. An absent label is not a wildcard;
+`name`/`cluster` are not label keys, so a team cannot choose its own cluster.
+
+### Fixed — approval ids no longer collide, and Open never overwrites
+
+An approval id gains a random suffix, and `Approvals.Open` refuses an id it already holds
+(`ErrApprovalExists`) — a conformance rule for every store. On a coarse clock a decided approval could
+be reopened as pending, after which the two-party rule fired against the person who did nothing wrong.
+
 ### Changed — requires mantlekeep-control v0.5.0
 
 The sibling pin moves from v0.4.1 to the newest released control. Nothing here uses the new
