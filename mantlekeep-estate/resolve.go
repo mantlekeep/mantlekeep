@@ -17,9 +17,12 @@ type Desired struct {
 // DesiredItem is one resource, floored and gated. Flat on purpose: a reconciler diffs a list,
 // and a nested tree would need a walker that has to agree with the differ.
 type DesiredItem struct {
-	Asset   string `json:"asset"` // kafka | postgres | harbor | app
-	Kind    string `json:"kind"`  // boundary | topic | schema | project | robot | deployment
-	Name    string `json:"name"`  // fully qualified, already prefixed with the namespace
+	Asset string `json:"asset"` // kafka | postgres | harbor | app
+	Kind  string `json:"kind"`  // boundary | topic | schema | project | robot | deployment
+	Name  string `json:"name"`  // fully qualified, already prefixed with the namespace
+	// Team is the manifest's team. The namespace may differ (see [NamespacePattern]), so a
+	// consumer that labels by team reads it here.
+	Team    string `json:"team,omitempty"`
 	Tier    Tier   `json:"tier"`
 	Gate    Gate   `json:"gate"`
 	Cluster string `json:"cluster,omitempty"`
@@ -205,16 +208,20 @@ func resolveApps(m Manifest, floor Floor, placer *Placer,
 		if err != nil {
 			return nil, err
 		}
+		namespace, err := placer.namespaceOf(decision.Cluster).Render(m.Owns, decision.Env)
+		if err != nil {
+			return nil, fmt.Errorf("resolve: app %q on %q: %w", app.Name, decision.Cluster, err)
+		}
 		deployment := m.Owns + "-" + app.Name
 		changes = append(changes, DesiredItem{
-			Asset: "app", Kind: "deployment", Name: deployment, Tier: tier,
+			Asset: "app", Kind: "deployment", Name: deployment, Tier: tier, Team: m.Team,
 			// The tier's gate, RAISED by any floor rule naming this app. Keyed team-qualified,
 			// because app names repeat across an organisation and a bare name would gate every
 			// team's.
 			Gate:    floor.GateForApp(tier, qualified),
 			Cluster: decision.Cluster, Limits: limits, Image: app.Image,
 			Runtime: string(app.Runtime),
-			Slot:    Slot{Cluster: decision.Cluster, Namespace: m.Owns, Name: deployment},
+			Slot:    Slot{Cluster: decision.Cluster, Namespace: namespace, Name: deployment},
 			// Where an app runs is now a PLATFORM choice, so it travels with the change and
 			// reaches the chain. Without it nobody can answer "why is my app on that cluster?"
 			Placement: &decision,

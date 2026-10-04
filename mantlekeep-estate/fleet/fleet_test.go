@@ -164,3 +164,17 @@ func TestOvercommittedReadsAsFullNotNegative(t *testing.T) {
 		t.Fatalf("want 0 free, got %+v", reports)
 	}
 }
+
+// A namespace pattern loads onto its cluster; an unknown placeholder is refused at load.
+func TestANamespacePatternLoadsAndIsValidated(t *testing.T) {
+	clusters, err := fleet.Parse([]byte(`{"clusters":[{"name":"alpha-sit","env":"sit","residency":"region-a","namespace":"{env}-{owns}"}]}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if clusters[0].Namespace != "{env}-{owns}" {
+		t.Errorf("namespace %q, want {env}-{owns}", clusters[0].Namespace)
+	}
+	if _, err := fleet.Parse([]byte(`{"clusters":[{"name":"alpha-sit","env":"sit","residency":"region-a","namespace":"{team}"}]}`)); err == nil {
+		t.Error("an unknown placeholder loaded; want a refusal")
+	}
+}

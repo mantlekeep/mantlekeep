@@ -34,6 +34,8 @@ type Cluster struct {
 	// keeps working and a claim may use either form. Residency is deliberately NOT a label — see
 	// [Placement.Requires].
 	Labels map[string]string `json:"labels,omitempty"`
+	// Namespace is where an app lands on this cluster; empty means the manifest's owns.
+	Namespace NamespacePattern `json:"namespace,omitempty"`
 	// Reachable is false when the platform could not read this cluster. An unreachable cluster
 	// is UNKNOWN, never empty: placing into one we cannot see would be placing blind.
 	Reachable bool `json:"reachable"`
@@ -86,6 +88,16 @@ type Placer struct {
 // NewPlacer builds a placer over the registry.
 func NewPlacer(clusters []Cluster) *Placer {
 	return &Placer{clusters: clusters, capacity: map[string]float64{}, minFree: 0.10}
+}
+
+// namespaceOf returns the namespace pattern of the named cluster; empty when it has none.
+func (p *Placer) namespaceOf(cluster string) NamespacePattern {
+	for _, candidate := range p.clusters {
+		if candidate.Name == cluster {
+			return candidate.Namespace
+		}
+	}
+	return ""
 }
 
 // WithCapacity supplies reported free capacity per cluster.

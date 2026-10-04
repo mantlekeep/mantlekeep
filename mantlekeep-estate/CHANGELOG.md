@@ -17,6 +17,17 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+### Added — a fleet entry may name the namespace its apps land in
+
+A cluster in the fleet registry takes an optional `namespace` pattern: `{owns}` (the default, unchanged
+behaviour), `{env}-{owns}`, or a literal such as `sit-workloads` that every team shares. So one physical
+cluster can host several environments, each as its own fleet entry with its own namespaces. An unknown
+placeholder is refused at load; a pattern that renders an invalid namespace refuses the app. Treat the
+pattern as fixed once anything is deployed — changing it moves every slot.
+
+`DesiredItem` carries `team`, because the namespace is no longer always the team: a consumer that labels
+or selects by team reads it there.
+
 ## [v0.4.0] — 2026-10-04
 
 ### Added — the CLI authenticates with a bearer token; a refusal has its own exit code
