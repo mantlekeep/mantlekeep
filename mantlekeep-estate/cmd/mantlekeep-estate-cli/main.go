@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -40,7 +41,15 @@ const usage = `mantlekeep-estate-cli — check an estate manifest before a servi
 Flags:
   -estate  URL of the estate service (submit only)
   -team    team the manifest belongs to (submit only; defaults to the manifest's own)
-  -user    caller identity, sent as the gateway would set it (submit only)
+  -user    caller identity for a LOOPBACK development estate only (submit only)
+
+Identity for a real estate, from the environment (a pipeline's credential store):
+  MANTLEKEEP_TOKEN                    an access token, or
+  MANTLEKEEP_OIDC_TOKEN_URL           fetch one with client credentials:
+  MANTLEKEEP_OIDC_CLIENT_ID / _SECRET
+
+Exit codes: 0 applied · 1 error · 2 waiting for approval · 3 refused by the door ·
+            4 not every change applied (e.g. the app is not admitted)
 
 A file of "-" reads standard input, so this works in a pipe.
 `
@@ -191,9 +200,13 @@ func submit(path, estateURL, team, user string) error {
 	if estateURL == "" {
 		return fmt.Errorf("submit needs -estate <url>")
 	}
-	if user == "" {
-		return fmt.Errorf("submit needs -user <id>: the estate records WHO asked, and this " +
-			"CLI will not send a change with nobody's name on it")
+	token, err := bearerToken(context.Background())
+	if err != nil {
+		return err
+	}
+	if token == "" && user == "" {
+		return fmt.Errorf("submit needs an identity: %s, or %s with a client id and secret, "+
+			"or -user <id> for a loopback development estate", tokenEnv, tokenURLEnv)
 	}
 	manifest, asJSON, err := readManifest(path)
 	if err != nil {
@@ -219,7 +232,11 @@ func submit(path, estateURL, team, user string) error {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set(estateWebUserHeader, user)
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	} else {
+		request.Header.Set(estateWebUserHeader, user)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	// #nosec G704 -- same operator-supplied address, already checked by estateEndpoint.
@@ -236,17 +253,45 @@ func submit(path, estateURL, team, user string) error {
 	}
 	fmt.Println(string(body))
 
-	// The three outcomes are DIFFERENT and the exit code says which. A pending approval is
-	// not a failure — scripting this must be able to tell "waiting for a person" apart from
-	// "refused", or a pipeline will treat an approval as an outage.
-	switch {
-	case response.StatusCode == http.StatusConflict:
-		fmt.Fprintln(os.Stderr, "pending: a person must approve this before it applies")
-		os.Exit(2)
-	case response.StatusCode >= 400:
-		return fmt.Errorf("the estate refused this change (HTTP %d)", response.StatusCode)
+	code, err := exitFor(response.StatusCode, body)
+	if err != nil {
+		return err
+	}
+	if code != 0 {
+		fmt.Fprintln(os.Stderr, exitMessages[code])
+		os.Exit(code)
 	}
 	return nil
+}
+
+// exitFor turns the estate's answer into the exit a pipeline reads: 0 applied, 2 waiting for a
+// person, 3 refused by the door, 4 not every change applied. An error is exit 1.
+func exitFor(status int, body []byte) (int, error) {
+	switch {
+	case status == http.StatusConflict:
+		return 2, nil
+	case status == http.StatusForbidden:
+		return 3, nil
+	case status >= 400:
+		return 1, fmt.Errorf("the estate refused this change (HTTP %d)", status)
+	}
+	// A 200 can still carry changes that did not apply — an app not admitted to the environment
+	// comes back under "failed". A pipeline must never read that as success.
+	var applied struct {
+		Refused []json.RawMessage `json:"refused"`
+		Failed  []json.RawMessage `json:"failed"`
+	}
+	if json.Unmarshal(body, &applied) == nil && len(applied.Refused)+len(applied.Failed) > 0 {
+		return 4, nil
+	}
+	return 0, nil
+}
+
+// exitMessages say why, on stderr, beside the code.
+var exitMessages = map[int]string{
+	2: "pending: a person must approve this before it applies",
+	3: "refused: the door does not permit this change",
+	4: "not applied: a change was refused or failed (for example, not admitted) — see the response above",
 }
 
 // estateWebUserHeader mirrors the service's caller header. Named here rather than imported
