@@ -30,6 +30,7 @@ type cluster struct {
 	Env       string `json:"env"`
 	Purpose   string `json:"purpose"`
 	Residency string `json:"residency"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // Load reads the cluster registry.
@@ -93,6 +94,11 @@ func Parse(content []byte) ([]estate.Cluster, error) {
 					"unknown must not be placed into", entry.Name)
 		}
 
+		pattern := estate.NamespacePattern(entry.Namespace)
+		if err := pattern.Validate(); err != nil {
+			return nil, fmt.Errorf("fleet: cluster %q: %w", entry.Name, err)
+		}
+
 		clusters = append(clusters, estate.Cluster{
 			Name:      entry.Name,
 			Provider:  entry.Provider,
@@ -100,6 +106,7 @@ func Parse(content []byte) ([]estate.Cluster, error) {
 			Env:       entry.Env,
 			Purpose:   entry.Purpose,
 			Residency: estate.Residency(entry.Residency),
+			Namespace: pattern,
 			// Reachability is MEASURED, never declared. A registry claiming a cluster is up
 			// would be a file asserting a fact about the world; the observer decides this.
 			Reachable: false,
