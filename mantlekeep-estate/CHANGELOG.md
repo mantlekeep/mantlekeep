@@ -17,6 +17,8 @@ bare version numbers — one version described everything then.
 
 ## [Unreleased]
 
+## [v0.5.0] — 2026-10-04
+
 ### Added — a fleet entry may name the namespace its apps land in
 
 A cluster in the fleet registry takes an optional `namespace` pattern: `{owns}` (the default, unchanged
