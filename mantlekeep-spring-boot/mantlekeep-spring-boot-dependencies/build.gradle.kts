@@ -12,7 +12,7 @@ javaPlatform {
 }
 
 dependencies {
-    api(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
+    api(platform("org.springframework.boot:spring-boot-dependencies:4.1.2"))
     constraints {
         // MantleKeep module versions are pinned here as the family grows.
     }
